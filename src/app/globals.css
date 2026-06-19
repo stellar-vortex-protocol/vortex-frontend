@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  :root {
+    --font-geist-sans: "Inter", system-ui, sans-serif;
+    --font-geist-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  html { -webkit-font-smoothing: antialiased; }
+
+  body {
+    background: #080C14;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% -20%, rgba(76,235,168,0.06) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(167,139,250,0.04) 0%, transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  ::selection { background: rgba(76,235,168,0.25); color: inherit; }
+  :focus-visible { outline: 1.5px solid rgba(76,235,168,0.5); outline-offset: 2px; }
+}
+
+@layer components {
+  .card {
+    @apply bg-vx-card border border-vx-border rounded-xl overflow-hidden;
+    background-image: linear-gradient(160deg, rgba(76,235,168,0.025) 0%, transparent 50%);
+  }
+
+  .card-sm {
+    @apply bg-vx-surface/60 border border-vx-border rounded-lg;
+  }
+
+  .eyebrow {
+    @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-vx-muted;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .num { font-family: var(--font-geist-mono); font-variant-numeric: tabular-nums; }
+
+  .input-swap {
+    @apply w-full bg-transparent text-3xl font-light text-vx-text
+           placeholder-vx-dim/60 focus:outline-none caret-vx-sage;
+  }
+
+  .token-btn {
+    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg
+           border border-vx-border hover:border-vx-border hover:bg-vx-card/80
+           transition-all duration-150 cursor-pointer select-none;
+  }
+
+  .chain-badge {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono
+           bg-vx-lav-bg text-vx-lav border border-vx-lav/20;
+  }
+
+  .stellar-badge {
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono
+           bg-vx-sage-bg text-vx-sage border border-vx-sage/20;
+  }
+
+  .state-dot {
+    @apply w-1.5 h-1.5 rounded-full;
+  }
+}
+
+/* Swap button gradient */
+.btn-swap {
+  background: linear-gradient(135deg, #4CEBA8 0%, #38BDF8 100%);
+  color: #080C14;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  padding: 0.875rem;
+  border-radius: 0.75rem;
+  width: 100%;
+  transition: filter 0.15s, transform 0.1s;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-swap:hover { filter: brightness(1.08); }
+.btn-swap:active { transform: scale(0.99); }
+.btn-swap:disabled {
+  background: linear-gradient(135deg, rgba(76,235,168,0.25) 0%, rgba(56,189,248,0.25) 100%);
+  color: rgba(8,12,20,0.5);
+  cursor: not-allowed;
+}
+
+/* Flow animation for intent pipeline */
+.intent-flow-line {
+  stroke-dasharray: 6 4;
+  stroke-dashoffset: 10;
+  animation: flow 1.2s linear infinite;
+}
+
+@keyframes flow {
+  to { stroke-dashoffset: 0; }
+}
