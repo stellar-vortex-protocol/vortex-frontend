@@ -6,7 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 Next.js 14 app providing the user-facing swap interface and the solver
-dashboard. Part of the multi-repo Vortex stack — see also
+dashboard. Built with TypeScript and Tailwind CSS. Part of the multi-repo
+Vortex stack — see also
 [`vortex-contract`](https://github.com/vortex-protocol/vortex-contract) and
 [`vortex-backend`](https://github.com/vortex-protocol/vortex-backend).
 
