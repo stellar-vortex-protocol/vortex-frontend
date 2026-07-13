@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { Nav } from "@/components/Nav";
+import { Footer } from "@/components/Footer";
 
 // ─── Chain / Token Data ───────────────────────────────────────────────────────
 
@@ -394,35 +396,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* ── Nav ── */}
-      <nav className="sticky top-0 z-50 border-b border-vx-border bg-vx-ink/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <svg className="w-6 h-6 text-vx-sage" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="font-semibold text-sm tracking-tight text-vx-text">Vortex</span>
-            </div>
-            <div className="hidden md:flex items-center gap-5 text-sm text-vx-muted">
-              <Link href="/explore" className="hover:text-vx-text transition-colors">Explore</Link>
-              <Link href="/solve" className="hover:text-vx-text transition-colors">Become a Solver</Link>
-              <a href="https://github.com/vortex-protocol" className="hover:text-vx-text transition-colors">
-                Docs
-              </a>
-            </div>
-          </div>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-vx-border
-                             text-sm text-vx-muted hover:text-vx-text hover:border-vx-sage/30
-                             transition-all duration-150">
-            <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Connect Freighter
-          </button>
-        </div>
-      </nav>
+      <Nav variant="home" />
 
       {/* ── Main layout ── */}
       <div className="max-w-6xl mx-auto px-5 py-14">
@@ -498,15 +472,7 @@ export default function HomePage() {
       </div>
 
       {/* ── Footer ── */}
-      <footer className="mt-20 border-t border-vx-border px-5 py-8">
-        <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-vx-muted">
-          <span>© 2025 Vortex Protocol · MIT License</span>
-          <div className="flex gap-5">
-            <a href="https://github.com/vortex-protocol" className="hover:text-vx-text transition-colors">GitHub</a>
-            <a href="https://discord.gg/vortex" className="hover:text-vx-text transition-colors">Discord</a>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
