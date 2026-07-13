@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Nav } from "@/components/Nav";
 
 const MOCK_SOLVERS = [
   {
@@ -54,25 +54,7 @@ export default function SolvePage() {
   return (
     <div className="min-h-screen">
       {/* Nav */}
-      <nav className="sticky top-0 z-50 border-b border-vx-border bg-vx-ink/80 backdrop-blur-md">
-        <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-vx-sage" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="font-semibold text-sm text-vx-text">Vortex</span>
-            </Link>
-            <span className="text-vx-dim">/</span>
-            <span className="text-sm text-vx-muted">Solver Portal</span>
-          </div>
-          <button className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
-                             hover:border-vx-sage/30 hover:text-vx-text transition-all">
-            Connect Freighter
-          </button>
-        </div>
-      </nav>
+      <Nav variant="breadcrumb" label="Solver Portal" />
 
       <div className="max-w-5xl mx-auto px-5 py-12">
         <div className="mb-10">
