@@ -18,12 +18,12 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
       <button
         type="button"
         onClick={disconnect}
-        title="Click to disconnect"
-        className={`${baseClass} border-vx-sage/40 text-vx-text hover:border-vx-sage/70 hover:text-red-300 group`}
+        aria-label={`Disconnect wallet ${truncateAddress(address)}`}
+        className={`${baseClass} border-vx-sage/40 text-vx-text hover:border-vx-sage/70 hover:text-red-300 focus-visible:text-red-300 group`}
       >
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-vx-sage mr-1.5 align-middle" />
-        <span className="group-hover:hidden">{truncateAddress(address)}</span>
-        <span className="hidden group-hover:inline">Disconnect</span>
+        <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-vx-sage mr-1.5 align-middle" />
+        <span aria-hidden="true" className="group-hover:hidden group-focus-visible:hidden">{truncateAddress(address)}</span>
+        <span aria-hidden="true" className="hidden group-hover:inline group-focus-visible:inline">Disconnect</span>
       </button>
     );
   }
@@ -37,7 +37,7 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
       className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
     >
       {!compact && (
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+        <svg aria-hidden="true" className="w-4 h-4" viewBox="0 0 16 16" fill="none">
           <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
           <path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>

@@ -62,6 +62,7 @@ export function SwapCard() {
             {CHAINS.map(c => (
               <button
                 key={c.id}
+                type="button"
                 onClick={() => {
                   setSrcChain(c.id);
                   setSrcToken(SRC_TOKENS[c.id][0]);
@@ -74,6 +75,7 @@ export function SwapCard() {
                   }`}
               >
                 <span
+                  aria-hidden="true"
                   className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: c.color }}
                 />
@@ -92,34 +94,46 @@ export function SwapCard() {
           <div className="flex items-center justify-between">
             <span className="eyebrow">From</span>
             <button
+              type="button"
               onClick={() => setShowChainPicker(true)}
+              aria-haspopup="true"
+              aria-expanded={showChainPicker}
               className="chain-badge cursor-pointer hover:bg-vx-lav/15 transition-colors"
             >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: chain.color }} />
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: chain.color }} />
               {chain.name}
-              <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
+              <svg aria-hidden="true" className="w-3 h-3" viewBox="0 0 12 12" fill="none">
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
             </button>
           </div>
 
           <div className="flex items-center gap-3">
+            <label htmlFor="src-amount" className="sr-only">Amount to swap</label>
             <input
+              id="src-amount"
               type="number"
               value={srcAmount}
               onChange={e => setSrcAmount(e.target.value)}
               placeholder="0"
               className="input-swap flex-1"
             />
-            <div className="token-btn" onClick={() => setShowTokenPicker(!showTokenPicker)}>
-              <div className="w-6 h-6 rounded-full bg-vx-lav/20 flex items-center justify-center text-xs font-bold text-vx-lav">
+            <button
+              type="button"
+              className="token-btn"
+              onClick={() => setShowTokenPicker(!showTokenPicker)}
+              aria-haspopup="true"
+              aria-expanded={showTokenPicker}
+              aria-label={`Select source token, currently ${srcToken.symbol}`}
+            >
+              <span aria-hidden="true" className="w-6 h-6 rounded-full bg-vx-lav/20 flex items-center justify-center text-xs font-bold text-vx-lav">
                 {srcToken.symbol[0]}
-              </div>
+              </span>
               <span className="font-semibold text-sm text-vx-text">{srcToken.symbol}</span>
-              <svg className="w-3.5 h-3.5 text-vx-muted" viewBox="0 0 14 14" fill="none">
+              <svg aria-hidden="true" className="w-3.5 h-3.5 text-vx-muted" viewBox="0 0 14 14" fill="none">
                 <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-            </div>
+            </button>
           </div>
 
           {showTokenPicker && (
@@ -127,6 +141,7 @@ export function SwapCard() {
               {SRC_TOKENS[srcChain].map(t => (
                 <button
                   key={t.symbol}
+                  type="button"
                   onClick={() => { setSrcToken(t); setShowTokenPicker(false); }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
                     ${t.symbol === srcToken.symbol ? "bg-vx-lav-bg text-vx-lav" : "hover:bg-vx-surface text-vx-muted hover:text-vx-text"}`}
@@ -147,7 +162,7 @@ export function SwapCard() {
 
         {/* Swap direction arrow */}
         <div className="flex justify-center">
-          <div className="w-8 h-8 rounded-full bg-vx-surface border border-vx-border flex items-center justify-center z-10">
+          <div aria-hidden="true" className="w-8 h-8 rounded-full bg-vx-surface border border-vx-border flex items-center justify-center z-10">
             <svg className="w-4 h-4 text-vx-sage" viewBox="0 0 16 16" fill="none">
               <path d="M8 3v10M5 10l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -159,7 +174,7 @@ export function SwapCard() {
           <div className="flex items-center justify-between">
             <span className="eyebrow">To</span>
             <span className="stellar-badge">
-              <svg className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="currentColor">
+              <svg aria-hidden="true" className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="currentColor">
                 <circle cx="5" cy="5" r="2" />
               </svg>
               Stellar
@@ -170,7 +185,8 @@ export function SwapCard() {
             <div className="flex-1">
               {quoting ? (
                 <div className="h-9 flex items-center">
-                  <div className="w-24 h-6 bg-vx-surface rounded animate-pulse" />
+                  <div aria-hidden="true" className="w-24 h-6 bg-vx-surface rounded animate-pulse" />
+                  <span className="sr-only">Loading quote…</span>
                 </div>
               ) : (
                 <div className="text-3xl font-light text-vx-text num">
@@ -182,7 +198,9 @@ export function SwapCard() {
               {DST_TOKENS.map(t => (
                 <button
                   key={t.symbol}
+                  type="button"
                   onClick={() => setDstToken(t)}
+                  aria-pressed={dstToken.symbol === t.symbol}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all
                     ${dstToken.symbol === t.symbol
                       ? "bg-vx-sage-bg text-vx-sage border-vx-sage/30"
@@ -216,25 +234,27 @@ export function SwapCard() {
 
         {/* Quote error — falls back to an estimated rate above */}
         {quoteError && hasAmount && !quoting && (
-          <p className="text-center text-[11px] text-amber-400/90 px-1">
+          <p role="status" className="text-center text-[11px] text-amber-400/90 px-1">
             Live quote unavailable — showing an estimated rate.
           </p>
         )}
 
         {/* Submission error */}
         {submission.status === "error" && (
-          <p className="text-center text-[11px] text-red-400 px-1">{submission.error}</p>
+          <p role="alert" className="text-center text-[11px] text-red-400 px-1">{submission.error}</p>
         )}
 
         {/* Submit */}
         <button
+          type="button"
           className="btn-swap"
           disabled={!canSwap && submission.status !== "success"}
+          aria-busy={isSubmitting}
           onClick={handleSubmit}
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
-              <svg className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
               </svg>
               {SUBMISSION_LABEL[submission.status]}
@@ -243,7 +263,7 @@ export function SwapCard() {
             "Swap submitted ✓ — start a new swap"
           ) : quoting ? (
             <span className="flex items-center justify-center gap-2">
-              <svg className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
               </svg>
               Finding best route…
