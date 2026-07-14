@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { isConnectedMock, requestAccessMock, getNetworkMock } = vi.hoisted(() => ({
+const { isConnectedMock, requestAccessMock, getNetworkMock, addToastMock } = vi.hoisted(() => ({
   isConnectedMock: vi.fn(),
   requestAccessMock: vi.fn(),
   getNetworkMock: vi.fn(),
+  addToastMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -14,6 +15,10 @@ vi.mock("@stellar/freighter-api", () => ({
     requestAccess: requestAccessMock,
     getNetwork: getNetworkMock,
   },
+}));
+
+vi.mock("@/store/toast", () => ({
+  useToastStore: { getState: () => ({ addToast: addToastMock }) },
 }));
 
 import { useWalletStore } from "@/store/wallet";
@@ -64,5 +69,20 @@ describe("ConnectWalletButton", () => {
     await user.click(screen.getByText("GABC...3456"));
 
     expect(useWalletStore.getState().isConnected).toBe(false);
+  });
+
+  it("shows a toast when a direct connect attempt fails", async () => {
+    isConnectedMock.mockResolvedValue(false);
+
+    const user = userEvent.setup();
+    render(<ConnectWalletButton />);
+    await user.click(screen.getByText("Connect Freighter"));
+
+    await waitFor(() => {
+      expect(addToastMock).toHaveBeenCalledWith(
+        "Freighter extension is not installed or enabled.",
+        "error"
+      );
+    });
   });
 });

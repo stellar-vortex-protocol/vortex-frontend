@@ -36,6 +36,12 @@ describe("IntentDetailPage", () => {
     expect(screen.getByText(/Couldn't find that intent/)).toBeInTheDocument();
   });
 
+  it("shows a not-found message when the request succeeds with no intent data", () => {
+    useIntentMock.mockReturnValue({ intent: undefined, isLoading: false, error: undefined });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+    expect(screen.getByText("No details found for this intent.")).toBeInTheDocument();
+  });
+
   it("renders the intent's details", () => {
     useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);

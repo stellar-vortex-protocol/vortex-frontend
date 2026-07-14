@@ -1,6 +1,7 @@
 "use client";
 
 import { useWalletStore } from "@/store/wallet";
+import { useToastStore } from "@/store/toast";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -8,6 +9,14 @@ function truncateAddress(address: string) {
 
 export function ConnectWalletButton({ compact = false }: { compact?: boolean }) {
   const { address, isConnected, isConnecting, error, connect, disconnect } = useWalletStore();
+
+  const handleConnect = async () => {
+    await connect();
+    const latestError = useWalletStore.getState().error;
+    if (latestError) {
+      useToastStore.getState().addToast(latestError, "error");
+    }
+  };
 
   const baseClass = compact
     ? "px-3 py-1.5 text-xs rounded-lg border transition-all"
@@ -31,7 +40,7 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
   return (
     <button
       type="button"
-      onClick={connect}
+      onClick={handleConnect}
       disabled={isConnecting}
       title={error ?? undefined}
       className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}

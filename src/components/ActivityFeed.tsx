@@ -9,7 +9,7 @@ const CHAIN_COLOR: Record<string, string> = {
 };
 
 export function ActivityFeed() {
-  const { items, isLoading, isLive } = useIntentFeed();
+  const { items, isLoading, error, isLive } = useIntentFeed();
 
   if (isLoading && items.length === 0) {
     return (
@@ -27,6 +27,15 @@ export function ActivityFeed() {
         <span aria-hidden="true" className={`state-dot ${isLive ? "bg-vx-sage" : "bg-vx-dim"}`} />
         {isLive ? "Live" : "Polling"}
       </div>
+      {error && items.length === 0 ? (
+        <div className="p-4 text-center text-xs text-vx-muted bg-vx-surface/40 rounded-lg border border-vx-line">
+          Live feed unavailable right now.
+        </div>
+      ) : items.length === 0 ? (
+        <div className="p-4 text-center text-xs text-vx-muted bg-vx-surface/40 rounded-lg border border-vx-line">
+          No fills yet.
+        </div>
+      ) : null}
       {items.slice(0, 6).map((item) => {
         const color = CHAIN_COLOR[item.srcChain] ?? "#8B8B93";
         return (
