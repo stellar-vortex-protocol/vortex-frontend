@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { isConnectedMock, requestAccessMock, getNetworkMock } = vi.hoisted(() => ({
+const { isConnectedMock, requestAccessMock, getNetworkMock, isAllowedMock, getPublicKeyMock } = vi.hoisted(() => ({
   isConnectedMock: vi.fn(),
   requestAccessMock: vi.fn(),
   getNetworkMock: vi.fn(),
+  isAllowedMock: vi.fn(),
+  getPublicKeyMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -11,6 +13,8 @@ vi.mock("@stellar/freighter-api", () => ({
     isConnected: isConnectedMock,
     requestAccess: requestAccessMock,
     getNetwork: getNetworkMock,
+    isAllowed: isAllowedMock,
+    getPublicKey: getPublicKeyMock,
   },
 }));
 
@@ -86,5 +90,39 @@ describe("useWalletStore", () => {
     expect(state.isConnected).toBe(false);
     expect(state.address).toBeNull();
     expect(state.network).toBeNull();
+  });
+
+  it("hydrate() is a no-op when there is no persisted session", async () => {
+    await useWalletStore.getState().hydrate();
+
+    expect(isConnectedMock).not.toHaveBeenCalled();
+    expect(useWalletStore.getState().isConnected).toBe(false);
+  });
+
+  it("hydrate() silently restores a session the extension still allows", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "TESTNET" });
+    isConnectedMock.mockResolvedValue(true);
+    isAllowedMock.mockResolvedValue(true);
+    getPublicKeyMock.mockResolvedValue("GOLD123");
+    getNetworkMock.mockResolvedValue("TESTNET");
+
+    await useWalletStore.getState().hydrate();
+
+    expect(requestAccessMock).not.toHaveBeenCalled();
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(true);
+    expect(state.address).toBe("GOLD123");
+  });
+
+  it("hydrate() clears a stale session the extension no longer allows", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "TESTNET" });
+    isConnectedMock.mockResolvedValue(true);
+    isAllowedMock.mockResolvedValue(false);
+
+    await useWalletStore.getState().hydrate();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.address).toBeNull();
   });
 });
