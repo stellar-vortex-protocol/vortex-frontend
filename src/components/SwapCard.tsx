@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { useQuote } from "@/hooks/useQuote";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { CHAINS, SRC_TOKENS, DST_TOKENS } from "@/lib/marketData";
+
+const SUBMISSION_LABEL: Record<string, string> = {
+  connecting: "Connecting wallet…",
+  building: "Preparing swap…",
+  "awaiting-signature": "Confirm in Freighter…",
+  submitting: "Submitting…",
+};
 
 export function SwapCard() {
   const [srcChain, setSrcChain] = useState("ethereum");
@@ -30,7 +38,19 @@ export function SwapCard() {
       : 0;
 
   const srcValueUSD = srcAmount ? parseFloat(srcAmount) * srcToken.priceUSD : 0;
-  const canSwap = srcAmount && parseFloat(srcAmount) > 0 && !quoting;
+
+  const submission = useSwapSubmission();
+  const isSubmitting = submission.status in SUBMISSION_LABEL;
+  const canSwap = Boolean(srcAmount) && parseFloat(srcAmount) > 0 && !quoting && !isSubmitting;
+
+  const handleSubmit = () => {
+    if (submission.status === "success") {
+      submission.reset();
+      setSrcAmount("");
+      return;
+    }
+    submission.submit({ srcChain, srcToken: srcToken.symbol, srcAmount, dstToken: dstToken.symbol });
+  };
 
   return (
     <div className="relative">
@@ -201,9 +221,27 @@ export function SwapCard() {
           </p>
         )}
 
+        {/* Submission error */}
+        {submission.status === "error" && (
+          <p className="text-center text-[11px] text-red-400 px-1">{submission.error}</p>
+        )}
+
         {/* Submit */}
-        <button className="btn-swap" disabled={!canSwap}>
-          {quoting ? (
+        <button
+          className="btn-swap"
+          disabled={!canSwap && submission.status !== "success"}
+          onClick={handleSubmit}
+        >
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              </svg>
+              {SUBMISSION_LABEL[submission.status]}
+            </span>
+          ) : submission.status === "success" ? (
+            "Swap submitted ✓ — start a new swap"
+          ) : quoting ? (
             <span className="flex items-center justify-center gap-2">
               <svg className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
@@ -211,7 +249,9 @@ export function SwapCard() {
               Finding best route…
             </span>
           ) : canSwap ? (
-            `Swap ${srcAmount} ${srcToken.symbol} → ${dstToken.symbol}`
+            submission.status === "error"
+              ? `Retry: Swap ${srcAmount} ${srcToken.symbol} → ${dstToken.symbol}`
+              : `Swap ${srcAmount} ${srcToken.symbol} → ${dstToken.symbol}`
           ) : (
             "Enter an amount"
           )}
