@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-const { signTransactionMock, registerSolverMock, submitSolverRegistrationMock, mutateMock } = vi.hoisted(() => ({
+const { signTransactionMock, registerSolverMock, submitSolverRegistrationMock, mutateMock, addToastMock } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   registerSolverMock: vi.fn(),
   submitSolverRegistrationMock: vi.fn(),
   mutateMock: vi.fn(),
+  addToastMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -18,6 +19,9 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("swr", () => ({ mutate: mutateMock }));
+vi.mock("@/store/toast", () => ({
+  useToastStore: { getState: () => ({ addToast: addToastMock }) },
+}));
 
 import { useWalletStore } from "@/store/wallet";
 import { useSolverRegistration } from "./useSolverRegistration";
@@ -57,6 +61,7 @@ describe("useSolverRegistration", () => {
     expect(submitSolverRegistrationMock).toHaveBeenCalledWith("reg-1", "signed-xdr");
     expect(mutateMock).toHaveBeenCalledWith("/solvers");
     expect(result.current.status).toBe("success");
+    expect(addToastMock).toHaveBeenCalledWith("Registered as a solver.", "success");
   });
 
   it("errors when wallet connection fails", async () => {
@@ -91,6 +96,7 @@ describe("useSolverRegistration", () => {
     expect(result.current.status).toBe("error");
     expect(result.current.error).toBe("User declined access");
     expect(submitSolverRegistrationMock).not.toHaveBeenCalled();
+    expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
   });
 
   it("resets back to idle", async () => {
