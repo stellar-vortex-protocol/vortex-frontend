@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { Nav } from "@/components/Nav";
 import { useSolvers } from "@/hooks/useSolvers";
+import { useOpenIntents } from "@/hooks/useOpenIntents";
+import { useAcceptIntent } from "@/hooks/useAcceptIntent";
+import { timeRemaining } from "@/lib/time";
 
 const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -11,15 +14,11 @@ const usdCompact = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
-const OPEN_INTENTS = [
-  { id: "a1b2...",  chain: "Ethereum",  token: "USDC", amount: "500",   dst: "USDC", minOut: "495",   deadline: "18m" },
-  { id: "c3d4...",  chain: "Base",      token: "WETH", amount: "0.14",  dst: "USDC", minOut: "480",   deadline: "12m" },
-  { id: "e5f6...",  chain: "Optimism",  token: "USDC", amount: "200",   dst: "XLM",  minOut: "1,960", deadline: "26m" },
-];
-
 export default function SolvePage() {
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
+  const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
+  const { accept, acceptingId, error: acceptError } = useAcceptIntent();
 
   return (
     <div className="min-h-screen">
@@ -153,28 +152,54 @@ export default function SolvePage() {
               <span className="text-sm font-semibold text-vx-text">Open Intents</span>
               <span className="chip bg-vx-sage-bg text-vx-sage text-[10px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-vx-sage animate-pulse" />
-                {OPEN_INTENTS.length} available
+                {openIntents.length} available
               </span>
             </div>
-            <div className="divide-y divide-vx-line">
-              {OPEN_INTENTS.map(intent => (
-                <div key={intent.id} className="px-5 py-4 flex items-center justify-between gap-4 hover:bg-vx-surface/30">
-                  <div>
-                    <div className="num text-xs text-vx-muted mb-1">ID: {intent.id}</div>
-                    <div className="text-sm font-medium text-vx-text">
-                      {intent.amount} {intent.token} on {intent.chain}
+
+            {acceptError && (
+              <div className="px-5 py-2.5 text-xs text-red-400 border-b border-vx-line">{acceptError}</div>
+            )}
+
+            {intentsLoading && openIntents.length === 0 ? (
+              <div className="p-5 space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-14 bg-vx-surface/40 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : intentsError ? (
+              <div className="p-8 text-center text-sm text-vx-muted">
+                Couldn&apos;t load open intents right now. Try again shortly.
+              </div>
+            ) : openIntents.length === 0 ? (
+              <div className="p-8 text-center text-sm text-vx-muted">
+                No open intents right now — check back soon.
+              </div>
+            ) : (
+              <div className="divide-y divide-vx-line">
+                {openIntents.map(intent => (
+                  <div key={intent.id} className="px-5 py-4 flex items-center justify-between gap-4 hover:bg-vx-surface/30">
+                    <div>
+                      <div className="num text-xs text-vx-muted mb-1 capitalize">ID: {intent.id}</div>
+                      <div className="text-sm font-medium text-vx-text capitalize">
+                        {intent.srcAmount} {intent.srcToken} on {intent.srcChain}
+                      </div>
+                      <div className="text-xs text-vx-muted">
+                        Min out: {intent.minOut} {intent.dstToken} · Expires in {timeRemaining(intent.deadline)}
+                      </div>
                     </div>
-                    <div className="text-xs text-vx-muted">
-                      Min out: {intent.minOut} {intent.dst} · Expires in {intent.deadline}
-                    </div>
+                    <button
+                      onClick={() => accept(intent.id)}
+                      disabled={acceptingId === intent.id}
+                      className="px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg
+                                 border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0
+                                 disabled:opacity-60 disabled:cursor-wait"
+                    >
+                      {acceptingId === intent.id ? "Accepting…" : "Accept Intent →"}
+                    </button>
                   </div>
-                  <button className="px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg
-                                     border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0">
-                    Accept Intent →
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

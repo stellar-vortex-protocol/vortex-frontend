@@ -42,3 +42,10 @@ export function submitIntent(intentId: string, signedXdr: string) {
     body: JSON.stringify({ signedXdr }),
   });
 }
+
+export function acceptIntent(intentId: string, solverAddress: string) {
+  return apiFetch<SubmitIntentResponse>(`/intents/${intentId}/accept`, {
+    method: "POST",
+    body: JSON.stringify({ solverAddress }),
+  });
+}
