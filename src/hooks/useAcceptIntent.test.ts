@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 
-const { acceptIntentMock, mutateMock } = vi.hoisted(() => ({
+const { acceptIntentMock, mutateMock, addToastMock } = vi.hoisted(() => ({
   acceptIntentMock: vi.fn(),
   mutateMock: vi.fn(),
+  addToastMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({ acceptIntent: acceptIntentMock }));
 vi.mock("swr", () => ({ mutate: mutateMock }));
+vi.mock("@/store/toast", () => ({
+  useToastStore: { getState: () => ({ addToast: addToastMock }) },
+}));
 
 import { useWalletStore } from "@/store/wallet";
 import { useAcceptIntent } from "./useAcceptIntent";
@@ -37,6 +41,7 @@ describe("useAcceptIntent", () => {
     expect(mutateMock).toHaveBeenCalledWith("/intents/open");
     expect(result.current.error).toBeNull();
     expect(result.current.acceptingId).toBeNull();
+    expect(addToastMock).toHaveBeenCalledWith("Intent accepted — you have exclusive fill rights.", "success");
   });
 
   it("connects the wallet first when not already connected", async () => {
@@ -86,5 +91,6 @@ describe("useAcceptIntent", () => {
 
     expect(result.current.error).toBe("Intent already claimed");
     expect(result.current.acceptingId).toBeNull();
+    expect(addToastMock).toHaveBeenCalledWith("Intent already claimed", "error");
   });
 });

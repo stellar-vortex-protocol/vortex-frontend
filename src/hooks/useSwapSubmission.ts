@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import { createIntent, submitIntent } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
+import { useToastStore } from "@/store/toast";
 import type { QuoteRequest } from "@/lib/types";
 
 export type SwapSubmissionStatus =
@@ -49,9 +50,12 @@ export function useSwapSubmission() {
       await submitIntent(newIntentId, signedXdr);
 
       setStatus("success");
+      useToastStore.getState().addToast("Swap submitted successfully.", "success");
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to submit swap.";
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to submit swap.");
+      setError(message);
+      useToastStore.getState().addToast(message, "error");
     }
   }, []);
 
