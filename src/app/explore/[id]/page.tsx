@@ -43,7 +43,11 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
           <div className="card p-8 text-center text-sm text-vx-muted">
             Couldn&apos;t find that intent. It may not exist, or the relay is unreachable.
           </div>
-        ) : !intent ? null : (
+        ) : !intent ? (
+          <div className="card p-8 text-center text-sm text-vx-muted">
+            No details found for this intent.
+          </div>
+        ) : (
           <div className="card p-6 space-y-6">
             <div className="flex items-start justify-between gap-4">
               <div>

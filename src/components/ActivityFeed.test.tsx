@@ -40,4 +40,26 @@ describe("ActivityFeed", () => {
 
     expect(screen.getByText("Polling")).toBeInTheDocument();
   });
+
+  it("shows an empty state when there are no fills yet", () => {
+    useIntentFeedMock.mockReturnValue({ items: [], isLoading: false, error: undefined, isLive: false });
+    render(<ActivityFeed />);
+
+    expect(screen.getByText("No fills yet.")).toBeInTheDocument();
+  });
+
+  it("shows an error state when the feed can't be reached and there is no cached data", () => {
+    useIntentFeedMock.mockReturnValue({ items: [], isLoading: false, error: new Error("boom"), isLive: false });
+    render(<ActivityFeed />);
+
+    expect(screen.getByText("Live feed unavailable right now.")).toBeInTheDocument();
+  });
+
+  it("still renders cached items even if the latest refresh errored", () => {
+    useIntentFeedMock.mockReturnValue({ items: [item], isLoading: false, error: new Error("boom"), isLive: false });
+    render(<ActivityFeed />);
+
+    expect(screen.getByText("500 USDC → USDC")).toBeInTheDocument();
+    expect(screen.queryByText("Live feed unavailable right now.")).not.toBeInTheDocument();
+  });
 });
