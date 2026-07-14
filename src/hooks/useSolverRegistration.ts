@@ -3,6 +3,7 @@ import { mutate } from "swr";
 import freighterApi from "@stellar/freighter-api";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
+import { useToastStore } from "@/store/toast";
 
 export type SolverRegistrationStatus =
   | "idle"
@@ -44,9 +45,12 @@ export function useSolverRegistration() {
       await mutate("/solvers");
 
       setStatus("success");
+      useToastStore.getState().addToast("Registered as a solver.", "success");
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to register as a solver.";
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Failed to register as a solver.");
+      setError(message);
+      useToastStore.getState().addToast(message, "error");
     }
   }, []);
 

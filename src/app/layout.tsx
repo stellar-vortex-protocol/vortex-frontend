@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { WalletHydrator } from "@/components/WalletHydrator";
+import { ToastViewport } from "@/components/ToastViewport";
 
 export const metadata: Metadata = {
   title: "Vortex | Cross-chain Swaps via Stellar",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="bg-vx-ink text-vx-text antialiased">
         <WalletHydrator />
         {children}
+        <ToastViewport />
       </body>
     </html>
   );

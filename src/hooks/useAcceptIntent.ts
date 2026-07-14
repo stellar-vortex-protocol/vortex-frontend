@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { mutate } from "swr";
 import { acceptIntent } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
+import { useToastStore } from "@/store/toast";
 
 export function useAcceptIntent() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -23,8 +24,11 @@ export function useAcceptIntent() {
 
       await acceptIntent(intentId, wallet.address);
       await mutate("/intents/open");
+      useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to accept intent.");
+      const message = err instanceof Error ? err.message : "Failed to accept intent.";
+      setError(message);
+      useToastStore.getState().addToast(message, "error");
     } finally {
       setAcceptingId(null);
     }

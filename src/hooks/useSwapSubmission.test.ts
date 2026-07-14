@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-const { signTransactionMock, createIntentMock, submitIntentMock } = vi.hoisted(() => ({
+const { signTransactionMock, createIntentMock, submitIntentMock, addToastMock } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   createIntentMock: vi.fn(),
   submitIntentMock: vi.fn(),
+  addToastMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -14,6 +15,10 @@ vi.mock("@stellar/freighter-api", () => ({
 vi.mock("@/lib/api", () => ({
   createIntent: createIntentMock,
   submitIntent: submitIntentMock,
+}));
+
+vi.mock("@/store/toast", () => ({
+  useToastStore: { getState: () => ({ addToast: addToastMock }) },
 }));
 
 import { useWalletStore } from "@/store/wallet";
@@ -75,6 +80,7 @@ describe("useSwapSubmission", () => {
     expect(result.current.status).toBe("success");
     expect(result.current.intentId).toBe("intent-1");
     expect(result.current.error).toBeNull();
+    expect(addToastMock).toHaveBeenCalledWith("Swap submitted successfully.", "success");
   });
 
   it("skips reconnecting when the wallet is already connected", async () => {
@@ -106,6 +112,7 @@ describe("useSwapSubmission", () => {
     expect(result.current.status).toBe("error");
     expect(result.current.error).toBe("User declined access");
     expect(submitIntentMock).not.toHaveBeenCalled();
+    expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
   });
 
   it("resets back to idle", async () => {
