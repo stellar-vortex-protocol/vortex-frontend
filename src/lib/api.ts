@@ -1,4 +1,11 @@
-import type { CreateIntentRequest, CreateIntentResponse, SubmitIntentResponse } from "./types";
+import type {
+  CreateIntentRequest,
+  CreateIntentResponse,
+  RegisterSolverRequest,
+  RegisterSolverResponse,
+  SubmitIntentResponse,
+  SubmitRegistrationResponse,
+} from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -47,5 +54,19 @@ export function acceptIntent(intentId: string, solverAddress: string) {
   return apiFetch<SubmitIntentResponse>(`/intents/${intentId}/accept`, {
     method: "POST",
     body: JSON.stringify({ solverAddress }),
+  });
+}
+
+export function registerSolver(req: RegisterSolverRequest) {
+  return apiFetch<RegisterSolverResponse>("/solvers", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export function submitSolverRegistration(registrationId: string, signedXdr: string) {
+  return apiFetch<SubmitRegistrationResponse>(`/solvers/${registrationId}/submit`, {
+    method: "POST",
+    body: JSON.stringify({ signedXdr }),
   });
 }

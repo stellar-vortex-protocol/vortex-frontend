@@ -5,7 +5,9 @@ import { Nav } from "@/components/Nav";
 import { useSolvers } from "@/hooks/useSolvers";
 import { useOpenIntents } from "@/hooks/useOpenIntents";
 import { useAcceptIntent } from "@/hooks/useAcceptIntent";
+import { useSolverRegistration } from "@/hooks/useSolverRegistration";
 import { timeRemaining } from "@/lib/time";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -14,11 +16,44 @@ const usdCompact = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+const MIN_BOND_USD = 50;
+
+const REGISTRATION_LABEL: Record<string, string> = {
+  connecting: "Connecting wallet…",
+  building: "Preparing registration…",
+  "awaiting-signature": "Confirm in Freighter…",
+  submitting: "Submitting…",
+};
+
 export default function SolvePage() {
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
   const { accept, acceptingId, error: acceptError } = useAcceptIntent();
+
+  const [address, setAddress] = useState("");
+  const [bond, setBond] = useState("");
+  const registration = useSolverRegistration();
+  const isRegistering = registration.status in REGISTRATION_LABEL;
+
+  const addressError = address && !isValidStellarPublicKey(address)
+    ? "Enter a valid Stellar address (starts with G)."
+    : null;
+  const bondError = bond && (isNaN(parseFloat(bond)) || parseFloat(bond) < MIN_BOND_USD)
+    ? `Minimum bond is ${MIN_BOND_USD} USDC.`
+    : null;
+  const canRegister = Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering;
+
+  const handleRegister = () => {
+    if (registration.status === "success") {
+      registration.reset();
+      setAddress("");
+      setBond("");
+      return;
+    }
+    if (!canRegister) return;
+    registration.register(address, parseFloat(bond));
+  };
 
   return (
     <div className="min-h-screen">
@@ -211,27 +246,56 @@ export default function SolvePage() {
                 <h3 className="text-base font-semibold text-vx-text mb-1">Register as Solver</h3>
                 <p className="text-xs text-vx-muted">Deposit a USDC bond to start filling intents.</p>
               </div>
-              {[
-                { label: "Stellar Address",  placeholder: "G...", type: "text" },
-                { label: "Bond Amount (USDC)", placeholder: "Minimum 50 USDC", type: "number" },
-              ].map(field => (
-                <div key={field.label}>
-                  <label className="eyebrow block mb-2">{field.label}</label>
-                  <input
-                    type={field.type}
-                    placeholder={field.placeholder}
-                    className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
-                               text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
-                               focus:border-vx-sage/50 transition-colors"
-                  />
-                </div>
-              ))}
+
+              <div>
+                <label className="eyebrow block mb-2">Stellar Address</label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value.trim())}
+                  placeholder="G..."
+                  className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
+                             text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
+                             focus:border-vx-sage/50 transition-colors"
+                />
+                {addressError && <p className="text-xs text-red-400 mt-1.5">{addressError}</p>}
+              </div>
+
+              <div>
+                <label className="eyebrow block mb-2">Bond Amount (USDC)</label>
+                <input
+                  type="number"
+                  value={bond}
+                  onChange={(e) => setBond(e.target.value)}
+                  placeholder="Minimum 50 USDC"
+                  className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
+                             text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
+                             focus:border-vx-sage/50 transition-colors"
+                />
+                {bondError && <p className="text-xs text-red-400 mt-1.5">{bondError}</p>}
+              </div>
+
               <div className="bg-vx-surface/50 rounded-lg p-3 text-xs text-vx-muted space-y-1">
                 <div>• Minimum bond: 50 USDC</div>
                 <div>• Slash on failed fill: 10% of bond</div>
                 <div>• Withdraw bond anytime when inactive</div>
               </div>
-              <button className="btn-swap">Connect Freighter to Register</button>
+
+              {registration.status === "error" && (
+                <p className="text-xs text-red-400">{registration.error}</p>
+              )}
+
+              <button
+                onClick={handleRegister}
+                disabled={!canRegister && registration.status !== "success"}
+                className="btn-swap"
+              >
+                {isRegistering
+                  ? REGISTRATION_LABEL[registration.status]
+                  : registration.status === "success"
+                    ? "Registered ✓ — register another"
+                    : "Connect Freighter to Register"}
+              </button>
             </div>
           </div>
         )}

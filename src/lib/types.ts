@@ -89,3 +89,18 @@ export type Solver = {
   chains: string[];
   status: "active" | "inactive";
 };
+
+export type RegisterSolverRequest = {
+  address: string;
+  bondUsd: number;
+};
+
+export type RegisterSolverResponse = {
+  registrationId: string;
+  unsignedXdr: string;
+};
+
+export type SubmitRegistrationResponse = {
+  registrationId: string;
+  status: "active" | "pending";
+};

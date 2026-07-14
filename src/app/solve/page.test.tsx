@@ -3,15 +3,20 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { OpenIntent, Solver } from "@/lib/types";
 
-const { useSolversMock, useOpenIntentsMock, useAcceptIntentMock, acceptMock } = vi.hoisted(() => ({
-  useSolversMock: vi.fn(),
-  useOpenIntentsMock: vi.fn(),
-  useAcceptIntentMock: vi.fn(),
-  acceptMock: vi.fn(),
-}));
+const { useSolversMock, useOpenIntentsMock, useAcceptIntentMock, acceptMock, useSolverRegistrationMock, registerMock, resetMock } =
+  vi.hoisted(() => ({
+    useSolversMock: vi.fn(),
+    useOpenIntentsMock: vi.fn(),
+    useAcceptIntentMock: vi.fn(),
+    acceptMock: vi.fn(),
+    useSolverRegistrationMock: vi.fn(),
+    registerMock: vi.fn(),
+    resetMock: vi.fn(),
+  }));
 vi.mock("@/hooks/useSolvers", () => ({ useSolvers: useSolversMock }));
 vi.mock("@/hooks/useOpenIntents", () => ({ useOpenIntents: useOpenIntentsMock }));
 vi.mock("@/hooks/useAcceptIntent", () => ({ useAcceptIntent: useAcceptIntentMock }));
+vi.mock("@/hooks/useSolverRegistration", () => ({ useSolverRegistration: useSolverRegistrationMock }));
 
 import SolvePage from "./page";
 
@@ -42,9 +47,17 @@ const openIntents: OpenIntent[] = [
   },
 ];
 
+const VALID_ADDRESS = "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
+
 async function openIntentsTab() {
   const user = userEvent.setup();
   await user.click(screen.getByText("intents"));
+  return user;
+}
+
+async function registerTab() {
+  const user = userEvent.setup();
+  await user.click(screen.getByText("register"));
   return user;
 }
 
@@ -52,6 +65,12 @@ describe("SolvePage", () => {
   beforeEach(() => {
     useOpenIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: undefined });
     useAcceptIntentMock.mockReturnValue({ accept: acceptMock, acceptingId: null, error: null });
+    useSolverRegistrationMock.mockReturnValue({
+      status: "idle",
+      error: null,
+      register: registerMock,
+      reset: resetMock,
+    });
   });
 
   describe("leaderboard tab", () => {
@@ -142,6 +161,94 @@ describe("SolvePage", () => {
       await openIntentsTab();
 
       expect(screen.getByText("Intent already claimed")).toBeInTheDocument();
+    });
+  });
+
+  describe("register tab", () => {
+    beforeEach(() => {
+      useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+    });
+
+    it("disables submit until both fields are valid", async () => {
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      const button = screen.getByText("Connect Freighter to Register");
+      expect(button).toBeDisabled();
+
+      await user.type(screen.getByPlaceholderText("G..."), VALID_ADDRESS);
+      expect(button).toBeDisabled();
+
+      await user.type(screen.getByPlaceholderText("Minimum 50 USDC"), "50");
+      expect(button).toBeEnabled();
+    });
+
+    it("shows a validation error for a malformed Stellar address", async () => {
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      await user.type(screen.getByPlaceholderText("G..."), "not-a-valid-address");
+      expect(screen.getByText(/Enter a valid Stellar address/)).toBeInTheDocument();
+    });
+
+    it("shows a validation error for a bond below the minimum", async () => {
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      await user.type(screen.getByPlaceholderText("Minimum 50 USDC"), "10");
+      expect(screen.getByText(/Minimum bond is 50 USDC/)).toBeInTheDocument();
+    });
+
+    it("calls register() with the entered address and bond amount", async () => {
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      await user.type(screen.getByPlaceholderText("G..."), VALID_ADDRESS);
+      await user.type(screen.getByPlaceholderText("Minimum 50 USDC"), "100");
+      await user.click(screen.getByText("Connect Freighter to Register"));
+
+      expect(registerMock).toHaveBeenCalledWith(VALID_ADDRESS, 100);
+    });
+
+    it("shows a busy label while registering", async () => {
+      useSolverRegistrationMock.mockReturnValue({
+        status: "awaiting-signature",
+        error: null,
+        register: registerMock,
+        reset: resetMock,
+      });
+      render(<SolvePage />);
+      await registerTab();
+
+      expect(screen.getByText("Confirm in Freighter…")).toBeInTheDocument();
+    });
+
+    it("shows a success state and resets the form when clicked again", async () => {
+      useSolverRegistrationMock.mockReturnValue({
+        status: "success",
+        error: null,
+        register: registerMock,
+        reset: resetMock,
+      });
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      const button = screen.getByText("Registered ✓ — register another");
+      await user.click(button);
+      expect(resetMock).toHaveBeenCalled();
+    });
+
+    it("shows a registration error", async () => {
+      useSolverRegistrationMock.mockReturnValue({
+        status: "error",
+        error: "Bond deposit failed",
+        register: registerMock,
+        reset: resetMock,
+      });
+      render(<SolvePage />);
+      await registerTab();
+
+      expect(screen.getByText("Bond deposit failed")).toBeInTheDocument();
     });
   });
 });
