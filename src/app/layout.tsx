@@ -1,13 +1,31 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { WalletHydrator } from "@/components/WalletHydrator";
 import { ToastViewport } from "@/components/ToastViewport";
 
+const TITLE = "Vortex | Cross-chain Swaps via Stellar";
+const DESCRIPTION =
+  "Swap any token from any chain directly to Stellar. Intent-based cross-chain liquidity protocol — no bridges, no wrapped tokens.";
+
 export const metadata: Metadata = {
-  title: "Vortex | Cross-chain Swaps via Stellar",
-  description:
-    "Swap any token from any chain directly to Stellar. Intent-based cross-chain liquidity protocol — no bridges, no wrapped tokens.",
+  title: { default: TITLE, template: "%s | Vortex" },
+  description: DESCRIPTION,
   keywords: ["stellar", "cross-chain", "bridge", "swap", "intents", "defi", "soroban"],
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    siteName: "Vortex",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#080C14",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
