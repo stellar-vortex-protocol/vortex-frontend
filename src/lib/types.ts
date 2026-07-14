@@ -51,6 +51,24 @@ export type OpenIntent = {
   deadline: string;
 };
 
+export type CreateIntentRequest = {
+  srcChain: string;
+  srcToken: string;
+  srcAmount: string;
+  dstToken: string;
+  dstAddress: string;
+};
+
+export type CreateIntentResponse = {
+  intentId: string;
+  unsignedXdr: string;
+};
+
+export type SubmitIntentResponse = {
+  intentId: string;
+  status: IntentStatus;
+};
+
 export type Solver = {
   name: string;
   address: string;

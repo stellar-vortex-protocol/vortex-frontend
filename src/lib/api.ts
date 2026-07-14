@@ -1,3 +1,5 @@
+import type { CreateIntentRequest, CreateIntentResponse, SubmitIntentResponse } from "./types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export class ApiError extends Error {
@@ -26,3 +28,17 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export const fetcher = <T>(path: string) => apiFetch<T>(path);
+
+export function createIntent(req: CreateIntentRequest) {
+  return apiFetch<CreateIntentResponse>("/intents", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export function submitIntent(intentId: string, signedXdr: string) {
+  return apiFetch<SubmitIntentResponse>(`/intents/${intentId}/submit`, {
+    method: "POST",
+    body: JSON.stringify({ signedXdr }),
+  });
+}
