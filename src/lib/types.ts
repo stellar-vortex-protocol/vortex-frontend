@@ -41,6 +41,14 @@ export type FeedItem = {
   createdAt: string;
 };
 
+export type IntentDetail = FeedItem & {
+  dstAmount: string;
+  minOut: string;
+  dstAddress: string;
+  deadline: string;
+  txHash?: string;
+};
+
 export type OpenIntent = {
   id: string;
   srcChain: string;
