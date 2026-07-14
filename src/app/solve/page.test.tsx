@@ -73,6 +73,28 @@ describe("SolvePage", () => {
     });
   });
 
+  it("renders content within a main landmark", () => {
+    useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+    render(<SolvePage />);
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+  });
+
+  it("exposes the tabs with correct ARIA roles and selected state", async () => {
+    useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+    render(<SolvePage />);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(3);
+    expect(screen.getByRole("tab", { name: "leaderboard" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute("aria-selected", "false");
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "intents" }));
+
+    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("id", "panel-intents");
+  });
+
   describe("leaderboard tab", () => {
     it("shows a loading skeleton while solvers are being fetched", () => {
       useSolversMock.mockReturnValue({ solvers: [], isLoading: true, error: undefined });
@@ -176,10 +198,10 @@ describe("SolvePage", () => {
       const button = screen.getByText("Connect Freighter to Register");
       expect(button).toBeDisabled();
 
-      await user.type(screen.getByPlaceholderText("G..."), VALID_ADDRESS);
+      await user.type(screen.getByLabelText("Stellar Address"), VALID_ADDRESS);
       expect(button).toBeDisabled();
 
-      await user.type(screen.getByPlaceholderText("Minimum 50 USDC"), "50");
+      await user.type(screen.getByLabelText("Bond Amount (USDC)"), "50");
       expect(button).toBeEnabled();
     });
 
@@ -187,7 +209,7 @@ describe("SolvePage", () => {
       render(<SolvePage />);
       const user = await registerTab();
 
-      await user.type(screen.getByPlaceholderText("G..."), "not-a-valid-address");
+      await user.type(screen.getByLabelText("Stellar Address"), "not-a-valid-address");
       expect(screen.getByText(/Enter a valid Stellar address/)).toBeInTheDocument();
     });
 
@@ -195,7 +217,7 @@ describe("SolvePage", () => {
       render(<SolvePage />);
       const user = await registerTab();
 
-      await user.type(screen.getByPlaceholderText("Minimum 50 USDC"), "10");
+      await user.type(screen.getByLabelText("Bond Amount (USDC)"), "10");
       expect(screen.getByText(/Minimum bond is 50 USDC/)).toBeInTheDocument();
     });
 
@@ -203,8 +225,8 @@ describe("SolvePage", () => {
       render(<SolvePage />);
       const user = await registerTab();
 
-      await user.type(screen.getByPlaceholderText("G..."), VALID_ADDRESS);
-      await user.type(screen.getByPlaceholderText("Minimum 50 USDC"), "100");
+      await user.type(screen.getByLabelText("Stellar Address"), VALID_ADDRESS);
+      await user.type(screen.getByLabelText("Bond Amount (USDC)"), "100");
       await user.click(screen.getByText("Connect Freighter to Register"));
 
       expect(registerMock).toHaveBeenCalledWith(VALID_ADDRESS, 100);

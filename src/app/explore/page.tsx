@@ -55,7 +55,7 @@ export default function ExplorePage() {
     <div className="min-h-screen">
       <Nav variant="breadcrumb" label="Explore" />
 
-      <div className="max-w-5xl mx-auto px-5 py-12">
+      <main id="main-content" className="max-w-5xl mx-auto px-5 py-12">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
             <div className="eyebrow mb-3">Intent Explorer</div>
@@ -65,14 +65,16 @@ export default function ExplorePage() {
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-vx-muted px-1 pt-1 flex-shrink-0">
-            <span className={`state-dot ${isLive ? "bg-vx-sage" : "bg-vx-dim"}`} />
+            <span aria-hidden="true" className={`state-dot ${isLive ? "bg-vx-sage" : "bg-vx-dim"}`} />
             {isLive ? "Live" : "Polling"}
           </div>
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
+          <label htmlFor="status-filter" className="sr-only">Filter by status</label>
           <select
+            id="status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as IntentStatus | "all")}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
@@ -84,7 +86,9 @@ export default function ExplorePage() {
             ))}
           </select>
 
+          <label htmlFor="chain-filter" className="sr-only">Filter by chain</label>
           <select
+            id="chain-filter"
             value={chainFilter}
             onChange={(e) => setChainFilter(e.target.value)}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
@@ -97,7 +101,9 @@ export default function ExplorePage() {
             ))}
           </select>
 
+          <label htmlFor="sort-order" className="sr-only">Sort order</label>
           <select
+            id="sort-order"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortOption)}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
@@ -156,6 +162,7 @@ export default function ExplorePage() {
             {pageCount > 1 && (
               <div className="flex items-center justify-center gap-4 mt-6">
                 <button
+                  type="button"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
@@ -167,6 +174,7 @@ export default function ExplorePage() {
                   Page {page} of {pageCount}
                 </span>
                 <button
+                  type="button"
                   onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
                   disabled={page === pageCount}
                   className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
@@ -178,7 +186,7 @@ export default function ExplorePage() {
             )}
           </>
         )}
-      </div>
+      </main>
 
       <Footer />
     </div>

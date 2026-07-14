@@ -46,6 +46,18 @@ describe("SwapCard", () => {
     expect(screen.getByText("Enter an amount")).toBeInTheDocument();
   });
 
+  it("exposes the amount input via an accessible label", () => {
+    renderSwapCard();
+    expect(screen.getByLabelText("Amount to swap")).toBeInTheDocument();
+  });
+
+  it("makes the source token picker a real, keyboard-operable button", () => {
+    renderSwapCard();
+    const toggle = screen.getByRole("button", { name: "Select source token, currently USDC" });
+    expect(toggle.tagName).toBe("BUTTON");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("fetches and renders a live quote after the debounced amount settles", async () => {
     const quote: Quote = {
       dstAmount: "497.1234",

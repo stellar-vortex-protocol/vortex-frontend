@@ -22,7 +22,7 @@ function IntentPipeline() {
       {stages.map((s, i) => (
         <div key={s.label} className="flex items-center">
           <div className="flex flex-col items-center gap-1.5">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+            <div aria-hidden="true" className="w-8 h-8 rounded-full flex items-center justify-center border-2"
                  style={{ borderColor: s.color, background: `${s.color}15` }}>
               <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
             </div>
@@ -64,7 +64,7 @@ export default function HomePage() {
       <Nav variant="home" />
 
       {/* ── Main layout ── */}
-      <div className="max-w-6xl mx-auto px-5 py-14">
+      <main id="main-content" className="max-w-6xl mx-auto px-5 py-14">
         <div className="grid lg:grid-cols-[1fr_420px] gap-10 items-start">
 
           {/* Left: copy + pipeline + feed */}
@@ -122,19 +122,19 @@ export default function HomePage() {
                 {CHAINS.map(c => (
                   <div key={c.id}
                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-vx-surface rounded-lg border border-vx-border">
-                    <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
+                    <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ background: c.color }} />
                     <span className="text-xs text-vx-muted">{c.name}</span>
                   </div>
                 ))}
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-vx-sage-bg rounded-lg border border-vx-sage/20">
-                  <span className="w-2 h-2 rounded-full bg-vx-sage" />
+                  <span aria-hidden="true" className="w-2 h-2 rounded-full bg-vx-sage" />
                   <span className="text-xs text-vx-sage font-medium">Stellar (dest.)</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* ── Footer ── */}
       <Footer />

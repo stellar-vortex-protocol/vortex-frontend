@@ -78,27 +78,33 @@ describe("ExplorePage", () => {
     expect(screen.getByText("Polling")).toBeInTheDocument();
   });
 
-  it("filters by status", async () => {
+  it("filters by status, via its accessible label", async () => {
     useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
-    await user.selectOptions(screen.getByDisplayValue("All statuses"), "pending");
+    await user.selectOptions(screen.getByLabelText("Filter by status"), "pending");
 
     expect(screen.getByText("0.14 WETH → USDC")).toBeInTheDocument();
     expect(screen.queryByText("500 USDC → USDC")).not.toBeInTheDocument();
     expect(screen.getByText("1 intent")).toBeInTheDocument();
   });
 
-  it("filters by chain", async () => {
+  it("filters by chain, via its accessible label", async () => {
     useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
-    await user.selectOptions(screen.getByDisplayValue("All chains"), "base");
+    await user.selectOptions(screen.getByLabelText("Filter by chain"), "base");
 
     expect(screen.getByText("0.14 WETH → USDC")).toBeInTheDocument();
     expect(screen.queryByText("500 USDC → USDC")).not.toBeInTheDocument();
+  });
+
+  it("renders the results within a main landmark", () => {
+    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    render(<ExplorePage />);
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
   });
 
   it("links each row to its intent detail page", () => {

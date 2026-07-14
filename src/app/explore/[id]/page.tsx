@@ -29,7 +29,7 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
     <div className="min-h-screen">
       <Nav variant="breadcrumb" label={`Intent ${params.id.slice(0, 8)}`} />
 
-      <div className="max-w-3xl mx-auto px-5 py-12">
+      <main id="main-content" className="max-w-3xl mx-auto px-5 py-12">
         <Link href="/explore" className="text-xs text-vx-sage hover:underline mb-6 inline-block">
           ← Back to explorer
         </Link>
@@ -76,7 +76,7 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
                 <a
                   href={`https://stellar.expert/explorer/${NETWORK}/tx/${intent.txHash}`}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
                   className="text-xs text-vx-sage hover:underline num"
                 >
                   View settlement tx on stellar.expert →
@@ -85,7 +85,7 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
             )}
           </div>
         )}
-      </div>
+      </main>
 
       <Footer />
     </div>

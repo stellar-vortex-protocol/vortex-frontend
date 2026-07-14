@@ -60,7 +60,7 @@ export default function SolvePage() {
       {/* Nav */}
       <Nav variant="breadcrumb" label="Solver Portal" />
 
-      <div className="max-w-5xl mx-auto px-5 py-12">
+      <main id="main-content" className="max-w-5xl mx-auto px-5 py-12">
         <div className="mb-10">
           <div className="eyebrow mb-3">Solver Network</div>
           <h1 className="text-3xl font-bold text-vx-text mb-3">Become a Vortex Solver</h1>
@@ -98,10 +98,15 @@ export default function SolvePage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-vx-surface/50 p-1 rounded-lg w-fit">
+        <div role="tablist" aria-label="Solver portal sections" className="flex gap-1 mb-6 bg-vx-surface/50 p-1 rounded-lg w-fit">
           {(["leaderboard", "intents", "register"] as const).map(t => (
             <button
               key={t}
+              type="button"
+              role="tab"
+              id={`tab-${t}`}
+              aria-selected={tab === t}
+              aria-controls={`panel-${t}`}
               onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-all
                 ${tab === t ? "bg-vx-card text-vx-text border border-vx-border" : "text-vx-muted hover:text-vx-text"}`}
@@ -113,7 +118,7 @@ export default function SolvePage() {
 
         {/* Leaderboard */}
         {tab === "leaderboard" && (
-          <div className="card overflow-hidden">
+          <div id="panel-leaderboard" role="tabpanel" aria-labelledby="tab-leaderboard" className="card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30">
               <span className="text-sm font-semibold text-vx-text">Active Solvers</span>
             </div>
@@ -182,7 +187,7 @@ export default function SolvePage() {
 
         {/* Open intents */}
         {tab === "intents" && (
-          <div className="card overflow-hidden">
+          <div id="panel-intents" role="tabpanel" aria-labelledby="tab-intents" className="card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30 flex items-center justify-between">
               <span className="text-sm font-semibold text-vx-text">Open Intents</span>
               <span className="chip bg-vx-sage-bg text-vx-sage text-[10px]">
@@ -192,7 +197,7 @@ export default function SolvePage() {
             </div>
 
             {acceptError && (
-              <div className="px-5 py-2.5 text-xs text-red-400 border-b border-vx-line">{acceptError}</div>
+              <div role="alert" className="px-5 py-2.5 text-xs text-red-400 border-b border-vx-line">{acceptError}</div>
             )}
 
             {intentsLoading && openIntents.length === 0 ? (
@@ -223,8 +228,10 @@ export default function SolvePage() {
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={() => accept(intent.id)}
                       disabled={acceptingId === intent.id}
+                      aria-busy={acceptingId === intent.id}
                       className="px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg
                                  border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0
                                  disabled:opacity-60 disabled:cursor-wait"
@@ -240,7 +247,7 @@ export default function SolvePage() {
 
         {/* Register form */}
         {tab === "register" && (
-          <div className="max-w-md">
+          <div id="panel-register" role="tabpanel" aria-labelledby="tab-register" className="max-w-md">
             <div className="card p-6 space-y-5">
               <div>
                 <h3 className="text-base font-semibold text-vx-text mb-1">Register as Solver</h3>
@@ -248,31 +255,41 @@ export default function SolvePage() {
               </div>
 
               <div>
-                <label className="eyebrow block mb-2">Stellar Address</label>
+                <label htmlFor="solver-address" className="eyebrow block mb-2">Stellar Address</label>
                 <input
+                  id="solver-address"
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value.trim())}
                   placeholder="G..."
+                  aria-invalid={Boolean(addressError)}
+                  aria-describedby={addressError ? "solver-address-error" : undefined}
                   className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
                              text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
                              focus:border-vx-sage/50 transition-colors"
                 />
-                {addressError && <p className="text-xs text-red-400 mt-1.5">{addressError}</p>}
+                {addressError && (
+                  <p id="solver-address-error" role="alert" className="text-xs text-red-400 mt-1.5">{addressError}</p>
+                )}
               </div>
 
               <div>
-                <label className="eyebrow block mb-2">Bond Amount (USDC)</label>
+                <label htmlFor="solver-bond" className="eyebrow block mb-2">Bond Amount (USDC)</label>
                 <input
+                  id="solver-bond"
                   type="number"
                   value={bond}
                   onChange={(e) => setBond(e.target.value)}
                   placeholder="Minimum 50 USDC"
+                  aria-invalid={Boolean(bondError)}
+                  aria-describedby={bondError ? "solver-bond-error" : undefined}
                   className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
                              text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
                              focus:border-vx-sage/50 transition-colors"
                 />
-                {bondError && <p className="text-xs text-red-400 mt-1.5">{bondError}</p>}
+                {bondError && (
+                  <p id="solver-bond-error" role="alert" className="text-xs text-red-400 mt-1.5">{bondError}</p>
+                )}
               </div>
 
               <div className="bg-vx-surface/50 rounded-lg p-3 text-xs text-vx-muted space-y-1">
@@ -282,12 +299,14 @@ export default function SolvePage() {
               </div>
 
               {registration.status === "error" && (
-                <p className="text-xs text-red-400">{registration.error}</p>
+                <p role="alert" className="text-xs text-red-400">{registration.error}</p>
               )}
 
               <button
+                type="button"
                 onClick={handleRegister}
                 disabled={!canRegister && registration.status !== "success"}
+                aria-busy={isRegistering}
                 className="btn-swap"
               >
                 {isRegistering
@@ -299,7 +318,7 @@ export default function SolvePage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
