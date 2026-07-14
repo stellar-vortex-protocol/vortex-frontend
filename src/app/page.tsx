@@ -1,22 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { SwapCard } from "@/components/SwapCard";
+import { ActivityFeed } from "@/components/ActivityFeed";
 import { CHAINS } from "@/lib/marketData";
-
-// ─── Recent Intents Feed ──────────────────────────────────────────────────────
-
-const FEED_ITEMS = [
-  { chain: "ethereum", token: "USDC", amount: "500", dst: "USDC", solver: "Alpha", time: "12s ago", status: "filled" },
-  { chain: "base",     token: "WETH", amount: "0.14", dst: "USDC", solver: "Beta",  time: "47s ago", status: "filled" },
-  { chain: "polygon",  token: "USDC", amount: "200", dst: "XLM",  solver: "Beta",  time: "1m ago",  status: "accepted" },
-  { chain: "arbitrum", token: "WETH", amount: "1.00", dst: "USDC", solver: "Alpha", time: "2m ago",  status: "filled" },
-  { chain: "ethereum", token: "USDC", amount: "2000", dst: "USDC", solver: "Beta",  time: "3m ago",  status: "filled" },
-  { chain: "optimism", token: "USDC", amount: "150", dst: "XLM",  solver: "Gamma", time: "5m ago",  status: "filled" },
-];
 
 // ─── Intent Pipeline Visualization ────────────────────────────────────────────
 
@@ -53,62 +42,6 @@ function IntentPipeline() {
               </svg>
             </div>
           )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Activity Feed ────────────────────────────────────────────────────────────
-
-function ActivityFeed() {
-  const [items, setItems] = useState(FEED_ITEMS);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const chains = ["ethereum", "base", "polygon", "arbitrum"];
-      const tokens = ["USDC", "WETH"];
-      const solvers = ["Alpha", "Beta", "Gamma"];
-      const newItem = {
-        chain: chains[Math.floor(Math.random() * chains.length)],
-        token: tokens[Math.floor(Math.random() * tokens.length)],
-        amount: (Math.random() * 900 + 100).toFixed(0),
-        dst: "USDC",
-        solver: solvers[Math.floor(Math.random() * solvers.length)],
-        time: "just now",
-        status: "filled" as const,
-      };
-      setItems(prev => [newItem, ...prev.slice(0, 7)]);
-    }, 8000);
-    return () => clearInterval(id);
-  }, []);
-
-  const chainColor: Record<string, string> = {
-    ethereum: "#627EEA", base: "#0052FF", polygon: "#8247E5",
-    arbitrum: "#12AAFF", optimism: "#FF0420", avalanche: "#E84142",
-  };
-
-  return (
-    <div className="space-y-2">
-      {items.slice(0, 6).map((item, i) => (
-        <div key={i} className="flex items-center gap-3 p-3 bg-vx-surface/40 rounded-lg
-                                border border-vx-line hover:border-vx-border transition-colors">
-          <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-               style={{ background: `${chainColor[item.chain]}20`, border: `1px solid ${chainColor[item.chain]}30` }}>
-            <div className="w-2 h-2 rounded-full" style={{ background: chainColor[item.chain] }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-vx-text truncate">
-              {item.amount} {item.token} → {item.dst}
-            </div>
-            <div className="text-[10px] text-vx-muted capitalize">
-              {item.chain} · via {item.solver}
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <span className="state-dot bg-vx-sage" />
-            <span className="text-[10px] text-vx-muted">{item.time}</span>
-          </div>
         </div>
       ))}
     </div>
