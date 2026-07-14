@@ -2,45 +2,14 @@
 
 import { useState } from "react";
 import { Nav } from "@/components/Nav";
+import { useSolvers } from "@/hooks/useSolvers";
 
-const MOCK_SOLVERS = [
-  {
-    name: "Alpha Market Making",
-    address: "GABC...1234",
-    bond: "5,000 USDC",
-    fills: 842,
-    failed: 3,
-    volume: "$4.2M",
-    avgTime: "47s",
-    successRate: 99.6,
-    chains: ["Ethereum", "Base", "Arbitrum", "Optimism"],
-    status: "active",
-  },
-  {
-    name: "Beta Liquidity Co",
-    address: "GDEF...5678",
-    bond: "10,000 USDC",
-    fills: 1241,
-    failed: 8,
-    volume: "$9.8M",
-    avgTime: "32s",
-    successRate: 99.4,
-    chains: ["Ethereum", "Base", "Polygon", "Arbitrum", "Optimism", "Avalanche"],
-    status: "active",
-  },
-  {
-    name: "Gamma Arb Labs",
-    address: "GHIJ...9012",
-    bond: "2,500 USDC",
-    fills: 187,
-    failed: 12,
-    volume: "$820K",
-    avgTime: "89s",
-    successRate: 93.9,
-    chains: ["Ethereum", "Polygon"],
-    status: "active",
-  },
-];
+const usdCompact = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 
 const OPEN_INTENTS = [
   { id: "a1b2...",  chain: "Ethereum",  token: "USDC", amount: "500",   dst: "USDC", minOut: "495",   deadline: "18m" },
@@ -50,6 +19,7 @@ const OPEN_INTENTS = [
 
 export default function SolvePage() {
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
+  const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
 
   return (
     <div className="min-h-screen">
@@ -113,50 +83,66 @@ export default function SolvePage() {
             <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30">
               <span className="text-sm font-semibold text-vx-text">Active Solvers</span>
             </div>
-            <div className="divide-y divide-vx-line">
-              {MOCK_SOLVERS.map((s, i) => (
-                <div key={s.address} className="px-5 py-4 hover:bg-vx-surface/30 transition-colors">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <span className="num text-lg font-bold text-vx-dim w-6 flex-shrink-0">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-vx-text">{s.name}</div>
-                        <div className="num text-xs text-vx-muted">{s.address}</div>
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {s.chains.map(c => (
-                            <span key={c} className="text-[10px] px-1.5 py-0.5 bg-vx-surface rounded text-vx-muted">
-                              {c}
-                            </span>
-                          ))}
+            {solversLoading && solvers.length === 0 ? (
+              <div className="p-5 space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-16 bg-vx-surface/40 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : solversError ? (
+              <div className="p-8 text-center text-sm text-vx-muted">
+                Couldn&apos;t load the solver leaderboard right now. Try again shortly.
+              </div>
+            ) : solvers.length === 0 ? (
+              <div className="p-8 text-center text-sm text-vx-muted">
+                No active solvers yet.
+              </div>
+            ) : (
+              <div className="divide-y divide-vx-line">
+                {solvers.map((s, i) => (
+                  <div key={s.address} className="px-5 py-4 hover:bg-vx-surface/30 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <span className="num text-lg font-bold text-vx-dim w-6 flex-shrink-0">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-vx-text">{s.name}</div>
+                          <div className="num text-xs text-vx-muted">{s.address}</div>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {s.chains.map(c => (
+                              <span key={c} className="text-[10px] px-1.5 py-0.5 bg-vx-surface rounded text-vx-muted">
+                                {c}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-6 flex-shrink-0 text-right">
-                      <div>
-                        <div className="num text-sm font-semibold text-vx-text">{s.fills}</div>
-                        <div className="eyebrow">Fills</div>
-                      </div>
-                      <div>
-                        <div className="num text-sm font-semibold text-vx-text">{s.volume}</div>
-                        <div className="eyebrow">Volume</div>
-                      </div>
-                      <div>
-                        <div className="num text-sm font-semibold text-vx-text">{s.avgTime}</div>
-                        <div className="eyebrow">Avg Time</div>
-                      </div>
-                      <div>
-                        <div className={`num text-sm font-semibold ${s.successRate > 99 ? "text-vx-sage" : "text-vx-amber"}`}>
-                          {s.successRate}%
+                      <div className="grid grid-cols-4 gap-6 flex-shrink-0 text-right">
+                        <div>
+                          <div className="num text-sm font-semibold text-vx-text">{s.fills}</div>
+                          <div className="eyebrow">Fills</div>
                         </div>
-                        <div className="eyebrow">Success</div>
+                        <div>
+                          <div className="num text-sm font-semibold text-vx-text">{usdCompact.format(s.volumeUsd)}</div>
+                          <div className="eyebrow">Volume</div>
+                        </div>
+                        <div>
+                          <div className="num text-sm font-semibold text-vx-text">{s.avgFillTimeSeconds}s</div>
+                          <div className="eyebrow">Avg Time</div>
+                        </div>
+                        <div>
+                          <div className={`num text-sm font-semibold ${s.successRatePct > 99 ? "text-vx-sage" : "text-vx-amber"}`}>
+                            {s.successRatePct}%
+                          </div>
+                          <div className="eyebrow">Success</div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
