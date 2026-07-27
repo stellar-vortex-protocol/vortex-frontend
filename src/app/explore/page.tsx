@@ -6,6 +6,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { useLiveIntents } from "@/hooks/useLiveIntents";
+import { getMessage } from "@/lib/i18n";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
 import type { IntentStatus } from "@/lib/types";
@@ -53,26 +54,26 @@ export default function ExplorePage() {
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label="Explore" />
+      <Nav variant="breadcrumb" label={getMessage("explore.nav.label")} />
 
       <main id="main-content" className="max-w-5xl mx-auto px-5 py-12">
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
-            <div className="eyebrow mb-3">Intent Explorer</div>
-            <h1 className="text-3xl font-bold text-vx-text mb-3">Browse all intents</h1>
+            <div className="eyebrow mb-3">{getMessage("explore.page.eyebrow")}</div>
+            <h1 className="text-3xl font-bold text-vx-text mb-3">{getMessage("explore.page.hero.title")}</h1>
             <p className="text-vx-muted text-sm max-w-lg leading-relaxed">
-              Every swap intent submitted to Vortex, from open auctions to completed fills.
+              {getMessage("explore.page.hero.description")}
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-vx-muted px-1 pt-1 flex-shrink-0">
             <span aria-hidden="true" className={`state-dot ${isLive ? "bg-vx-sage" : "bg-vx-dim"}`} />
-            {isLive ? "Live" : "Polling"}
+            {isLive ? getMessage("explore.page.liveLabel") : getMessage("explore.page.pollingLabel")}
           </div>
         </div>
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
-          <label htmlFor="status-filter" className="sr-only">Filter by status</label>
+          <label htmlFor="status-filter" className="sr-only">{getMessage("explore.page.filterStatusLabel")}</label>
           <select
             id="status-filter"
             value={statusFilter}
@@ -81,19 +82,19 @@ export default function ExplorePage() {
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {s === "all" ? "All statuses" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s === "all" ? getMessage("explore.page.status.all") : s.charAt(0).toUpperCase() + s.slice(1)}
               </option>
             ))}
           </select>
 
-          <label htmlFor="chain-filter" className="sr-only">Filter by chain</label>
+          <label htmlFor="chain-filter" className="sr-only">{getMessage("explore.page.filterChainLabel")}</label>
           <select
             id="chain-filter"
             value={chainFilter}
             onChange={(e) => setChainFilter(e.target.value)}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
           >
-            <option value="all">All chains</option>
+            <option value="all">{getMessage("explore.page.chain.all")}</option>
             {CHAINS.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -101,20 +102,22 @@ export default function ExplorePage() {
             ))}
           </select>
 
-          <label htmlFor="sort-order" className="sr-only">Sort order</label>
+          <label htmlFor="sort-order" className="sr-only">{getMessage("explore.page.sortLabel")}</label>
           <select
             id="sort-order"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortOption)}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
           >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="largest">Largest amount</option>
+            <option value="newest">{getMessage("explore.page.sort.newest")}</option>
+            <option value="oldest">{getMessage("explore.page.sort.oldest")}</option>
+            <option value="largest">{getMessage("explore.page.sort.largest")}</option>
           </select>
 
           <span className="text-xs text-vx-muted ml-auto">
-            {filtered.length} intent{filtered.length === 1 ? "" : "s"}
+            {getMessage(filtered.length === 1 ? "explore.page.intentCount.one" : "explore.page.intentCount.many", {
+              count: filtered.length,
+            })}
           </span>
         </div>
 
@@ -127,11 +130,11 @@ export default function ExplorePage() {
           </div>
         ) : error ? (
           <div className="card p-8 text-center text-sm text-vx-muted">
-            Couldn&apos;t load intents right now. Try again shortly.
+            {getMessage("explore.page.errors.load")}
           </div>
         ) : filtered.length === 0 ? (
           <div className="card p-8 text-center text-sm text-vx-muted">
-            No intents match your filters.
+            {getMessage("explore.page.errors.empty")}
           </div>
         ) : (
           <>
@@ -168,10 +171,10 @@ export default function ExplorePage() {
                   className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
                              hover:text-vx-text hover:border-vx-sage/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                  Previous
+                  {getMessage("explore.page.pagination.previous")}
                 </button>
                 <span className="text-xs text-vx-muted num">
-                  Page {page} of {pageCount}
+                  {getMessage("explore.page.pagination.page", { page, pageCount })}
                 </span>
                 <button
                   type="button"
@@ -180,7 +183,7 @@ export default function ExplorePage() {
                   className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
                              hover:text-vx-text hover:border-vx-sage/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                  Next
+                  {getMessage("explore.page.pagination.next")}
                 </button>
               </div>
             )}
