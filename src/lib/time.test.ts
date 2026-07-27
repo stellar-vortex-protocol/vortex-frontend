@@ -16,6 +16,10 @@ describe("timeAgo", () => {
     expect(timeAgo(new Date(now - 5 * 60_000).toISOString(), now)).toBe("5m ago");
   });
 
+  it("uses locale-aware formatting for non-English locales", () => {
+    expect(timeAgo(new Date(now - 5 * 60_000).toISOString(), now, "fr")).toBe("il y a 5 minutes");
+  });
+
   it("formats hours", () => {
     expect(timeAgo(new Date(now - 3 * 60 * 60_000).toISOString(), now)).toBe("3h ago");
   });
@@ -38,6 +42,10 @@ describe("timeRemaining", () => {
 
   it("formats minutes", () => {
     expect(timeRemaining(new Date(now + 18 * 60_000).toISOString(), now)).toBe("18m");
+  });
+
+  it("uses locale-aware formatting for non-English locales", () => {
+    expect(timeRemaining(new Date(now + 18 * 60_000).toISOString(), now, "fr")).toBe("dans 18 minutes");
   });
 
   it("formats hours", () => {
