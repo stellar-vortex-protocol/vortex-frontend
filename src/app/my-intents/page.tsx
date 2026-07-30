@@ -8,7 +8,7 @@ import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
-import { CHAINS } from "@/lib/marketData";
+import { CHAINS, DEFAULT_CHAIN_COLOR, getChainMeta } from "@/lib/marketData";
 import { SkeletonCard } from "@/components/Skeleton";
 import type { IntentStatus } from "@/lib/types";
 
@@ -164,16 +164,12 @@ export default function MyIntentsPage() {
                       <div className="text-sm font-medium text-vx-text truncate">
                         {item.srcAmount} {item.srcToken} → {item.dstToken}
                       </div>
-                      <div className="text-xs text-vx-muted capitalize">
-                        {item.srcChain} · via {item.solver}
+                      <div className="self-start sm:self-center">
+                        <IntentStatusBadge status={item.status} />
                       </div>
-                      <IntentStatusBadge status={item.status} />
-                    </div>
-                    <div className="self-start sm:self-center">
-                      <IntentStatusBadge status={item.status} />
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  );
+                })}
               </div>
             )}
           </>

@@ -1,21 +1,4 @@
-/**
- * /solve — dynamically imported to keep it out of the initial homepage
- * bundle. Heavy dependencies (SWR hooks for solvers + open intents,
- * registration form) only load when the user navigates here.
- */
-import dynamic from "next/dynamic";
-import { SkeletonCard } from "@/components/Skeleton";
-import { Nav } from "@/components/Nav";
-import { Footer } from "@/components/Footer";
-import { useSolvers } from "@/hooks/useSolvers";
-import { useOpenIntents } from "@/hooks/useOpenIntents";
-import { useAcceptIntent } from "@/hooks/useAcceptIntent";
-import { useSolverRegistration } from "@/hooks/useSolverRegistration";
-import { IntentListSkeleton, SolverListSkeleton } from "@/components/Skeleton";
-import { timeRemaining } from "@/lib/time";
-import { isValidStellarPublicKey } from "@/lib/stellarAddress";
-import { getMessage } from "@/i18n/messages";
-import { formatCurrency } from "@/lib/format";
+"use client";
 
 const usdCompact = (value: number) =>
   formatCurrency(value, undefined, {

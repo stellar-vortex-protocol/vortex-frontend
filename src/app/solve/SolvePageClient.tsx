@@ -9,6 +9,7 @@ import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { DEFAULT_CHAIN_COLOR, getChainMeta } from "@/lib/marketData";
 import { getMessage } from "@/i18n/messages";
 import { formatCurrency } from "@/lib/format";
 import Link from "next/link";
@@ -173,14 +174,20 @@ export default function SolvePageClient() {
                           <div className="text-sm font-semibold text-vx-text truncate">{s.name}</div>
                           <div className="num text-xs text-vx-muted truncate">{s.address}</div>
                           <div className="flex flex-wrap gap-1 mt-1.5">
-                            {s.chains.map((c) => (
-                              <span
-                                key={c}
-                                className="text-[10px] px-1.5 py-0.5 bg-vx-surface rounded text-vx-muted"
-                              >
-                                {c}
-                              </span>
-                            ))}
+                            {s.chains.map((c) => {
+                              const chain = getChainMeta(c);
+                              const chainColor = chain?.color ?? DEFAULT_CHAIN_COLOR;
+
+                              return (
+                                <span
+                                  key={c}
+                                  className="text-[10px] px-1.5 py-0.5 rounded text-white"
+                                  style={{ backgroundColor: chainColor }}
+                                >
+                                  {chain?.name ?? c}
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -266,41 +273,50 @@ export default function SolvePageClient() {
               </div>
             ) : (
               <div className="divide-y divide-vx-line">
-                {openIntents.map((intent) => (
-                  <div
-                    key={intent.id}
-                    className="px-3 sm:px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 hover:bg-vx-surface/30"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="num text-xs text-vx-muted mb-1 capitalize">
-                        {getMessage("solve.intents.id", { id: intent.id })}
-                      </div>
-                      <div className="text-sm font-medium text-vx-text capitalize">
-                        {intent.srcAmount} {intent.srcToken} on {intent.srcChain}
-                      </div>
-                      <div className="text-xs text-vx-muted">
-                        {getMessage("solve.intents.details", {
-                          minOut: intent.minOut,
-                          dstToken: intent.dstToken,
-                          timeRemaining: timeRemaining(intent.deadline),
-                        })}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => accept(intent.id)}
-                      disabled={acceptingId === intent.id}
-                      aria-busy={acceptingId === intent.id}
-                      className="px-3 sm:px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg
-                                 border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0
-                                 w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
+                {openIntents.map((intent) => {
+                  const chain = getChainMeta(intent.srcChain);
+                  const chainColor = chain?.color ?? DEFAULT_CHAIN_COLOR;
+
+                  return (
+                    <div
+                      key={intent.id}
+                      className="px-3 sm:px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 hover:bg-vx-surface/30"
                     >
-                      {acceptingId === intent.id
-                        ? getMessage("solve.intents.accepting")
-                        : getMessage("solve.intents.accept")}
-                    </button>
-                  </div>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <div className="num text-xs text-vx-muted mb-1 capitalize">
+                          {getMessage("solve.intents.id", { id: intent.id })}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm font-medium text-vx-text">
+                          {intent.srcAmount} {intent.srcToken} on
+                          <span className="inline-flex items-center gap-1.5">
+                            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: chainColor }} />
+                            {chain?.name ?? intent.srcChain}
+                          </span>
+                        </div>
+                        <div className="text-xs text-vx-muted">
+                          {getMessage("solve.intents.details", {
+                            minOut: intent.minOut,
+                            dstToken: intent.dstToken,
+                            timeRemaining: timeRemaining(intent.deadline),
+                          })}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => accept(intent.id)}
+                        disabled={acceptingId === intent.id}
+                        aria-busy={acceptingId === intent.id}
+                        className="px-3 sm:px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg
+                                   border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0
+                                   w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
+                      >
+                        {acceptingId === intent.id
+                          ? getMessage("solve.intents.accepting")
+                          : getMessage("solve.intents.accept")}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

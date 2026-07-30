@@ -7,6 +7,12 @@ export const CHAINS = [
   { id: "avalanche",name: "Avalanche", short: "AVAX", color: "#E84142" },
 ];
 
+export const DEFAULT_CHAIN_COLOR = "#8B8B93";
+
+export function getChainMeta(chainId: string) {
+  return CHAINS.find((chain) => chain.id === chainId);
+}
+
 export const SRC_TOKENS: Record<string, { symbol: string; decimals: number; priceUSD: number }[]> = {
   ethereum: [
     { symbol: "USDC", decimals: 6,  priceUSD: 1.0 },

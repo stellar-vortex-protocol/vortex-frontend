@@ -8,7 +8,7 @@ import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useLiveIntents } from "@/hooks/useLiveIntents";
 import { timeAgo } from "@/lib/time";
-import { CHAINS } from "@/lib/marketData";
+import { CHAINS, DEFAULT_CHAIN_COLOR, getChainMeta } from "@/lib/marketData";
 import type { IntentStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
@@ -133,27 +133,33 @@ export default function ExplorePageClient() {
         ) : (
           <>
             <div className="space-y-2">
-              {paginated.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/explore/${item.id}`}
-                  className="flex items-center gap-4 p-4 bg-vx-surface/40 rounded-lg border border-vx-line
-                             hover:border-vx-border transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-vx-text truncate">
-                      {item.srcAmount} {item.srcToken} → {item.dstToken}
+              {paginated.map((item) => {
+                const chain = getChainMeta(item.srcChain);
+                const chainColor = chain?.color ?? DEFAULT_CHAIN_COLOR;
+
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/explore/${item.id}`}
+                    className="flex items-center gap-4 p-4 bg-vx-surface/40 rounded-lg border border-vx-line
+                               hover:border-vx-border transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-vx-text truncate">
+                        {item.srcAmount} {item.srcToken} → {item.dstToken}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-vx-muted">
+                        <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: chainColor }} />
+                        {chain?.name ?? item.srcChain} · via {item.solver}
+                      </div>
                     </div>
-                    <div className="text-xs text-vx-muted capitalize">
-                      {item.srcChain} · via {item.solver}
-                    </div>
-                  </div>
-                  <IntentStatusBadge status={item.status} />
-                  <span className="text-xs text-vx-muted num flex-shrink-0 w-16 text-right">
-                    {timeAgo(item.createdAt)}
-                  </span>
-                </Link>
-              ))}
+                    <IntentStatusBadge status={item.status} />
+                    <span className="text-xs text-vx-muted num flex-shrink-0 w-16 text-right">
+                      {timeAgo(item.createdAt)}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
 
             {pageCount > 1 && (
