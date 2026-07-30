@@ -4,10 +4,12 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
+import { SkeletonCard } from "@/components/Skeleton";
 import { useSolver } from "@/hooks/useSolver";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
 import { timeAgo } from "@/lib/time";
-import { CHAINS } from "@/lib/marketData";
+import { DEFAULT_CHAIN_COLOR, getChainMeta } from "@/lib/marketData";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 function truncateAddress(address: string) {
   if (address.length <= 12) return address;
@@ -105,9 +107,9 @@ export default function SolverDetailPage({ params }: { params: { address: string
                 <div className="flex flex-wrap gap-2">
                   {solver.chains.length > 0 ? (
                     solver.chains.map(chainId => {
-                      const chainMeta = CHAINS.find(c => c.id === chainId);
+                      const chainMeta = getChainMeta(chainId);
                       const chainName = chainMeta?.name ?? chainId;
-                      const chainColor = chainMeta?.color ?? "#6B7280";
+                      const chainColor = chainMeta?.color ?? DEFAULT_CHAIN_COLOR;
                       return (
                         <span 
                           key={chainId} 
@@ -151,29 +153,35 @@ export default function SolverDetailPage({ params }: { params: { address: string
                   {fillHistory
                     .filter(item => item.solver === solver.address)
                     .slice(0, 10)
-                    .map(fill => (
-                      <div 
-                        key={fill.id} 
-                        className="px-4 sm:px-5 py-4 hover:bg-vx-surface/30 transition-colors"
-                      >
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-start justify-between gap-2 min-w-0">
-                            <div className="min-w-0 flex-1">
-                              <div className="num text-xs text-vx-muted mb-1 truncate">
-                                ID: {fill.id}
+                    .map(fill => {
+                      const chain = getChainMeta(fill.srcChain);
+                      const chainColor = chain?.color ?? DEFAULT_CHAIN_COLOR;
+
+                      return (
+                        <div
+                          key={fill.id}
+                          className="px-4 sm:px-5 py-4 hover:bg-vx-surface/30 transition-colors"
+                        >
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-start justify-between gap-2 min-w-0">
+                              <div className="min-w-0 flex-1">
+                                <div className="num text-xs text-vx-muted mb-1 truncate">
+                                  ID: {fill.id}
+                                </div>
+                                <div className="text-xs sm:text-sm font-medium text-vx-text capitalize">
+                                  {fill.srcAmount} {fill.srcToken} → {fill.dstToken}
+                                </div>
                               </div>
-                              <div className="text-xs sm:text-sm font-medium text-vx-text capitalize">
-                                {fill.srcAmount} {fill.srcToken} → {fill.dstToken}
-                              </div>
+                              <IntentStatusBadge status={fill.status} />
                             </div>
-                            <IntentStatusBadge status={fill.status} />
-                          </div>
-                          <div className="text-xs text-vx-muted">
-                            {fill.srcChain} · {timeAgo(fill.createdAt)}
+                            <div className="flex items-center gap-1.5 text-xs text-vx-muted">
+                              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: chainColor }} />
+                              {chain?.name ?? fill.srcChain} · {timeAgo(fill.createdAt)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               )}
             </div>

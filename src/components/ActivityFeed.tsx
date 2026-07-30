@@ -2,13 +2,9 @@
 
 import { useMemo } from "react";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
+import { SkeletonCard } from "@/components/Skeleton";
+import { DEFAULT_CHAIN_COLOR, getChainMeta } from "@/lib/marketData";
 import { timeAgo } from "@/lib/time";
-import type { FeedItem } from "@/lib/types";
-
-const CHAIN_COLOR: Record<string, string> = {
-  ethereum: "#627EEA", base: "#0052FF", polygon: "#8247E5",
-  arbitrum: "#12AAFF", optimism: "#FF0420", avalanche: "#E84142",
-};
 
 /** Maximum number of activity items shown in the feed. */
 const FEED_LIMIT = 6;
@@ -23,7 +19,7 @@ export function ActivityFeed() {
   const visibleItems = useMemo(() => items.slice(0, FEED_LIMIT), [items]);
 
   if (isLoading && items.length === 0) {
-    return <FeedSkeleton count={3} />;
+    return <SkeletonCard rows={3} />;
   }
 
   return (
@@ -42,7 +38,8 @@ export function ActivityFeed() {
         </div>
       ) : null}
       {visibleItems.map((item) => {
-        const color = CHAIN_COLOR[item.srcChain] ?? "#8B8B93";
+        const chain = getChainMeta(item.srcChain);
+        const color = chain?.color ?? DEFAULT_CHAIN_COLOR;
         return (
           <div key={item.id} className="flex items-center gap-3 p-3 bg-vx-surface/40 rounded-lg
                                   border border-vx-line hover:border-vx-border transition-colors">
@@ -54,8 +51,8 @@ export function ActivityFeed() {
               <div className="text-xs font-medium text-vx-text truncate">
                 {item.srcAmount} {item.srcToken} → {item.dstToken}
               </div>
-              <div className="text-[10px] text-vx-muted capitalize">
-                {item.srcChain} · via {item.solver}
+              <div className="text-[10px] text-vx-muted">
+                {chain?.name ?? item.srcChain} · via {item.solver}
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -67,8 +64,4 @@ export function ActivityFeed() {
       })}
     </div>
   );
-}
-
-export function ActivityFeed() {
-  return <ActivityFeedView {...useIntentFeed()} />;
 }
