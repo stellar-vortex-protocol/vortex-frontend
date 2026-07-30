@@ -14,12 +14,23 @@ export type SwapSubmissionStatus =
   | "success"
   | "error";
 
+const PENDING_STATUSES: SwapSubmissionStatus[] = [
+  "connecting",
+  "building",
+  "awaiting-signature",
+  "submitting",
+];
+
 export function useSwapSubmission() {
   const [status, setStatus] = useState<SwapSubmissionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [intentId, setIntentId] = useState<string | null>(null);
 
   const submit = useCallback(async (params: QuoteRequest) => {
+    if (PENDING_STATUSES.includes(status)) {
+      return;
+    }
+
     setError(null);
     setIntentId(null);
 

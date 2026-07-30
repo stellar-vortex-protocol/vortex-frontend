@@ -50,8 +50,9 @@
   .num { font-family: var(--font-geist-mono); font-variant-numeric: tabular-nums; }
 
   .input-swap {
-    @apply w-full bg-transparent text-3xl font-light text-vx-text
-           placeholder-vx-dim/60 focus:outline-none caret-vx-sage;
+    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg
+           placeholder-vx-dim/60 caret-vx-sage
+           focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
   }
 
   .token-btn {
@@ -115,4 +116,15 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+html[data-motion="allow"] *, html[data-motion="allow"] *::before, html[data-motion="allow"] *::after {
+  scroll-behavior: smooth;
 }

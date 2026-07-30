@@ -7,7 +7,7 @@ import { SwapCard } from "@/components/SwapCard";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { CHAINS } from "@/lib/marketData";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
-import type { MessageKey } from "@/lib/i18n";
+import type { MessageKey } from "@/lib/i18n/index";
 
 // ─── Intent Pipeline Visualization ────────────────────────────────────────────
 

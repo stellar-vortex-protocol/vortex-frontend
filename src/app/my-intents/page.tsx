@@ -43,6 +43,10 @@ export default function MyIntentsPage() {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
+  const handleExportCsv = () => {
+    downloadCsv("vortex-my-intents.csv", buildIntentsCsv(filtered));
+  };
+
   return (
     <div className="min-h-screen">
       <Nav variant="breadcrumb" label="My Intents" />
@@ -109,7 +113,16 @@ export default function MyIntentsPage() {
                 </select>
               </label>
 
-              <span className="text-xs text-vx-muted ml-auto" aria-live="polite" aria-atomic="true">
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                disabled={filtered.length === 0}
+                className="ml-auto px-3 py-2 rounded-lg border border-vx-border text-xs font-semibold text-vx-muted hover:text-vx-text hover:border-vx-sage/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-vx-border disabled:hover:text-vx-muted"
+              >
+                Export CSV
+              </button>
+
+              <span className="text-xs text-vx-muted" aria-live="polite" aria-atomic="true">
                 {filtered.length} intent{filtered.length === 1 ? "" : "s"}
               </span>
             </fieldset>
@@ -141,24 +154,15 @@ export default function MyIntentsPage() {
               </div>
             ) : (
               <div data-address={address} data-testid="intents-list" className="space-y-2" role="list">
-                {filtered.map((item) => {
-                  const chain = getChainMeta(item.srcChain);
-                  const chainColor = chain?.color ?? DEFAULT_CHAIN_COLOR;
-
-                  return (
-                    <Link
-                      key={item.id}
-                      href={`/explore/${item.id}`}
-                      className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-vx-surface/40 rounded-lg border border-vx-line hover:border-vx-sage/40 transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-vx-text truncate">
-                          {item.srcAmount} {item.srcToken} → {item.dstToken}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-vx-muted">
-                          <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: chainColor }} />
-                          {chain?.name ?? item.srcChain} · via {item.solver}
-                        </div>
+                {filtered.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/explore/${item.id}`}
+                    className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-vx-surface/40 rounded-lg border border-vx-line hover:border-vx-sage/40 active:bg-vx-surface/60 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-vx-text truncate">
+                        {item.srcAmount} {item.srcToken} → {item.dstToken}
                       </div>
                       <div className="self-start sm:self-center">
                         <IntentStatusBadge status={item.status} />

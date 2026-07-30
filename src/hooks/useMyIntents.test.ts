@@ -84,8 +84,8 @@ describe("useMyIntents", () => {
       json: async () => [intent],
     });
 
-    const { result, rerender } = renderHook(
-      ({ addr }: { addr: string | null }) => useMyIntents(addr),
+    const { result, rerender } = renderHook<ReturnType<typeof useMyIntents>, { addr: string | null }>(
+      ({ addr }) => useMyIntents(addr),
       { wrapper, initialProps: { addr: "GABC123" } },
     );
 

@@ -21,14 +21,14 @@ describe("useToastStore", () => {
     const id = useToastStore.getState().addToast("Swap submitted", "success");
 
     const [toast] = useToastStore.getState().toasts;
-    expect(toast.id).toBe(id);
-    expect(toast.message).toBe("Swap submitted");
-    expect(toast.variant).toBe("success");
+    expect(toast!.id).toBe(id);
+    expect(toast!.message).toBe("Swap submitted");
+    expect(toast!.variant).toBe("success");
   });
 
   it("defaults to the 'info' variant", () => {
     useToastStore.getState().addToast("Heads up");
-    expect(useToastStore.getState().toasts[0].variant).toBe("info");
+    expect(useToastStore.getState().toasts[0]!.variant).toBe("info");
   });
 
   it("dismisses a toast by id", () => {

@@ -52,7 +52,7 @@ describe("HomePage", () => {
       ["Auction", "Solvers bid"],
       ["Relay", "Best fills"],
       ["Settle", "On Stellar"],
-    ]) {
+    ] as [string, string][]) {
       expect(screen.getByText(label)).toBeInTheDocument();
       expect(screen.getByText(sub)).toBeInTheDocument();
     }

@@ -37,7 +37,7 @@ describe("useLiveIntents", () => {
   });
 
   it("prepends a live message ahead of the REST list, deduped by id", () => {
-    const liveItem: FeedItem = { ...restItems[0], id: "live-1", solver: "Beta" };
+    const liveItem: FeedItem = { ...restItems[0]!, id: "live-1", solver: "Beta" };
     useIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: liveItem });
 

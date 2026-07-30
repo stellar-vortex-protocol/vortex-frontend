@@ -148,6 +148,34 @@ describe("SwapCard", () => {
     expect(screen.getByText(`Swap 500 USDC → USDC`)).toBeInTheDocument();
   });
 
+  it("renders a warning for high price impact quotes", async () => {
+    const quote: Quote = {
+      dstAmount: "497.1234",
+      solver: "Beta Liquidity Co",
+      fillTimeSeconds: 32,
+      priceImpactPct: 3.5,
+      protocolFeePct: 0.05,
+      rate: "1 USDC = 8.4600 XLM",
+    };
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => quote,
+    });
+
+    const user = userEvent.setup();
+    renderSwapCard();
+
+    await user.type(screen.getByPlaceholderText("0"), "500");
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("alert")).toHaveTextContent("High price impact above 3%");
+      },
+      { timeout: 2000 }
+    );
+  });
+
   it("falls back to an estimate and shows a warning when the quote request fails", async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
@@ -168,6 +196,38 @@ describe("SwapCard", () => {
       },
       { timeout: 2000 }
     );
+  });
+
+  it("truncates input to the selected token's decimal precision (USDC = 6 dp)", async () => {
+    const user = userEvent.setup();
+    renderSwapCard();
+
+    // USDC (default token) has 6 decimal places. Typing 9 dp should truncate.
+    const input = screen.getByPlaceholderText("0");
+    await user.type(input, "1.123456789");
+
+    // The displayed value must not exceed 6 decimal places.
+    expect((input as HTMLInputElement).value).toBe("1.123456");
+  });
+
+  it("truncates input to 18 decimal places when WETH is selected", async () => {
+    const user = userEvent.setup();
+    renderSwapCard();
+
+    // Open the token picker and switch to WETH.
+    const tokenBtn = screen.getByRole("button", {
+      name: "Select source token, currently USDC",
+    });
+    await user.click(tokenBtn);
+
+    const wethOption = await screen.findByRole("button", { name: /WETH/ });
+    await user.click(wethOption);
+
+    const input = screen.getByPlaceholderText("0");
+    // WETH has 18 dp — typing 20 fractional digits should truncate to 18.
+    await user.type(input, "0.123456789012345678901234");
+
+    expect((input as HTMLInputElement).value).toBe("0.123456789012345678");
   });
 
   it("submits a swap end-to-end for an already-connected wallet", async () => {
@@ -204,11 +264,23 @@ describe("SwapCard", () => {
     await user.type(input, "500");
     await waitFor(() => expect(screen.getByText("Beta Liquidity Co")).toBeInTheDocument(), { timeout: 2000 });
 
+    await user.clear(screen.getByLabelText("Slippage tolerance percent"));
+    await user.type(screen.getByLabelText("Slippage tolerance percent"), "1");
+
+    expect(screen.getByText("Min out: 492.1522 USDC")).toBeInTheDocument();
+
     await user.click(screen.getByText(`Swap 500 USDC → USDC`));
 
     await waitFor(() => {
       expect(screen.getByText(/Swap submitted/)).toBeInTheDocument();
     });
     expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", { network: "TESTNET" });
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/intents"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"minOut":"492.1522"'),
+      })
+    );
   });
 });

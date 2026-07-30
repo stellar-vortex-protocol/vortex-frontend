@@ -1,9 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import { useWalletStore } from "@/store/wallet";
 import { Nav } from "./Nav";
+
+const initialWalletState = useWalletStore.getState();
 
 /** Wrap Nav in I18nProvider so locale context is available. */
 function renderNav(props: Parameters<typeof Nav>[0]) {
@@ -14,7 +17,7 @@ function renderNav(props: Parameters<typeof Nav>[0]) {
 
 describe("Nav", () => {
   beforeEach(() => {
-    mockWallet({ isConnected: false });
+    useWalletStore.setState(initialWalletState, true);
   });
 
   it("renders the full link nav for the home variant", () => {
@@ -25,14 +28,13 @@ describe("Nav", () => {
   });
 
   it("does not render My Intents link when wallet is disconnected", () => {
-    mockWallet({ isConnected: false });
-    render(<Nav variant="home" />);
+    renderNav({ variant: "home" });
     expect(screen.queryByText("My Intents")).not.toBeInTheDocument();
   });
 
   it("renders My Intents link when wallet is connected", () => {
-    mockWallet({ isConnected: true });
-    render(<Nav variant="home" />);
+    useWalletStore.setState({ isConnected: true });
+    renderNav({ variant: "home" });
     expect(screen.getByRole("link", { name: "My Intents" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "My Intents" })).toHaveAttribute("href", "/my-intents");
   });
@@ -48,24 +50,32 @@ describe("Nav", () => {
     expect(screen.queryByLabelText("Open menu")).not.toBeInTheDocument();
   });
 
-  describe("locale switcher", () => {
-    it("renders a labeled locale-select control", () => {
+  describe("settings panel", () => {
+    it("opens the preferences panel from the nav", async () => {
+      const user = userEvent.setup();
       renderNav({ variant: "home" });
 
-      const select = screen.getByRole("combobox", { name: /switch language/i });
-      expect(select).toBeInTheDocument();
+      expect(screen.queryByRole("combobox", { name: /switch language/i })).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Settings" }));
+
+      expect(screen.getByRole("combobox", { name: /switch language/i })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /motion preference/i })).toBeInTheDocument();
     });
 
-    it("defaults to the locale provided by I18nProvider", () => {
+    it("defaults to the locale provided by I18nProvider", async () => {
+      const user = userEvent.setup();
       renderNav({ variant: "home" });
 
+      await user.click(screen.getByRole("button", { name: "Settings" }));
       const select = screen.getByRole("combobox", { name: /switch language/i });
       expect((select as HTMLSelectElement).value).toBe("en");
     });
 
-    it("lists all available locales as options", () => {
+    it("lists all available locales as options", async () => {
+      const user = userEvent.setup();
       renderNav({ variant: "home" });
 
+      await user.click(screen.getByRole("button", { name: "Settings" }));
       const options = screen.getAllByRole("option");
       const values = options.map((o) => (o as HTMLOptionElement).value);
       expect(values).toContain("en");
@@ -76,30 +86,31 @@ describe("Nav", () => {
       const user = userEvent.setup();
       renderNav({ variant: "home" });
 
+      await user.click(screen.getByRole("button", { name: "Settings" }));
       const select = screen.getByRole("combobox", { name: /switch language/i });
       await user.selectOptions(select, "es");
 
       expect((select as HTMLSelectElement).value).toBe("es");
     });
 
-    it("is keyboard-operable (accessible via keyboard)", async () => {
+    it("updates the reduced motion override", async () => {
       const user = userEvent.setup();
       renderNav({ variant: "home" });
 
-      const select = screen.getByRole("combobox", { name: /switch language/i });
+      await user.click(screen.getByRole("button", { name: "Settings" }));
+      const select = screen.getByRole("combobox", { name: /motion preference/i });
+      await user.selectOptions(select, "reduce");
 
-      // Tab to the select and verify it becomes focused
-      await user.tab();
-      // The select should be reachable via keyboard (focusable)
-      select.focus();
-      expect(document.activeElement).toBe(select);
+      expect((select as HTMLSelectElement).value).toBe("reduce");
+      expect(document.documentElement.dataset.motion).toBe("reduce");
     });
 
-    it("also renders locale switcher in the breadcrumb variant", () => {
+    it("also renders settings in the breadcrumb variant", async () => {
+      const user = userEvent.setup();
       renderNav({ variant: "breadcrumb", label: "Solver Portal" });
 
-      const select = screen.getByRole("combobox", { name: /switch language/i });
-      expect(select).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Settings" }));
+      expect(screen.getByRole("combobox", { name: /switch language/i })).toBeInTheDocument();
     });
   });
 
@@ -124,16 +135,16 @@ describe("Nav", () => {
 
       await user.click(screen.getByLabelText("Open menu"));
       const links = screen.getAllByText("Explore");
-      await user.click(links[links.length - 1]);
+      await user.click(links[links.length - 1]!);
 
       expect(screen.getByLabelText("Open menu")).toBeInTheDocument();
       expect(screen.getAllByText("Explore")).toHaveLength(1);
     });
 
     it("includes My Intents link in mobile menu when wallet is connected", async () => {
-      mockWallet({ isConnected: true });
+      useWalletStore.setState({ isConnected: true });
       const user = userEvent.setup();
-      render(<Nav variant="home" />);
+      renderNav({ variant: "home" });
 
       await user.click(screen.getByLabelText("Open menu"));
 
@@ -141,9 +152,9 @@ describe("Nav", () => {
     });
 
     it("closes menu when My Intents is clicked", async () => {
-      mockWallet({ isConnected: true });
+      useWalletStore.setState({ isConnected: true });
       const user = userEvent.setup();
-      render(<Nav variant="home" />);
+      renderNav({ variant: "home" });
 
       await user.click(screen.getByLabelText("Open menu"));
       const mobileMyIntentsLink = screen.getAllByRole("link", { name: "My Intents" })[1];

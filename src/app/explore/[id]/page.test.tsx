@@ -20,7 +20,7 @@ const detail: IntentDetail = {
   status: "filled",
   createdAt: new Date(Date.now() - 60_000).toISOString(),
   deadline: new Date(Date.now() + 5 * 60_000).toISOString(),
-  txHash: "abc123hash",
+  txHash: "abc1234567890hash",
 };
 
 describe("IntentDetailPage", () => {
@@ -52,19 +52,29 @@ describe("IntentDetailPage", () => {
     expect(screen.getByText("GABCDE...Z23456")).toBeInTheDocument();
   });
 
+  it("shows a truncated tx hash, a copy button, and a stellar.expert link when a txHash is present", () => {
+    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.getByText("abc123...90hash")).toBeInTheDocument();
+    expect(screen.getByText("Copy")).toBeInTheDocument();
+    expect(screen.getByText(/View on stellar.expert/)).toBeInTheDocument();
+  });
+
   it("links to the settlement tx on stellar.expert when a txHash is present", () => {
     useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
-    const link = screen.getByText(/View settlement tx/);
-    expect(link).toHaveAttribute("href", "https://stellar.expert/explorer/testnet/tx/abc123hash");
+    const link = screen.getByText(/View on stellar.expert/);
+    expect(link).toHaveAttribute("href", "https://stellar.expert/explorer/testnet/tx/abc1234567890hash");
   });
 
-  it("omits the settlement tx link when there is no txHash yet", () => {
+  it("omits the settlement tx section when there is no txHash yet", () => {
     useIntentMock.mockReturnValue({ intent: { ...detail, txHash: undefined }, isLoading: false, error: undefined });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
-    expect(screen.queryByText(/View settlement tx/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/View on stellar.expert/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Copy")).not.toBeInTheDocument();
   });
 
   it("links back to the explorer", () => {

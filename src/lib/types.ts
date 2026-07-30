@@ -17,7 +17,12 @@ export type QuoteRequest = {
   srcToken: string;
   srcAmount: string;
   dstToken: string;
+  minOut?: string;
 };
+
+export type QuoteErrorType =
+  | { kind: "no-solver"; message?: string }
+  | { kind: "generic"; message: string };
 
 export type Quote = {
   dstAmount: string;
@@ -39,6 +44,7 @@ export type FeedItem = {
   solver: string;
   status: IntentStatus;
   createdAt: string;
+  deadline?: string;
 };
 
 export type IntentDetail = FeedItem & {
@@ -64,6 +70,7 @@ export type CreateIntentRequest = {
   srcToken: string;
   srcAmount: string;
   dstToken: string;
+  minOut?: string;
   dstAddress: string;
 };
 

@@ -37,7 +37,7 @@ describe("useIntentFeed", () => {
   });
 
   it("prepends a live message ahead of the REST snapshot", () => {
-    const liveItem: FeedItem = { ...seedItems[0], id: "live-1", solver: "Beta" };
+    const liveItem: FeedItem = { ...seedItems[0]!, id: "live-1", solver: "Beta" };
     useActivityFeedMock.mockReturnValue({ items: seedItems, isLoading: false, error: undefined });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: liveItem });
 

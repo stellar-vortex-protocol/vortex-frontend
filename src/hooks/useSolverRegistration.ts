@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { mutate } from "swr";
 import freighterApi from "@stellar/freighter-api";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 
@@ -13,6 +14,31 @@ export type SolverRegistrationStatus =
   | "submitting"
   | "success"
   | "error";
+
+function RegistrationErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 409) {
+      return "This address is already registered as a solver.";
+    }
+    if (err.status === 400) {
+      const body = err.message.toLowerCase();
+      if (body.includes("bond") || body.includes("insufficient")) {
+        return "Insufficient bond amount. The bond must meet the minimum required.";
+      }
+    }
+    if (err.status === 422) {
+      const body = err.message.toLowerCase();
+      if (body.includes("bond") || body.includes("insufficient")) {
+        return "Insufficient bond amount. The bond must meet the minimum required.";
+      }
+    }
+    return err.message;
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return "Failed to register as a solver.";
+}
 
 export function useSolverRegistration() {
   const [status, setStatus] = useState<SolverRegistrationStatus>("idle");
@@ -47,7 +73,7 @@ export function useSolverRegistration() {
       setStatus("success");
       useToastStore.getState().addToast("Registered as a solver.", "success");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to register as a solver.";
+      const message = RegistrationErrorMessage(err);
       setStatus("error");
       setError(message);
       useToastStore.getState().addToast(message, "error");

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { apiFetch, ApiError } from "./api";
+import { apiFetch, ApiError, TimeoutError } from "./api";
 
 describe("apiFetch", () => {
   beforeEach(() => {
@@ -8,6 +8,7 @@ describe("apiFetch", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("resolves with parsed JSON on a successful response", async () => {
@@ -64,5 +65,50 @@ describe("apiFetch", () => {
     });
 
     await expect(apiFetch("/boom")).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("throws a TimeoutError when the request exceeds the timeout", async () => {
+    vi.useFakeTimers();
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          const signal = init?.signal;
+          if (signal) {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }
+        })
+    );
+
+    const promise = apiFetch("/slow");
+    vi.advanceTimersByTime(10_000);
+
+    await expect(promise).rejects.toThrow(TimeoutError);
+    vi.useRealTimers();
+  });
+
+  it("throws a distinct TimeoutError message rather than a generic network error", async () => {
+    vi.useFakeTimers();
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          const signal = init?.signal;
+          if (signal) {
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }
+        })
+    );
+
+    const promise = apiFetch("/slow");
+    vi.advanceTimersByTime(10_000);
+
+    await expect(promise).rejects.toMatchObject({
+      name: "TimeoutError",
+      message: "Request timed out. Please try again.",
+    });
+    vi.useRealTimers();
   });
 });

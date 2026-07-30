@@ -17,6 +17,8 @@ vi.mock("@/hooks/useSolvers", () => ({ useSolvers: useSolversMock }));
 vi.mock("@/hooks/useOpenIntents", () => ({ useOpenIntents: useOpenIntentsMock }));
 vi.mock("@/hooks/useAcceptIntent", () => ({ useAcceptIntent: useAcceptIntentMock }));
 vi.mock("@/hooks/useSolverRegistration", () => ({ useSolverRegistration: useSolverRegistrationMock }));
+vi.mock("@/components/Nav", () => ({ Nav: () => <nav /> }));
+vi.mock("@/components/Footer", () => ({ Footer: () => <footer /> }));
 
 import SolvePage from "./page";
 import { messages } from "@/i18n/messages";
@@ -130,6 +132,31 @@ describe("SolvePage", () => {
       expect(screen.getByText("$4.2M")).toBeInTheDocument();
       expect(screen.getByText("47s")).toBeInTheDocument();
       expect(screen.getByText("99.6%")).toBeInTheDocument();
+    });
+
+    it("sorts the leaderboard by name, volume, fills, and success rate", async () => {
+      const otherSolver: Solver = {
+        ...solvers[0],
+        name: "Zulu Solver",
+        address: "GDEF...5678",
+        fills: 900,
+        volumeUsd: 5_000_000,
+        successRatePct: 99.9,
+      };
+      useSolversMock.mockReturnValue({ solvers: [otherSolver, solvers[0]], isLoading: false, error: undefined });
+      const user = userEvent.setup();
+      render(<SolvePage />);
+
+      const solverNames = () =>
+        screen.getAllByText(/^(Alpha Market Making|Zulu Solver)$/).map((element) => element.textContent);
+
+      await user.click(screen.getByRole("button", { name: /^Name/ }));
+      expect(solverNames()).toEqual(["Alpha Market Making", "Zulu Solver"]);
+
+      for (const name of ["Volume", "Fills", "Success"]) {
+        await user.click(screen.getByRole("button", { name: new RegExp(`^${name}`, "i") }));
+        expect(solverNames()).toEqual(["Zulu Solver", "Alpha Market Making"]);
+      }
     });
 
     it("wraps solver rows in links to detail page", () => {
@@ -257,6 +284,14 @@ describe("SolvePage", () => {
 
       await user.type(screen.getByLabelText("Bond Amount (USDC)"), "50");
       expect(button).toBeEnabled();
+    });
+
+    it("shows a visible focus ring on the address and bond inputs", async () => {
+      render(<SolvePage />);
+      await registerTab();
+
+      expect(screen.getByLabelText("Stellar Address")).toHaveClass("focus:ring-2", "focus:ring-vx-sage");
+      expect(screen.getByLabelText("Bond Amount (USDC)")).toHaveClass("focus:ring-2", "focus:ring-vx-sage");
     });
 
     it("shows a validation error for a malformed Stellar address", async () => {

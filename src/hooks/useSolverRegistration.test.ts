@@ -1,12 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-const { signTransactionMock, registerSolverMock, submitSolverRegistrationMock, mutateMock, addToastMock } = vi.hoisted(() => ({
+const { signTransactionMock, registerSolverMock, submitSolverRegistrationMock, mutateMock, addToastMock, apiErrorMock } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   registerSolverMock: vi.fn(),
   submitSolverRegistrationMock: vi.fn(),
   mutateMock: vi.fn(),
   addToastMock: vi.fn(),
+  apiErrorMock: class extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.name = "ApiError";
+      this.status = status;
+    }
+  },
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -16,6 +24,7 @@ vi.mock("@stellar/freighter-api", () => ({
 vi.mock("@/lib/api", () => ({
   registerSolver: registerSolverMock,
   submitSolverRegistration: submitSolverRegistrationMock,
+  ApiError: apiErrorMock,
 }));
 
 vi.mock("swr", () => ({ mutate: mutateMock }));
@@ -115,5 +124,37 @@ describe("useSolverRegistration", () => {
 
     expect(result.current.status).toBe("idle");
     expect(result.current.error).toBeNull();
+  });
+
+  it("surfaces a specific message when the address is already registered", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+    registerSolverMock.mockResolvedValue({ registrationId: "reg-4", unsignedXdr: "unsigned-xdr" });
+    signTransactionMock.mockResolvedValue("signed-xdr");
+    submitSolverRegistrationMock.mockRejectedValue(new apiErrorMock("address already registered", 409));
+
+    const { result } = renderHook(() => useSolverRegistration());
+    await act(async () => {
+      await result.current.register("GXYZ999", 50);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toBe("This address is already registered as a solver.");
+    expect(addToastMock).toHaveBeenCalledWith("This address is already registered as a solver.", "error");
+  });
+
+  it("surfaces a specific message when the bond is insufficient", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+    registerSolverMock.mockResolvedValue({ registrationId: "reg-5", unsignedXdr: "unsigned-xdr" });
+    signTransactionMock.mockResolvedValue("signed-xdr");
+    submitSolverRegistrationMock.mockRejectedValue(new apiErrorMock("insufficient bond", 400));
+
+    const { result } = renderHook(() => useSolverRegistration());
+    await act(async () => {
+      await result.current.register("GXYZ999", 50);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toBe("Insufficient bond amount. The bond must meet the minimum required.");
+    expect(addToastMock).toHaveBeenCalledWith("Insufficient bond amount. The bond must meet the minimum required.", "error");
   });
 });

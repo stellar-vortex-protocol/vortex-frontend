@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { VortexLogo } from "./VortexLogo";
 import { ConnectWalletButton } from "./ConnectWalletButton";
+import { SettingsPanel } from "./SettingsPanel";
 import { getMessage } from "@/lib/i18n-legacy";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { LOCALES, type Locale } from "@/lib/i18n";
+import { useWalletStore } from "@/store/wallet";
 
 type NavProps = { variant: "home" } | { variant: "breadcrumb"; label: string };
 
@@ -16,20 +18,11 @@ const NAV_LINKS = [
   { href: "/solve", label: "becomeSolver" as const },
 ];
 
-/** Locale display names shown in the switcher. */
-const LOCALE_LABELS: Record<Locale, string> = {
-  en: "EN",
-  es: "ES",
-};
-
 export function Nav(props: NavProps) {
   const maxWidth = props.variant === "home" ? "max-w-6xl" : "max-w-5xl";
   const [mobileOpen, setMobileOpen] = useState(false);
   const isConnected = useWalletStore((s) => s.isConnected);
   const pathname = usePathname();
-
-  const locale = useLocale();
-  const setLocale = useSetLocale();
 
   return (
     <nav className="sticky top-0 z-50 border-b border-vx-border bg-vx-ink/80 backdrop-blur-md">
@@ -42,23 +35,23 @@ export function Nav(props: NavProps) {
             </div>
             <div className="hidden md:flex items-center gap-5 text-sm text-vx-muted">
               {NAV_LINKS.map((link) => (
-                <Link key={link.href} href={link.href} className="hover:text-vx-text transition-colors">
+                <Link key={link.href} href={link.href} className="hover:text-vx-text active:text-vx-sage transition-colors">
                   {getMessage(`nav.${link.label}`)}
                 </Link>
               ))}
               {isConnected && (
-                <Link href="/my-intents" className={`transition-colors ${pathname === "/my-intents" ? "text-vx-text" : "hover:text-vx-text"}`}>
+                <Link href="/my-intents" className={`transition-colors ${pathname === "/my-intents" ? "text-vx-text" : "hover:text-vx-text active:text-vx-sage"}`}>
                   My Intents
                 </Link>
               )}
-              <a href="https://github.com/vortex-protocol" className="hover:text-vx-text transition-colors">
+              <a href="https://github.com/vortex-protocol" className="hover:text-vx-text active:text-vx-sage transition-colors">
                 {getMessage("nav.docs")}
               </a>
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-6">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2 transition-opacity active:opacity-80">
               <VortexLogo className="w-5 h-5 text-vx-sage" />
               <span className="font-semibold text-sm text-vx-text">{getMessage("nav.branding")}</span>
             </Link>
@@ -78,7 +71,7 @@ export function Nav(props: NavProps) {
             onChange={(e) => setLocale(e.target.value as Locale)}
             aria-label="Switch language"
             className="bg-transparent border border-vx-border rounded-md px-2 py-1 text-xs
-                       text-vx-muted hover:text-vx-text hover:border-vx-sage/50 transition-colors
+                       text-vx-muted hover:text-vx-text hover:border-vx-sage/50 active:text-vx-sage transition-colors
                        cursor-pointer focus:outline-none focus:ring-2 focus:ring-vx-sage/50"
           >
             {LOCALES.map((loc) => (
@@ -91,10 +84,11 @@ export function Nav(props: NavProps) {
           <ConnectWalletButton compact={props.variant === "breadcrumb"} />
           {props.variant === "home" && (
             <button
-              onClick={() => setMobileOpen((open) => !open)}
+              ref={toggleRef}
+              onClick={() => (mobileOpen ? closeMobileMenu() : setMobileOpen(true))}
               aria-expanded={mobileOpen}
               aria-label={mobileOpen ? getMessage("nav.closeMenu") : getMessage("nav.openMenu")}
-              className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg border border-vx-border text-vx-muted hover:text-vx-text transition-colors"
+              className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg border border-vx-border text-vx-muted hover:text-vx-text active:text-vx-sage transition-colors"
             >
               <svg aria-hidden="true" className="w-4 h-4" viewBox="0 0 16 16" fill="none">
                 {mobileOpen ? (
@@ -109,12 +103,12 @@ export function Nav(props: NavProps) {
       </div>
 
       {props.variant === "home" && mobileOpen && (
-        <div className="md:hidden border-t border-vx-border bg-vx-ink/95 backdrop-blur-md px-5 py-3 flex flex-col gap-1">
+        <div ref={panelRef} className="md:hidden border-t border-vx-border bg-vx-ink/95 backdrop-blur-md px-5 py-3 flex flex-col gap-1">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={closeMobileMenu}
               className="py-2 text-sm text-vx-muted hover:text-vx-text transition-colors"
             >
               {getMessage(`nav.${link.label}`)}
@@ -124,14 +118,14 @@ export function Nav(props: NavProps) {
             <Link
               href="/my-intents"
               onClick={() => setMobileOpen(false)}
-              className={`py-2 text-sm transition-colors ${pathname === "/my-intents" ? "text-vx-text" : "text-vx-muted hover:text-vx-text"}`}
+              className={`py-2 text-sm transition-colors ${pathname === "/my-intents" ? "text-vx-text" : "text-vx-muted hover:text-vx-text active:text-vx-sage"}`}
             >
               My Intents
             </Link>
           )}
           <a
             href="https://github.com/vortex-protocol"
-            onClick={() => setMobileOpen(false)}
+            onClick={closeMobileMenu}
             className="py-2 text-sm text-vx-muted hover:text-vx-text transition-colors"
           >
             {getMessage("nav.docs")}

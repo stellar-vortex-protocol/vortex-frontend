@@ -31,3 +31,4 @@ jobs:
           name: coverage-report
           path: coverage/
       - run: npm run build
+      - run: node scripts/check-bundle-size.mjs
