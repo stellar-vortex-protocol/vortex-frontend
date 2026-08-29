@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
@@ -14,14 +16,43 @@ import type { IntentStatus } from "@/lib/types";
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
 const SORT_OPTIONS = ["newest", "oldest", "largest"] as const;
 type SortOption = (typeof SORT_OPTIONS)[number];
-const PAGE_SIZE = 10;
+const CHAIN_IDS = new Set(CHAINS.map((c) => c.id));
+const ROW_HEIGHT = 96;
+const ROW_GAP = 8;
+
+function readStatus(value: string | null): IntentStatus | "all" {
+  return value && (STATUS_OPTIONS as string[]).includes(value) ? (value as IntentStatus | "all") : "all";
+}
+function readChain(value: string | null): string {
+  return value && CHAIN_IDS.has(value) ? value : "all";
+}
+function readSort(value: string | null): SortOption {
+  return value && (SORT_OPTIONS as readonly string[]).includes(value) ? (value as SortOption) : "newest";
+}
 
 export default function ExplorePageClient() {
   const { intents, isLoading, error, isLive } = useLiveIntents();
-  const [statusFilter, setStatusFilter] = useState<IntentStatus | "all">("all");
-  const [chainFilter, setChainFilter] = useState<string>("all");
-  const [sort, setSort] = useState<SortOption>("newest");
-  const [page, setPage] = useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const statusFilter = readStatus(searchParams.get("status"));
+  const chainFilter = readChain(searchParams.get("chain"));
+  const sort = readSort(searchParams.get("sort"));
+
+  const updateQuery = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === "all" || value === "newest" || value === "") next.delete(key);
+      else next.set(key, value);
+    }
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
+
+  const setStatusFilter = (value: IntentStatus | "all") => updateQuery({ status: value });
+  const setChainFilter = (value: string) => updateQuery({ chain: value });
+  const setSort = (value: SortOption) => updateQuery({ sort: value });
 
   const filtered = useMemo(() => {
     let result = intents;
@@ -41,16 +72,19 @@ export default function ExplorePageClient() {
     return result;
   }, [intents, statusFilter, chainFilter, sort]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Pagination is superseded by virtualization (#228): the full filtered/sorted
+  // list is windowed instead of paginated, so `page` is intentionally not a URL param.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+  });
 
   useEffect(() => {
-    setPage(1);
-  }, [statusFilter, chainFilter, sort]);
-
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
+    rowVirtualizer.scrollToIndex(0);
+  }, [statusFilter, chainFilter, sort, rowVirtualizer]);
 
   return (
     <div className="min-h-screen">
@@ -131,57 +165,48 @@ export default function ExplorePageClient() {
             No intents match your filters.
           </div>
         ) : (
-          <>
-            <div className="space-y-2">
-              {paginated.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/explore/${item.id}`}
-                  className="flex items-center gap-4 p-4 bg-vx-surface/40 rounded-lg border border-vx-line
-                             hover:border-vx-border transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-vx-text truncate">
-                      {item.srcAmount} {item.srcToken} → {item.dstToken}
+          <div
+            ref={scrollRef}
+            className="max-h-[70vh] overflow-y-auto"
+            role="list"
+            aria-label={`${filtered.length} intent${filtered.length === 1 ? "" : "s"}`}
+          >
+            <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                const item = filtered[virtualRow.index];
+                return (
+                  <Link
+                    key={item.id}
+                    href={`/explore/${item.id}`}
+                    role="listitem"
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: virtualRow.size - ROW_GAP,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className="flex items-center gap-4 p-4 bg-vx-surface/40 rounded-lg border border-vx-line
+                               hover:border-vx-border transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-vx-text truncate">
+                        {item.srcAmount} {item.srcToken} → {item.dstToken}
+                      </div>
+                      <div className="text-xs text-vx-muted capitalize">
+                        {item.srcChain} · via {item.solver}
+                      </div>
                     </div>
-                    <div className="text-xs text-vx-muted capitalize">
-                      {item.srcChain} · via {item.solver}
-                    </div>
-                  </div>
-                  <IntentStatusBadge status={item.status} />
-                  <span className="text-xs text-vx-muted num flex-shrink-0 w-16 text-right">
-                    {timeAgo(item.createdAt)}
-                  </span>
-                </Link>
-              ))}
+                    <IntentStatusBadge status={item.status} />
+                    <span className="text-xs text-vx-muted num flex-shrink-0 w-16 text-right">
+                      {timeAgo(item.createdAt)}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
-
-            {pageCount > 1 && (
-              <div className="flex items-center justify-center gap-4 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
-                             hover:text-vx-text hover:border-vx-sage/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-vx-muted num">
-                  Page {page} of {pageCount}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  disabled={page === pageCount}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted
-                             hover:text-vx-text hover:border-vx-sage/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
+          </div>
         )}
       </main>
 

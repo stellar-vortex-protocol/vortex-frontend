@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useToastStore, type ToastVariant } from "@/store/toast";
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
@@ -21,7 +22,13 @@ export function ToastViewport() {
           role="status"
           className={`flex items-start gap-3 px-4 py-3 rounded-lg border text-sm shadow-lg animate-fade-up ${VARIANT_STYLES[toast.variant]}`}
         >
-          <span className="flex-1">{toast.message}</span>
+          {toast.href ? (
+            <Link href={toast.href} className="flex-1 underline underline-offset-2">
+              {toast.message}
+            </Link>
+          ) : (
+            <span className="flex-1">{toast.message}</span>
+          )}
           <button
             onClick={() => dismissToast(toast.id)}
             aria-label="Dismiss notification"

@@ -54,6 +54,20 @@ Seeds from REST `/intents/feed` (`src/hooks/useActivityFeed.ts`) and layers live
 | `status` | `string` | Enum: `pending`, `accepted`, `filled`, `failed` |
 | `createdAt` | `string` | ISO-8601 UTC timestamp |
 
+## App-Wide Status-Change Alerts
+
+`useIntentStatusWatcher` (`src/hooks/useIntentStatusWatcher.ts`), mounted via
+`IntentStatusWatcher` in `src/app/layout.tsx`, subscribes to the same feed as
+`useMyLiveIntents` but skips the REST snapshot fetch — it only diffs
+`status` per intent `id` across incoming WebSocket messages, so it stays
+cheap to run on every page. On a transition it pushes a toast (batched into
+a single "N intents updated" toast when several land within the same
+1-second window) linking to the intent, unless the user is already on
+`/my-intents` where the transition is visible directly. State resets when
+the connected wallet address changes. Browser `Notification` support was
+scoped out of the initial pass — see issue #231 — since it requires an
+explicit settings toggle to request permission.
+
 ## Backend Reference
 
 If the canonical schema lives in [vortex-backend](https://github.com/vortex-protocol/vortex-backend),

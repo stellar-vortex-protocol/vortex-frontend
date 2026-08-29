@@ -10,10 +10,18 @@ import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
 import { CHAINS } from "@/lib/marketData";
 import { SkeletonCard } from "@/components/Skeleton";
+import { buildIntentsCsv, downloadCsv, CSV_HEADERS } from "@/lib/csv";
 import type { IntentStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
 const PAGE_SIZE = 10;
+const DATE_RANGE_OPTIONS = [
+  { value: "all", label: "All time" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+] as const;
+type DateRange = (typeof DATE_RANGE_OPTIONS)[number]["value"];
 
 export default function MyIntentsPage() {
   const address = useWalletStore((s) => s.address);
@@ -23,28 +31,42 @@ export default function MyIntentsPage() {
 
   const [statusFilter, setStatusFilter] = useState<IntentStatus | "all">("all");
   const [chainFilter, setChainFilter] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
   const [page, setPage] = useState(1);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([...CSV_HEADERS]);
 
   const filtered = useMemo(() => {
     let result = intents;
     if (statusFilter !== "all") result = result.filter((i) => i.status === statusFilter);
     if (chainFilter !== "all") result = result.filter((i) => i.srcChain === chainFilter);
+    if (dateRange !== "all") {
+      const cutoff = Date.now() - Number(dateRange) * 24 * 60 * 60 * 1000;
+      result = result.filter((i) => new Date(i.createdAt).getTime() >= cutoff);
+    }
     return result;
-  }, [intents, statusFilter, chainFilter]);
+  }, [intents, statusFilter, chainFilter, dateRange]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, chainFilter]);
+  }, [statusFilter, chainFilter, dateRange]);
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
+  const exportCsv = useMemo(() => buildIntentsCsv(filtered, selectedColumns), [filtered, selectedColumns]);
+
   const handleExportCsv = () => {
-    downloadCsv("vortex-my-intents.csv", buildIntentsCsv(filtered));
+    downloadCsv("vortex-my-intents.csv", exportCsv);
+  };
+
+  const toggleColumn = (column: string) => {
+    setSelectedColumns((prev) =>
+      prev.includes(column) ? prev.filter((c) => c !== column) : [...CSV_HEADERS].filter((c) => c === column || prev.includes(c))
+    );
   };
 
   return (
@@ -113,10 +135,25 @@ export default function MyIntentsPage() {
                 </select>
               </label>
 
+              <label htmlFor="my-date-range-filter">
+                <span className="sr-only">Filter by date range</span>
+                <select
+                  id="my-date-range-filter"
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value as DateRange)}
+                  className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
+                  aria-label="Filter intents by date range"
+                >
+                  {DATE_RANGE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </label>
+
               <button
                 type="button"
                 onClick={handleExportCsv}
-                disabled={filtered.length === 0}
+                disabled={filtered.length === 0 || selectedColumns.length === 0}
                 className="ml-auto px-3 py-2 rounded-lg border border-vx-border text-xs font-semibold text-vx-muted hover:text-vx-text hover:border-vx-sage/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-vx-border disabled:hover:text-vx-muted"
               >
                 Export CSV
@@ -126,6 +163,22 @@ export default function MyIntentsPage() {
                 {filtered.length} intent{filtered.length === 1 ? "" : "s"}
               </span>
             </fieldset>
+
+            {isConnected && (
+              <fieldset className="flex flex-wrap items-center gap-3 mb-6 border-0 p-0">
+                <legend className="text-xs text-vx-muted mb-1">Export columns</legend>
+                {CSV_HEADERS.map((col) => (
+                  <label key={col} className="flex items-center gap-1.5 text-xs text-vx-muted">
+                    <input
+                      type="checkbox"
+                      checked={selectedColumns.includes(col)}
+                      onChange={() => toggleColumn(col)}
+                    />
+                    {col}
+                  </label>
+                ))}
+              </fieldset>
+            )}
 
             {/* List */}
             {isLoading ? (
@@ -167,7 +220,6 @@ export default function MyIntentsPage() {
                       <div className="text-xs text-vx-muted capitalize">
                         {item.srcChain} · via {item.solver}
                       </div>
-                      <IntentStatusBadge status={item.status} />
                     </div>
                     <div className="self-start sm:self-center">
                       <IntentStatusBadge status={item.status} />

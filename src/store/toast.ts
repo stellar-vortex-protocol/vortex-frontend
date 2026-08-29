@@ -6,22 +6,23 @@ export type Toast = {
   id: string;
   message: string;
   variant: ToastVariant;
+  href?: string;
 };
 
 export const TOAST_DURATION_MS = 4000;
 
 type ToastState = {
   toasts: Toast[];
-  addToast: (message: string, variant?: ToastVariant) => string;
+  addToast: (message: string, variant?: ToastVariant, href?: string) => string;
   dismissToast: (id: string) => void;
 };
 
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
 
-  addToast: (message, variant = "info") => {
+  addToast: (message, variant = "info", href) => {
     const id = crypto.randomUUID();
-    set({ toasts: [...get().toasts, { id, message, variant }] });
+    set({ toasts: [...get().toasts, { id, message, variant, href }] });
     setTimeout(() => get().dismissToast(id), TOAST_DURATION_MS);
     return id;
   },
