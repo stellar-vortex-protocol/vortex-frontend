@@ -1,3 +1,21 @@
+/**
+ * PRICES_AS_OF
+ *
+ * The date these hardcoded token prices were last updated (ISO 8601 date string).
+ * These values are **static estimates** used only for the approximate-USD display
+ * in SwapCard and the chains list — the real settlement amounts always come from
+ * the live `useQuote` result, never from these numbers.
+ *
+ * ── How to refresh ────────────────────────────────────────────────────────────
+ * 1. Look up current prices on CoinGecko/CoinMarketCap for each token below.
+ * 2. Update the `priceUSD` values in `SRC_TOKENS` and `DST_TOKENS`.
+ * 3. Update this constant to today's date.
+ * 4. Open a PR — CI will verify the catalog and type-checks pass.
+ *
+ * A proper live-price oracle integration is tracked separately.
+ */
+export const PRICES_AS_OF = "2026-08-30";
+
 export const CHAINS = [
   { id: "ethereum", name: "Ethereum",  short: "ETH",  color: "#627EEA" },
   { id: "base",     name: "Base",      short: "BASE", color: "#0052FF" },

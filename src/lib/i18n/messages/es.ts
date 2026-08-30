@@ -10,6 +10,8 @@ export const es = {
   "wallet.error.connectFailed": "No se pudo conectar la billetera.",
 
   "swap.chainPicker.title": "Seleccionar cadena origen",
+  "swap.chainPicker.recent": "Recientes",
+  "swap.chainPicker.selectChain": "Seleccionar {name}",
 
   "swap.from.label": "De",
   "swap.from.amountLabel": "Cantidad a intercambiar",
@@ -17,6 +19,9 @@ export const es = {
   "swap.from.selectChain": "Cadena origen, actualmente {name}",
   "swap.from.selectToken": "Seleccionar token origen, actualmente {symbol}",
   "swap.from.approxValue": "≈ ${value}",
+
+  "swap.prices.estimated": "est.",
+  "swap.prices.asOf": "Precio estimado al {date}. La cotización en vivo actualizará esto cuando esté disponible.",
 
   "swap.to.label": "A",
   "swap.to.tokenGroup": "Token de destino",
@@ -35,7 +40,13 @@ export const es = {
   "swap.quote.protocolFee": "Comisión de protocolo",
   "swap.quote.protocolFeeValue": "{percent}%",
   "swap.quote.rate": "Tasa",
+
+  "swap.quote.fillTime.tooltip": "Tiempo estimado para que un solver complete tu swap después de enviarlo. El tiempo real puede variar.",
+  "swap.quote.priceImpact.tooltip": "Cuánto mueve tu operación el precio efectivo respecto al precio de mercado. Un impacto alto significa que recibirás menos que la tasa de mercado.",
+  "swap.quote.protocolFee.tooltip": "Pequeño porcentaje de comisión que cobra el protocolo Vortex en cada swap liquidado. Se deduce del monto de destino.",
   "swap.quote.unavailable": "Cotización en tiempo real no disponible — mostrando tasa estimada.",
+  "swap.quote.noSolver": "No hay solver disponible para esta ruta en este momento.",
+  "swap.quote.staleWarning": "La cotización está desactualizada. Espera a que se actualice antes de enviar.",
   "swap.quote.highPriceImpactWarning": "Impacto de precio alto por encima de {threshold}% — revisa antes de intercambiar.",
 
   "swap.submit.connecting": "Conectando billetera…",
@@ -49,6 +60,10 @@ export const es = {
   "swap.submit.retryCta": "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
 
   "swap.disclaimer": "El swap se liquida directamente en Stellar · Sin tokens envueltos · Protegido por bonos de solver",
+
+  "swap.destination.label": "Dirección de destino",
+  "swap.destination.placeholder": "G...",
+  "swap.destination.invalidAddress": "Introduce una dirección Stellar válida (empieza con G).",
 
   "home.hero.eyebrow": "Stellar Agentic Hackathon 2025",
   "home.hero.titleLine1": "Intercambia desde cualquier cadena",
