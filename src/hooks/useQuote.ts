@@ -26,8 +26,9 @@ function classifyQuoteError(err: unknown): QuoteErrorType {
 
 export function useQuote(params: QuoteRequest | null) {
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<number | null>(null);
-  const { data, error, isLoading } = useSWR<Quote>(quoteKey(params), fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<Quote>(quoteKey(params), fetcher, {
     revalidateOnFocus: false,
+    onSuccess: () => setQuoteFetchedAt(Date.now()),
     onErrorRetry(error, _key, _config, revalidate, { retryCount }) {
       // Do not retry on 4xx client errors — they won't self-heal.
       if (error?.status >= 400 && error?.status < 500) return;
@@ -37,5 +38,12 @@ export function useQuote(params: QuoteRequest | null) {
     },
   });
 
-  return { quote: data, quoteFetchedAt, isLoading, error };
+  return {
+    quote: data,
+    quoteFetchedAt,
+    isLoading,
+    error,
+    errorType: error ? classifyQuoteError(error) : undefined,
+    refresh: () => mutate(),
+  };
 }
