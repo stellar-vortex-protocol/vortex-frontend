@@ -15,12 +15,50 @@ import type { Quote, QuoteRequest } from "@/lib/types";
 export const DEFAULT_SLIPPAGE_PCT = 0.5;
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
 
+// A quote older than this is considered stale and must refresh before submit.
+export const STALE_QUOTE_THRESHOLD_MS = 30_000;
+
+// How long the "quote changed" delta indicator stays on screen after a refresh.
+const QUOTE_DELTA_TTL_MS = 4000;
+
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
   building: "swap.submit.building",
   "awaiting-signature": "swap.submit.awaitingSignature",
   submitting: "swap.submit.submitting",
 };
+
+// Small ▲/▼ indicator shown briefly next to a quote field when a fresh quote
+// moved it relative to the previous same-route quote (#297). Green when the
+// change favours the user, amber when it works against them.
+function QuoteDelta({
+  value,
+  betterWhenHigher,
+  format,
+  label,
+}: {
+  value: number;
+  betterWhenHigher: boolean;
+  format: (n: number) => string;
+  label: string;
+}) {
+  if (value === 0) return null;
+  const isUp = value > 0;
+  const isGood = betterWhenHigher ? isUp : !isUp;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[10px] font-semibold animate-fade-up ${
+        isGood ? "text-vx-sage" : "text-amber-400"
+      }`}
+    >
+      <span aria-hidden="true">{isUp ? "▲" : "▼"}</span>
+      <span aria-hidden="true">{format(Math.abs(value))}</span>
+      <span className="sr-only">
+        {label} {isGood ? "improved" : "worsened"} by {format(Math.abs(value))} on the latest quote
+      </span>
+    </span>
+  );
+}
 
 export type SwapCardProps = {
   initialAmount?: string;
@@ -36,9 +74,11 @@ export function SwapCard({
   const { t } = useTranslation();
 
   const [srcChain, setSrcChain] = useState("ethereum");
-  const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"][0]);
-  const [dstToken, setDstToken] = useState(DST_TOKENS[0]);
+  const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"]![0]!);
+  const [dstToken, setDstToken] = useState(DST_TOKENS[0]!);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
+  const [dstAddress, setDstAddress] = useState("");
+  const [slippagePct, setSlippagePct] = useState(String(DEFAULT_SLIPPAGE_PCT));
   const [showChainPicker, setShowChainPicker] = useState(false);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
   const chainToggleRef = useRef<HTMLButtonElement>(null);
@@ -66,8 +106,8 @@ export function SwapCard({
     if (e.key !== "Tab") return;
     const focusable = chainPickerRef.current?.querySelectorAll<HTMLButtonElement>("button");
     if (!focusable || focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();
       last.focus();
@@ -79,13 +119,50 @@ export function SwapCard({
 
   const debouncedAmount = useDebouncedValue(srcAmount, 500);
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
-  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError } = useQuote(
+  const { quote: fetchedQuote, quoteFetchedAt, isLoading: quoteIsLoading, error: quoteError } = useQuote(
     hasAmount && !previewQuote
       ? { srcChain, srcToken: srcToken.symbol, srcAmount: debouncedAmount, dstToken: dstToken.symbol }
       : null
   );
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
+  const quoteErrorType: { kind: "no-solver" | "generic" } | null = quoteError
+    ? { kind: /no[_ ]solver/i.test(quoteError.message ?? "") ? "no-solver" : "generic" }
+    : null;
+
+  // === "Quote changed" delta indicator (#297)
+  // Compare each fresh quote to the immediately-previous one for the *same
+  // route* (chain + token pair). A different route is a new quote entirely, not
+  // a delta; the very first quote for a route has nothing to compare against.
+  const routeKey = `${srcChain}|${srcToken.symbol}|${dstToken.symbol}`;
+  const prevQuoteRef = useRef<{ routeKey: string; quote: Quote } | null>(null);
+  const [quoteDelta, setQuoteDelta] = useState<{ dstAmount: number; priceImpactPct: number } | null>(null);
+
+  useEffect(() => {
+    const prev = prevQuoteRef.current;
+
+    // No quote (initial, or cleared while a new route's quote loads), or the
+    // route changed: drop any comparison history so the next quote for this
+    // route counts as a first quote, not a delta.
+    if (!quote || (prev && prev.routeKey !== routeKey)) {
+      prevQuoteRef.current = quote ? { routeKey, quote } : null;
+      setQuoteDelta(null);
+      return;
+    }
+
+    prevQuoteRef.current = { routeKey, quote };
+    if (!prev || prev.quote === quote) return;
+
+    const delta = {
+      dstAmount: parseFloat(quote.dstAmount) - parseFloat(prev.quote.dstAmount),
+      priceImpactPct: quote.priceImpactPct - prev.quote.priceImpactPct,
+    };
+    if (delta.dstAmount === 0 && delta.priceImpactPct === 0) return;
+
+    setQuoteDelta(delta);
+    const timer = setTimeout(() => setQuoteDelta(null), QUOTE_DELTA_TTL_MS);
+    return () => clearTimeout(timer);
+  }, [quote, routeKey]);
 
   const dstAddressError = dstAddress && !isValidStellarPublicKey(dstAddress)
     ? t("swap.destination.invalidAddress")
@@ -113,12 +190,15 @@ export function SwapCard({
   /** Truncate a raw amount string to at most `decimals` decimal places. */
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
-    if (dotIndex === -1 || decimals === 0) return value.split(".")[0];
+    if (dotIndex === -1 || decimals === 0) return value.split(".")[0] ?? "";
     return value.slice(0, dotIndex + 1 + decimals);
   }
 
   const handleAmountChange = (raw: string) => {
-    setSrcAmount(truncateToDecimals(raw, srcToken.decimals));
+    // The field is `type="text"` (a `type="number"` input silently reformats
+    // high-precision decimals) so keep only digits and a single dot here.
+    const cleaned = raw.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+    setSrcAmount(truncateToDecimals(cleaned, srcToken.decimals));
   };
 
   const handleSubmit = () => {
@@ -142,37 +222,13 @@ export function SwapCard({
       return;
     }
 
-    submission.submit({ srcChain, srcToken: srcToken.symbol, srcAmount, dstToken: dstToken.symbol });
+    submission.submit({ srcChain, srcToken: srcToken.symbol, srcAmount, dstToken: dstToken.symbol, minOut });
   };
 
   // While the chain picker overlay is open, the main card sits behind it
   // (opacity-0, pointer-events-none) — keep its controls out of the tab
   // order too, or keyboard users tab through invisible fields.
   const hiddenTabIndex = showChainPicker ? -1 : undefined;
-
-  const chainPickerRef = useRef<HTMLDivElement>(null);
-  const chainToggleRef = useRef<HTMLButtonElement>(null);
-
-  const closeChainPicker = () => {
-    setShowChainPicker(false);
-    chainToggleRef.current?.focus();
-  };
-
-  // Moves focus into the overlay when it opens, since its trigger becomes
-  // aria-hidden/untabbable the moment the main card is hidden behind it.
-  useEffect(() => {
-    if (!showChainPicker) return;
-    chainPickerRef.current?.querySelector<HTMLElement>("button")?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeChainPicker();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showChainPicker]);
 
   return (
     <div className="relative">
@@ -194,7 +250,8 @@ export function SwapCard({
                 type="button"
                 onClick={() => {
                   setSrcChain(c.id);
-                  setSrcToken(SRC_TOKENS[c.id][0]);
+                  const firstToken = SRC_TOKENS[c.id]?.[0];
+                  if (firstToken) setSrcToken(firstToken);
                   closeChainPicker();
                 }}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all
@@ -247,7 +304,8 @@ export function SwapCard({
             <label htmlFor="src-amount" className="sr-only">{t("swap.from.amountLabel")}</label>
             <input
               id="src-amount"
-              type="number"
+              type="text"
+              inputMode="decimal"
               tabIndex={hiddenTabIndex}
               value={srcAmount}
               onChange={e => handleAmountChange(e.target.value)}
@@ -330,12 +388,26 @@ export function SwapCard({
                   <span className="sr-only">{t("swap.to.quoteLoading")}</span>
                 </div>
               ) : (
-                <div className="text-3xl font-light text-vx-text num">
-                  {dstAmount > 0
-                    ? formatTokenAmount(dstAmount, undefined, {
-                        maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
-                      })
-                    : "0"}
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl font-light text-vx-text num">
+                    {dstAmount > 0
+                      ? formatTokenAmount(dstAmount, undefined, {
+                          maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
+                        })
+                      : "0"}
+                  </div>
+                  {quoteDelta && (
+                    <QuoteDelta
+                      value={quoteDelta.dstAmount}
+                      betterWhenHigher
+                      label={t("swap.to.label")}
+                      format={(n) =>
+                        formatTokenAmount(n, undefined, {
+                          maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
+                        })
+                      }
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -403,14 +475,30 @@ export function SwapCard({
             ] as const).map(([labelKey, value]) => (
               <div key={labelKey} className="flex items-center justify-between">
                 <span className="text-xs text-vx-muted">{t(labelKey)}</span>
-                <span
-                  className={`num text-xs font-medium ${
-                    labelKey === "swap.quote.priceImpact" && hasHighPriceImpact
-                      ? "text-amber-300"
-                      : "text-vx-text"
-                  }`}
-                >
-                  {value}
+                <span className="flex items-center gap-1.5">
+                  {labelKey === "swap.quote.priceImpact" && quoteDelta && (
+                    <QuoteDelta
+                      value={quoteDelta.priceImpactPct}
+                      betterWhenHigher={false}
+                      label={t("swap.quote.priceImpact")}
+                      format={(n) => `${n.toFixed(2)}%`}
+                    />
+                  )}
+                  {labelKey === "swap.quote.rate" && quoteDelta && (
+                    <span className="text-[10px] font-semibold text-vx-sage animate-fade-up">
+                      <span aria-hidden="true">↺</span>
+                      <span className="sr-only">Rate updated on the latest quote</span>
+                    </span>
+                  )}
+                  <span
+                    className={`num text-xs font-medium ${
+                      labelKey === "swap.quote.priceImpact" && hasHighPriceImpact
+                        ? "text-amber-300"
+                        : "text-vx-text"
+                    }`}
+                  >
+                    {value}
+                  </span>
                 </span>
               </div>
             ))}
@@ -419,6 +507,34 @@ export function SwapCard({
                 {t("swap.quote.highPriceImpactWarning", {
                   threshold: HIGH_PRICE_IMPACT_THRESHOLD_PCT,
                 })}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between gap-3 pt-1 border-t border-vx-line/60">
+              <label htmlFor="slippage-pct" className="text-xs text-vx-muted">
+                {t("swap.slippage.label")}
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  id="slippage-pct"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={50}
+                  step={0.1}
+                  tabIndex={hiddenTabIndex}
+                  value={slippagePct}
+                  onChange={(e) => setSlippagePct(e.target.value)}
+                  aria-label={t("swap.slippage.inputLabel")}
+                  className="w-16 bg-vx-surface border border-vx-border rounded-md px-2 py-1 text-xs text-vx-text text-right
+                             focus:outline-none focus:border-vx-sage/50"
+                />
+                <span aria-hidden="true" className="text-xs text-vx-muted">%</span>
+              </div>
+            </div>
+            {minOut !== "0" && (
+              <p className="num text-[11px] text-vx-muted text-right">
+                {t("swap.slippage.minOut", { amount: minOut, token: dstToken.symbol })}
               </p>
             )}
           </div>
