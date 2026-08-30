@@ -128,3 +128,39 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
 html[data-motion="allow"] *, html[data-motion="allow"] *::before, html[data-motion="allow"] *::after {
   scroll-behavior: smooth;
 }
+
+/* ── Print ──────────────────────────────────────────────────────────────────
+   The intent detail page (src/app/explore/[id]/page.tsx) doubles as a
+   printable / save-as-PDF record. Strip the app chrome and interactive-only
+   controls, and render the summary as plain black-on-white. Elements that
+   should not appear on paper carry Tailwind's `print:hidden`; this block
+   covers the structural chrome those utilities can't reach. */
+@media print {
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  #intent-record {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Keep colour-coded badges legible when printed in greyscale - they already
+     carry a text label and a distinct icon shape alongside the colour. */
+  #intent-record * {
+    color: #000 !important;
+    border-color: rgba(0, 0, 0, 0.25) !important;
+  }
+}
