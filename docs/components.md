@@ -77,3 +77,36 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 - On a failed `connect()` call, it also pushes an error toast via
   [`useToastStore`](../src/store/toast.ts) — you don't need to handle connection
   errors yourself when using this component.
+
+## `CommandPalette`
+
+[`src/components/CommandPalette.tsx`](../src/components/CommandPalette.tsx)
+
+Global `Cmd/Ctrl+K` command palette for keyboard-driven navigation. Mounted once
+in [`src/app/layout.tsx`](../src/app/layout.tsx) so the shortcut works on every
+route — you do not render it yourself.
+
+```tsx
+import { CommandPalette } from "@/components/CommandPalette";
+
+<CommandPalette />
+```
+
+**Props**
+
+None. State (open/closed, query, active option) is entirely internal.
+
+**Behavior**
+
+- `Cmd/Ctrl+K` toggles the palette open/closed from anywhere. `Escape` or a
+  click on the backdrop closes it.
+- Lists the four top-level routes (`/`, `/explore`, `/solve`, `/my-intents`),
+  filtered by the typed query against each route's label/path.
+- If the query is a valid Stellar public key it offers a direct jump to
+  `/solve/[address]`; otherwise a whitespace-free token that matches no route is
+  offered as an `/explore/[id]` lookup.
+- Fully keyboard-operable: `ArrowUp`/`ArrowDown` move the active option (wrapping),
+  `Enter` activates it, following the WAI-ARIA combobox/listbox pattern
+  (`role="combobox"` input + `role="listbox"` with `aria-activedescendant`).
+- On activate it calls `router.push(href)` and restores focus to the element that
+  was focused before the palette opened.
