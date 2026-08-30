@@ -2,8 +2,13 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/api";
 import type { IntentDetail } from "@/lib/types";
 
-// Single-intent detail fetch. No WebSocket or polling needed — the user
-// navigates here to check a specific intent's outcome.
+const POLL_INTERVAL_MS = 5_000;
+const TERMINAL_STATUSES = new Set(["filled", "failed"]);
+
+// Single-intent detail fetch. The WebSocket feed only carries FeedItem
+// summaries (not full IntentDetail), so per-intent live updates are done via
+// SWR polling instead of subscribing to the shared socket. Polling stops
+// once the intent reaches a terminal status to avoid wasted requests.
 //
 // revalidateOnFocus: true (default) is kept because a user may tab away,
 // wait for a fill, and tab back — which should show the updated status.
@@ -15,7 +20,8 @@ export function useIntent(id: string | null) {
     id ? `/intents/${id}` : null,
     fetcher,
     {
-      refreshInterval: 0,
+      refreshInterval: (latest) =>
+        latest && TERMINAL_STATUSES.has(latest.status) ? 0 : POLL_INTERVAL_MS,
       dedupingInterval: 5_000,
       revalidateOnFocus: true,
     },

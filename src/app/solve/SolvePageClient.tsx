@@ -9,15 +9,20 @@ import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { useWalletStore } from "@/store/wallet";
 import { getMessage } from "@/i18n/messages";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, toBCP47 } from "@/lib/format";
+import { useLocale } from "@/lib/i18n/I18nProvider";
 import Link from "next/link";
 
-const usdCompact = (value: number) =>
-  formatCurrency(value, undefined, {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  });
+function useUsdCompact() {
+  const locale = useLocale();
+  return (value: number) =>
+    formatCurrency(value, toBCP47(locale), {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    });
+}
 
 const MIN_BOND_USD = 50;
 
@@ -29,8 +34,13 @@ const REGISTRATION_LABEL: Record<string, string> = {
 };
 
 export default function SolvePageClient() {
+  const usdCompact = useUsdCompact();
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
+  const connectedAddress = useWalletStore((s) => s.address);
+  const ownSolver = connectedAddress
+    ? solvers.find((s) => s.address.toUpperCase() === connectedAddress.toUpperCase())
+    : undefined;
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
   const { accept, acceptingId, error: acceptError } = useAcceptIntent();
 
@@ -143,6 +153,15 @@ export default function SolvePageClient() {
                 {getMessage("solve.leaderboard.title")}
               </span>
             </div>
+
+            {ownSolver && (
+              <Link
+                href={`/solve/${ownSolver.address}`}
+                className="block px-5 py-3 text-xs sm:text-sm text-vx-sage bg-vx-sage-bg border-b border-vx-border hover:underline"
+              >
+                You&apos;re a registered solver — view your profile →
+              </Link>
+            )}
 
             {solversLoading && solvers.length === 0 ? (
               <div className="p-5">
@@ -378,6 +397,15 @@ export default function SolvePageClient() {
                 <p role="alert" className="text-xs text-red-400">
                   {registration.error}
                 </p>
+              )}
+
+              {registration.status === "success" && registration.registeredAddress && (
+                <Link
+                  href={`/solve/${registration.registeredAddress}`}
+                  className="block text-xs text-vx-sage hover:underline"
+                >
+                  View your solver profile →
+                </Link>
               )}
 
               <button

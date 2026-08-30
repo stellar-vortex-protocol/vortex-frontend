@@ -43,6 +43,7 @@ function RegistrationErrorMessage(err: unknown): string {
 export function useSolverRegistration() {
   const [status, setStatus] = useState<SolverRegistrationStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [registeredAddress, setRegisteredAddress] = useState<string | null>(null);
 
   const register = useCallback(async (address: string, bondUsd: number) => {
     setError(null);
@@ -71,6 +72,7 @@ export function useSolverRegistration() {
       await mutate("/solvers");
 
       setStatus("success");
+      setRegisteredAddress(address);
       useToastStore.getState().addToast("Registered as a solver.", "success");
     } catch (err) {
       const message = RegistrationErrorMessage(err);
@@ -83,7 +85,8 @@ export function useSolverRegistration() {
   const reset = useCallback(() => {
     setStatus("idle");
     setError(null);
+    setRegisteredAddress(null);
   }, []);
 
-  return { status, error, register, reset };
+  return { status, error, register, reset, registeredAddress };
 }
