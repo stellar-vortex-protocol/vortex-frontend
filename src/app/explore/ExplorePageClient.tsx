@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useLiveIntents } from "@/hooks/useLiveIntents";
+import { useLiveRelativeTime } from "@/hooks/useLiveRelativeTime";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
 import type { IntentStatus } from "@/lib/types";
@@ -18,6 +19,7 @@ const PAGE_SIZE = 10;
 
 export default function ExplorePageClient() {
   const { intents, isLoading, error, isLive } = useLiveIntents();
+  const now = useLiveRelativeTime();
   const [statusFilter, setStatusFilter] = useState<IntentStatus | "all">("all");
   const [chainFilter, setChainFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortOption>("newest");
@@ -150,7 +152,7 @@ export default function ExplorePageClient() {
                   </div>
                   <IntentStatusBadge status={item.status} />
                   <span className="text-xs text-vx-muted num flex-shrink-0 w-16 text-right">
-                    {timeAgo(item.createdAt)}
+                    {timeAgo(item.createdAt, now)}
                   </span>
                 </Link>
               ))}

@@ -11,6 +11,13 @@ const { useWalletStoreMock, useMyLiveIntentsMock } = vi.hoisted(() => ({
 vi.mock("@/store/wallet", () => ({ useWalletStore: useWalletStoreMock }));
 vi.mock("@/store/toast", () => ({ useToastStore: vi.fn(() => ({ addToast: vi.fn() })) }));
 vi.mock("@/hooks/useMyLiveIntents", () => ({ useMyLiveIntents: useMyLiveIntentsMock }));
+// Nav/Footer are unrelated chrome here and pull in wallet/i18n context this
+// suite does not set up - stub them so the page's own content is what's tested.
+vi.mock("@/components/Nav", () => ({ Nav: () => null }));
+vi.mock("@/components/Footer", () => ({ Footer: () => null }));
+vi.mock("@/components/ConnectWalletButton", () => ({
+  ConnectWalletButton: () => <button type="button">Connect Freighter</button>,
+}));
 
 import MyIntentsPage from "./page";
 
@@ -184,6 +191,16 @@ describe("MyIntentsPage", () => {
     render(<MyIntentsPage />);
     expect(screen.getByText(/haven't submitted any swaps/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /make your first swap/i })).toHaveAttribute("href", "/");
+  });
+
+  it("shows a relative 'submitted ... ago' timestamp on each row", () => {
+    mockWallet({ address: "GABC123", isConnected: true });
+    const recent: FeedItem[] = [
+      { ...intents[0]!, id: "9", createdAt: new Date(Date.now() - 90_000).toISOString() },
+    ];
+    useMyLiveIntentsMock.mockReturnValue({ intents: recent, isLoading: false, error: undefined });
+    render(<MyIntentsPage />);
+    expect(screen.getByText(/submitted 1m ago/)).toBeInTheDocument();
   });
 
   it("links each intent row to the intent detail page", () => {

@@ -8,8 +8,10 @@ import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
+import { useLiveRelativeTime } from "@/hooks/useLiveRelativeTime";
 import { CHAINS } from "@/lib/marketData";
-import { SkeletonCard } from "@/components/Skeleton";
+import { buildIntentsCsv, downloadCsv } from "@/lib/csv";
+import { timeAgo } from "@/lib/time";
 import type { IntentStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
@@ -20,6 +22,7 @@ export default function MyIntentsPage() {
   const isConnected = useWalletStore((s) => s.isConnected);
 
   const { intents, isLoading, error, isLive } = useMyLiveIntents(address);
+  const now = useLiveRelativeTime();
 
   const [statusFilter, setStatusFilter] = useState<IntentStatus | "all">("all");
   const [chainFilter, setChainFilter] = useState<string>("all");
@@ -87,7 +90,6 @@ export default function MyIntentsPage() {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as IntentStatus | "all")}
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
-                  aria-label="Filter intents by status"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -104,7 +106,6 @@ export default function MyIntentsPage() {
                   value={chainFilter}
                   onChange={(e) => setChainFilter(e.target.value)}
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
-                  aria-label="Filter intents by chain"
                 >
                   <option value="all">All chains</option>
                   {CHAINS.map((c) => (
@@ -129,10 +130,13 @@ export default function MyIntentsPage() {
 
             {/* List */}
             {isLoading ? (
-              <div className="space-y-2" role="status" aria-label="Loading intents">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 bg-vx-surface/40 rounded-lg border border-vx-line animate-pulse" />
-                ))}
+              <div role="status" className="space-y-2 text-sm text-vx-muted">
+                Loading your intents...
+                <div aria-hidden="true" className="space-y-2 pt-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 bg-vx-surface/40 rounded-lg border border-vx-line animate-pulse" />
+                  ))}
+                </div>
               </div>
             ) : error ? (
               <div role="alert" className="card p-8 text-center text-sm text-vx-muted">
@@ -167,7 +171,9 @@ export default function MyIntentsPage() {
                       <div className="text-xs text-vx-muted capitalize">
                         {item.srcChain} · via {item.solver}
                       </div>
-                      <IntentStatusBadge status={item.status} />
+                      <div className="text-[11px] text-vx-muted mt-0.5">
+                        submitted {timeAgo(item.createdAt, now)}
+                      </div>
                     </div>
                     <div className="self-start sm:self-center">
                       <IntentStatusBadge status={item.status} />
