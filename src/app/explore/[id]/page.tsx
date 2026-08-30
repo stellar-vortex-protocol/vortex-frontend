@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { CopyButton } from "@/components/CopyButton";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { SkeletonDetailCard } from "@/components/Skeleton";
 import { useIntent } from "@/hooks/useIntent";
@@ -96,12 +96,7 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
               <div className="pt-2 border-t border-vx-line">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-xs text-vx-muted num">{truncateAddress(intent.txHash)}</span>
-                  <button
-                    onClick={() => copy(intent.txHash)}
-                    className="text-xs text-vx-sage hover:underline"
-                  >
-                    {copied ? "Copied" : "Copy"}
-                  </button>
+                  <CopyButton value={intent.txHash} label="Copy transaction hash" />
                   <a
                     href={`https://stellar.expert/explorer/${NETWORK}/tx/${intent.txHash}`}
                     target="_blank"

@@ -6,7 +6,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useToastStore } from "@/store/toast";
 import { CHAINS, SRC_TOKENS, DST_TOKENS } from "@/lib/marketData";
-import { formatCurrency, formatTokenAmount } from "@/lib/format";
+import { formatCurrency, formatTokenAmount, toBCP47 } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import type { MessageKey } from "@/lib/i18n";
@@ -33,7 +33,7 @@ export function SwapCard({
   previewQuote,
   onPreviewSubmit,
 }: SwapCardProps = {}) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const [srcChain, setSrcChain] = useState("ethereum");
   const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"][0]);
@@ -285,7 +285,7 @@ export function SwapCard({
                     ${token.symbol === srcToken.symbol ? "bg-vx-lav-bg text-vx-lav" : "hover:bg-vx-surface text-vx-muted hover:text-vx-text"}`}
                 >
                   <span className="font-medium">{token.symbol}</span>
-                  <span className="num text-xs">${token.priceUSD.toLocaleString()}</span>
+                  <span className="num text-xs">${formatTokenAmount(token.priceUSD, toBCP47(locale))}</span>
                 </button>
               ))}
             </div>
@@ -293,9 +293,8 @@ export function SwapCard({
 
           {srcValueUSD > 0 && (
             <div className="num text-xs text-vx-muted">
-              {/* Number formatting stays locale-hardcoded here; issue #63 owns making it locale-aware. */}
               {t("swap.from.approxValue", {
-                value: srcValueUSD.toLocaleString("en-US", { maximumFractionDigits: 2 }),
+                value: formatTokenAmount(srcValueUSD, toBCP47(locale), { maximumFractionDigits: 2 }),
               })}
             </div>
           )}
