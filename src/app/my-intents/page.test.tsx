@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FeedItem } from "@/lib/types";
 
@@ -11,6 +11,13 @@ const { useWalletStoreMock, useMyLiveIntentsMock } = vi.hoisted(() => ({
 vi.mock("@/store/wallet", () => ({ useWalletStore: useWalletStoreMock }));
 vi.mock("@/store/toast", () => ({ useToastStore: vi.fn(() => ({ addToast: vi.fn() })) }));
 vi.mock("@/hooks/useMyLiveIntents", () => ({ useMyLiveIntents: useMyLiveIntentsMock }));
+// Nav/Footer/ConnectWalletButton carry their own (currently broken on main)
+// suites and wallet/i18n context this one does not set up.
+vi.mock("@/components/Nav", () => ({ Nav: () => null }));
+vi.mock("@/components/Footer", () => ({ Footer: () => null }));
+vi.mock("@/components/ConnectWalletButton", () => ({
+  ConnectWalletButton: () => <button type="button">Connect Freighter</button>,
+}));
 
 import MyIntentsPage from "./page";
 
@@ -73,6 +80,14 @@ const manyIntents: FeedItem[] = Array.from({ length: 25 }, (_, i) => ({
 }));
 
 describe("MyIntentsPage", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it("renders the main landmark with the correct id", () => {
     mockWallet();
     useMyLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: undefined, isLive: false });
@@ -184,6 +199,72 @@ describe("MyIntentsPage", () => {
     render(<MyIntentsPage />);
     expect(screen.getByText(/haven't submitted any swaps/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /make your first swap/i })).toHaveAttribute("href", "/");
+  });
+
+  describe("column visibility (#300)", () => {
+    function connectedWithIntents() {
+      mockWallet({ address: "GABC123", isConnected: true });
+      useMyLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined });
+    }
+
+    it("hides the solver column from every row when toggled off", async () => {
+      connectedWithIntents();
+      const user = userEvent.setup();
+      render(<MyIntentsPage />);
+
+      expect(screen.getByText(/via Alpha/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Columns" }));
+      await user.click(screen.getByRole("checkbox", { name: "Solver" }));
+
+      expect(screen.queryByText(/via Alpha/)).not.toBeInTheDocument();
+      // The source chain is a separate column and stays.
+      expect(screen.getByText(/ethereum/)).toBeInTheDocument();
+    });
+
+    it("persists the preference across a remount", async () => {
+      connectedWithIntents();
+      const user = userEvent.setup();
+      const { unmount } = render(<MyIntentsPage />);
+
+      await user.click(screen.getByRole("button", { name: "Columns" }));
+      await user.click(screen.getByRole("checkbox", { name: "Source chain" }));
+      expect(screen.queryByText(/ethereum/)).not.toBeInTheDocument();
+
+      unmount();
+      connectedWithIntents();
+      render(<MyIntentsPage />);
+
+      expect(screen.queryByText(/ethereum/)).not.toBeInTheDocument();
+    });
+
+    it("keeps status and date columns non-toggleable", async () => {
+      connectedWithIntents();
+      const user = userEvent.setup();
+      render(<MyIntentsPage />);
+
+      await user.click(screen.getByRole("button", { name: "Columns" }));
+
+      expect(screen.getByRole("checkbox", { name: /Status/ })).toBeDisabled();
+      expect(screen.getByRole("checkbox", { name: /Submitted/ })).toBeDisabled();
+      // Still rendered in the rows.
+      const list = screen.getByTestId("intents-list");
+      expect(within(list).getAllByText(/submitted .* ago/).length).toBeGreaterThan(0);
+    });
+
+    it("ignores unknown keys in a stale persisted preference", () => {
+      localStorage.setItem(
+        "vortex-my-intents-columns",
+        JSON.stringify({ solver: false, removedColumn: false }),
+      );
+      connectedWithIntents();
+      render(<MyIntentsPage />);
+
+      // Known key still applied...
+      expect(screen.queryByText(/via Alpha/)).not.toBeInTheDocument();
+      // ...and the page didn't crash on the unknown one.
+      expect(screen.getByTestId("intents-list")).toBeInTheDocument();
+    });
   });
 
   it("links each intent row to the intent detail page", () => {

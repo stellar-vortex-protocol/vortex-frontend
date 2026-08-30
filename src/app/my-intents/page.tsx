@@ -8,21 +8,42 @@ import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
+import { useColumnVisibility } from "@/hooks/useColumnVisibility";
 import { CHAINS } from "@/lib/marketData";
-import { SkeletonCard } from "@/components/Skeleton";
+import { buildIntentsCsv, downloadCsv } from "@/lib/csv";
+import { timeAgo } from "@/lib/time";
 import type { IntentStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
 const PAGE_SIZE = 10;
+
+// On-screen row columns. `pair` and `status` and `submitted` are essential for
+// scanning the list, so they can't be hidden; `chain` and `solver` are optional.
+const MY_INTENTS_COLUMNS = ["pair", "chain", "solver", "status", "submitted"] as const;
+type MyIntentsColumn = (typeof MY_INTENTS_COLUMNS)[number];
+const ALWAYS_VISIBLE_COLUMNS: MyIntentsColumn[] = ["pair", "status", "submitted"];
+const COLUMN_LABELS: Record<MyIntentsColumn, string> = {
+  pair: "Swap",
+  chain: "Source chain",
+  solver: "Solver",
+  status: "Status",
+  submitted: "Submitted",
+};
 
 export default function MyIntentsPage() {
   const address = useWalletStore((s) => s.address);
   const isConnected = useWalletStore((s) => s.isConnected);
 
   const { intents, isLoading, error, isLive } = useMyLiveIntents(address);
+  const { visibility, toggle, isToggleable } = useColumnVisibility<MyIntentsColumn>(
+    "vortex-my-intents-columns",
+    MY_INTENTS_COLUMNS,
+    ALWAYS_VISIBLE_COLUMNS,
+  );
 
   const [statusFilter, setStatusFilter] = useState<IntentStatus | "all">("all");
   const [chainFilter, setChainFilter] = useState<string>("all");
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [page, setPage] = useState(1);
 
   const filtered = useMemo(() => {
@@ -87,7 +108,6 @@ export default function MyIntentsPage() {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as IntentStatus | "all")}
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
-                  aria-label="Filter intents by status"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -104,7 +124,6 @@ export default function MyIntentsPage() {
                   value={chainFilter}
                   onChange={(e) => setChainFilter(e.target.value)}
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
-                  aria-label="Filter intents by chain"
                 >
                   <option value="all">All chains</option>
                   {CHAINS.map((c) => (
@@ -113,11 +132,48 @@ export default function MyIntentsPage() {
                 </select>
               </label>
 
+              <div className="relative ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowColumnMenu((open) => !open)}
+                  aria-haspopup="true"
+                  aria-expanded={showColumnMenu}
+                  className="px-3 py-2 rounded-lg border border-vx-border text-xs font-semibold text-vx-muted hover:text-vx-text hover:border-vx-sage/40 transition-colors"
+                >
+                  Columns
+                </button>
+                {showColumnMenu && (
+                  <div
+                    role="group"
+                    aria-label="Visible columns"
+                    className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-vx-border bg-vx-card p-2 shadow-xl"
+                  >
+                    {MY_INTENTS_COLUMNS.filter((c) => c !== "pair").map((column) => (
+                      <label
+                        key={column}
+                        className="flex items-center gap-2 px-1.5 py-1 text-xs text-vx-text"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={visibility[column]}
+                          disabled={!isToggleable(column)}
+                          onChange={() => toggle(column)}
+                        />
+                        {COLUMN_LABELS[column]}
+                        {!isToggleable(column) && (
+                          <span className="ml-auto text-[10px] text-vx-muted">always</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={handleExportCsv}
                 disabled={filtered.length === 0}
-                className="ml-auto px-3 py-2 rounded-lg border border-vx-border text-xs font-semibold text-vx-muted hover:text-vx-text hover:border-vx-sage/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-vx-border disabled:hover:text-vx-muted"
+                className="px-3 py-2 rounded-lg border border-vx-border text-xs font-semibold text-vx-muted hover:text-vx-text hover:border-vx-sage/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-vx-border disabled:hover:text-vx-muted"
               >
                 Export CSV
               </button>
@@ -129,10 +185,13 @@ export default function MyIntentsPage() {
 
             {/* List */}
             {isLoading ? (
-              <div className="space-y-2" role="status" aria-label="Loading intents">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-14 bg-vx-surface/40 rounded-lg border border-vx-line animate-pulse" />
-                ))}
+              <div role="status" className="space-y-2 text-sm text-vx-muted">
+                Loading your intents...
+                <div aria-hidden="true" className="space-y-2 pt-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 bg-vx-surface/40 rounded-lg border border-vx-line animate-pulse" />
+                  ))}
+                </div>
               </div>
             ) : error ? (
               <div role="alert" className="card p-8 text-center text-sm text-vx-muted">
@@ -164,10 +223,16 @@ export default function MyIntentsPage() {
                       <div className="text-sm font-medium text-vx-text truncate">
                         {item.srcAmount} {item.srcToken} → {item.dstToken}
                       </div>
-                      <div className="text-xs text-vx-muted capitalize">
-                        {item.srcChain} · via {item.solver}
+                      {(visibility.chain || visibility.solver) && (
+                        <div className="text-xs text-vx-muted capitalize">
+                          {visibility.chain && item.srcChain}
+                          {visibility.chain && visibility.solver && " · "}
+                          {visibility.solver && `via ${item.solver}`}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-vx-muted mt-0.5">
+                        submitted {timeAgo(item.createdAt)}
                       </div>
-                      <IntentStatusBadge status={item.status} />
                     </div>
                     <div className="self-start sm:self-center">
                       <IntentStatusBadge status={item.status} />
