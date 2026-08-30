@@ -91,6 +91,36 @@ To enable automated deployments, configure the following secrets in your GitHub 
 
 The workflow runs only on merges to `main`, not on every PR.
 
+### PR Preview Deployments
+
+Pull requests automatically receive live preview deployments to facilitate visual review. Each PR preview:
+
+- **Updates automatically** as new commits are pushed
+- **Uses staging backend** (testnet) to isolate testing from production
+- **Includes a comment** with the preview URL when deployment succeeds
+- **Gracefully handles** fork PRs by explaining local setup instead
+
+#### Fork PR Limitations
+
+For security, pull requests from forks do not receive preview deployments. This prevents exposing deployment credentials. Contributors from forks can:
+
+1. Clone the repository
+2. Checkout the PR branch
+3. Run `npm run dev` locally with their own `.env.local` configuration
+4. Test changes with a local backend instance
+
+#### Setup PR Preview
+
+PR previews require the same Vercel configuration as production deployments (see section above). Additionally, you can configure staging-specific environment variables:
+
+- `NEXT_PUBLIC_PREVIEW_API_URL` — Staging backend URL
+- `NEXT_PUBLIC_PREVIEW_WS_URL` — Staging WebSocket URL
+- `NEXT_PUBLIC_PREVIEW_NETWORK` — Staging network (e.g., `testnet`)
+- `NEXT_PUBLIC_PREVIEW_SETTLEMENT_CONTRACT` — Staging contract ID
+- `NEXT_PUBLIC_PREVIEW_SOLVER_REGISTRY_CONTRACT` — Staging contract ID
+
+If preview-specific variables are not set, the workflow uses sensible defaults pointing to testnet.
+
 ### Scripts
 
 | Script | Description |
