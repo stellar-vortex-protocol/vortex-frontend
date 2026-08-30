@@ -119,6 +119,10 @@ Issues on the Wave tracker use the following complexity labels with correspondin
 See the org-wide
 [CONTRIBUTING.md](https://github.com/stellar-vortex-protocol/.github/blob/main/CONTRIBUTING.md).
 
+### Security
+
+If you discover a security vulnerability, please report it privately according to our [Security Policy](./SECURITY.md) instead of using the public issue tracker.
+
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
