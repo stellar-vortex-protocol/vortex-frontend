@@ -36,7 +36,9 @@ export const en = {
   "swap.quote.protocolFeeValue": "{percent}%",
   "swap.quote.rate": "Rate",
   "swap.quote.unavailable": "Live quote unavailable — showing an estimated rate.",
+  "swap.quote.noSolver": "No solver is quoting this route right now — showing an estimated rate.",
   "swap.quote.staleWarning": "Quote is stale. Please wait for a refresh before submitting.",
+  "swap.quote.highPriceImpactWarning": "High price impact above {threshold}%.",
 
   "swap.submit.connecting": "Connecting wallet…",
   "swap.submit.building": "Preparing swap…",

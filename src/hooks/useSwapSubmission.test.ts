@@ -12,17 +12,22 @@ vi.mock("@stellar/freighter-api", () => ({
   default: { signTransaction: signTransactionMock },
 }));
 
-vi.mock("@/lib/api", () => ({
-  createIntent: createIntentMock,
-  submitIntent: submitIntentMock,
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    createIntent: createIntentMock,
+    submitIntent: submitIntentMock,
+  };
+});
 
 vi.mock("@/store/toast", () => ({
   useToastStore: { getState: () => ({ addToast: addToastMock }) },
 }));
 
+import { ApiError, TimeoutError } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
-import { useSwapSubmission } from "./useSwapSubmission";
+import { classifySwapError, useSwapSubmission } from "./useSwapSubmission";
 
 const params = { srcChain: "ethereum", srcToken: "USDC", srcAmount: "500", dstToken: "XLM" };
 const initialWalletState = useWalletStore.getState();
@@ -111,8 +116,60 @@ describe("useSwapSubmission", () => {
 
     expect(result.current.status).toBe("error");
     expect(result.current.error).toBe("User declined access");
+    expect(result.current.errorKind).toBe("user-rejected");
     expect(submitIntentMock).not.toHaveBeenCalled();
     expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
+  });
+
+  // ── Issue #301: error classification ────────────────────────────────────
+
+  it("classifies known swap-failure shapes without discarding the raw detail", () => {
+    expect(classifySwapError(new TimeoutError())).toBe("network");
+    expect(classifySwapError(new ApiError("no solver available for route", 409))).toBe("no-solver");
+    expect(classifySwapError(new ApiError("insufficient balance on source chain", 422))).toBe("balance");
+    expect(classifySwapError(new Error("Request was rejected by the user"))).toBe("user-rejected");
+    expect(classifySwapError(new ApiError("relay exploded", 500))).toBe("generic");
+    expect(classifySwapError("weird")).toBe("generic");
+  });
+
+  it("tags a relay timeout as a network error but keeps its message", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET" });
+    createIntentMock.mockRejectedValue(new TimeoutError());
+
+    const { result } = renderHook(() => useSwapSubmission());
+    await act(async () => {
+      await result.current.submit(params);
+    });
+
+    expect(result.current.errorKind).toBe("network");
+    expect(result.current.error).toMatch(/timed out/i);
+  });
+
+  it("tags a 5xx relay failure as generic and surfaces the backend message", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET" });
+    createIntentMock.mockRejectedValue(new ApiError("intent rejected: deadline in the past", 500));
+
+    const { result } = renderHook(() => useSwapSubmission());
+    await act(async () => {
+      await result.current.submit(params);
+    });
+
+    expect(result.current.errorKind).toBe("generic");
+    expect(result.current.error).toBe("intent rejected: deadline in the past");
+  });
+
+  it("clears errorKind on reset", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET" });
+    createIntentMock.mockRejectedValue(new ApiError("boom", 500));
+
+    const { result } = renderHook(() => useSwapSubmission());
+    await act(async () => {
+      await result.current.submit(params);
+    });
+    expect(result.current.errorKind).toBe("generic");
+
+    act(() => result.current.reset());
+    expect(result.current.errorKind).toBeNull();
   });
 
   it("resets back to idle", async () => {

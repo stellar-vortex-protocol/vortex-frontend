@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuote } from "@/hooks/useQuote";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useSwapSubmission } from "@/hooks/useSwapSubmission";
+import { useSwapSubmission, SWAP_ERROR_GUIDANCE } from "@/hooks/useSwapSubmission";
 import { useToastStore } from "@/store/toast";
 import { CHAINS, SRC_TOKENS, DST_TOKENS } from "@/lib/marketData";
 import { formatCurrency, formatTokenAmount } from "@/lib/format";
@@ -14,6 +14,9 @@ import type { Quote, QuoteRequest } from "@/lib/types";
 
 export const DEFAULT_SLIPPAGE_PCT = 0.5;
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
+
+// A quote older than this must refresh before a submit is allowed.
+export const STALE_QUOTE_THRESHOLD_MS = 30_000;
 
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
@@ -36,9 +39,11 @@ export function SwapCard({
   const { t } = useTranslation();
 
   const [srcChain, setSrcChain] = useState("ethereum");
-  const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"][0]);
-  const [dstToken, setDstToken] = useState(DST_TOKENS[0]);
+  const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"]![0]!);
+  const [dstToken, setDstToken] = useState(DST_TOKENS[0]!);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
+  const [dstAddress, setDstAddress] = useState("");
+  const [slippagePct, setSlippagePct] = useState(String(DEFAULT_SLIPPAGE_PCT));
   const [showChainPicker, setShowChainPicker] = useState(false);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
   const chainToggleRef = useRef<HTMLButtonElement>(null);
@@ -66,8 +71,8 @@ export function SwapCard({
     if (e.key !== "Tab") return;
     const focusable = chainPickerRef.current?.querySelectorAll<HTMLButtonElement>("button");
     if (!focusable || focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();
       last.focus();
@@ -79,13 +84,16 @@ export function SwapCard({
 
   const debouncedAmount = useDebouncedValue(srcAmount, 500);
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
-  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError } = useQuote(
+  const { quote: fetchedQuote, quoteFetchedAt, isLoading: quoteIsLoading, error: quoteError } = useQuote(
     hasAmount && !previewQuote
       ? { srcChain, srcToken: srcToken.symbol, srcAmount: debouncedAmount, dstToken: dstToken.symbol }
       : null
   );
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
+  const quoteErrorType: { kind: "no-solver" | "generic" } | null = quoteError
+    ? { kind: /no[_ ]solver/i.test(quoteError.message ?? "") ? "no-solver" : "generic" }
+    : null;
 
   const dstAddressError = dstAddress && !isValidStellarPublicKey(dstAddress)
     ? t("swap.destination.invalidAddress")
@@ -113,12 +121,15 @@ export function SwapCard({
   /** Truncate a raw amount string to at most `decimals` decimal places. */
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
-    if (dotIndex === -1 || decimals === 0) return value.split(".")[0];
+    if (dotIndex === -1 || decimals === 0) return value.split(".")[0] ?? "";
     return value.slice(0, dotIndex + 1 + decimals);
   }
 
   const handleAmountChange = (raw: string) => {
-    setSrcAmount(truncateToDecimals(raw, srcToken.decimals));
+    // `type="text"` field (a number input reformats high-precision decimals) -
+    // keep only digits and a single dot.
+    const cleaned = raw.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+    setSrcAmount(truncateToDecimals(cleaned, srcToken.decimals));
   };
 
   const handleSubmit = () => {
@@ -142,37 +153,13 @@ export function SwapCard({
       return;
     }
 
-    submission.submit({ srcChain, srcToken: srcToken.symbol, srcAmount, dstToken: dstToken.symbol });
+    submission.submit({ srcChain, srcToken: srcToken.symbol, srcAmount, dstToken: dstToken.symbol, minOut });
   };
 
   // While the chain picker overlay is open, the main card sits behind it
   // (opacity-0, pointer-events-none) — keep its controls out of the tab
   // order too, or keyboard users tab through invisible fields.
   const hiddenTabIndex = showChainPicker ? -1 : undefined;
-
-  const chainPickerRef = useRef<HTMLDivElement>(null);
-  const chainToggleRef = useRef<HTMLButtonElement>(null);
-
-  const closeChainPicker = () => {
-    setShowChainPicker(false);
-    chainToggleRef.current?.focus();
-  };
-
-  // Moves focus into the overlay when it opens, since its trigger becomes
-  // aria-hidden/untabbable the moment the main card is hidden behind it.
-  useEffect(() => {
-    if (!showChainPicker) return;
-    chainPickerRef.current?.querySelector<HTMLElement>("button")?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeChainPicker();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showChainPicker]);
 
   return (
     <div className="relative">
@@ -194,7 +181,8 @@ export function SwapCard({
                 type="button"
                 onClick={() => {
                   setSrcChain(c.id);
-                  setSrcToken(SRC_TOKENS[c.id][0]);
+                  const firstToken = SRC_TOKENS[c.id]?.[0];
+                  if (firstToken) setSrcToken(firstToken);
                   closeChainPicker();
                 }}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all
@@ -247,7 +235,8 @@ export function SwapCard({
             <label htmlFor="src-amount" className="sr-only">{t("swap.from.amountLabel")}</label>
             <input
               id="src-amount"
-              type="number"
+              type="text"
+              inputMode="decimal"
               tabIndex={hiddenTabIndex}
               value={srcAmount}
               onChange={e => handleAmountChange(e.target.value)}
@@ -421,6 +410,34 @@ export function SwapCard({
                 })}
               </p>
             )}
+
+            <div className="flex items-center justify-between gap-3 pt-1 border-t border-vx-line/60">
+              <label htmlFor="slippage-pct" className="text-xs text-vx-muted">
+                {t("swap.slippage.label")}
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  id="slippage-pct"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={50}
+                  step={0.1}
+                  tabIndex={hiddenTabIndex}
+                  value={slippagePct}
+                  onChange={(e) => setSlippagePct(e.target.value)}
+                  aria-label={t("swap.slippage.inputLabel")}
+                  className="w-16 bg-vx-surface border border-vx-border rounded-md px-2 py-1 text-xs text-vx-text text-right
+                             focus:outline-none focus:border-vx-sage/50"
+                />
+                <span aria-hidden="true" className="text-xs text-vx-muted">%</span>
+              </div>
+            </div>
+            {minOut !== "0" && (
+              <p className="num text-[11px] text-vx-muted text-right">
+                {t("swap.slippage.minOut", { amount: minOut, token: dstToken.symbol })}
+              </p>
+            )}
           </div>
         )}
 
@@ -435,7 +452,25 @@ export function SwapCard({
 
         {/* Submission error */}
         {submission.status === "error" && (
-          <p role="alert" className="text-center text-[11px] text-red-400 px-1">{submission.error}</p>
+          <div className="text-[11px] px-1 space-y-1">
+            <p role="alert" className="text-center text-red-400">{submission.error}</p>
+            {submission.errorKind && submission.errorKind !== "generic" ? (
+              <p className="text-center text-vx-muted">
+                {SWAP_ERROR_GUIDANCE[submission.errorKind]}
+              </p>
+            ) : (
+              <details className="text-vx-muted">
+                <summary className="cursor-pointer text-center hover:text-vx-text">
+                  Why did this happen?
+                </summary>
+                <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                  <li>Check your wallet has enough balance on the source chain (plus gas).</li>
+                  <li>Confirm Freighter is on the expected network.</li>
+                  <li>Wait a moment and try again - the relay or a solver may be briefly unavailable.</li>
+                </ul>
+              </details>
+            )}
+          </div>
         )}
 
         {/* Submit */}
