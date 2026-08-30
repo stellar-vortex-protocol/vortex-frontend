@@ -55,6 +55,7 @@ export const es = {
   "home.hero.titleLine2": "directamente a Stellar.",
   "home.hero.body":
     "Vortex es un protocolo cross-chain basado en intenciones. Expresa lo que quieres y los solvers compiten por cumplirlo — sin puentes, sin tokens envueltos, sin suposiciones de confianza más allá del bono del solver.",
+  "home.hero.solverCta": "Conviértete en solver →",
 
   "home.stats.totalVolume": "Volumen Total",
   "home.stats.intentsFilled": "Intenciones Completadas",

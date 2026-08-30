@@ -5,6 +5,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { SwapCard } from "@/components/SwapCard";
 import { ActivityFeed } from "@/components/ActivityFeed";
+import { OnboardingHints } from "@/components/OnboardingHints";
 import { CHAINS } from "@/lib/marketData";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n/index";
@@ -86,6 +87,13 @@ export default function HomePage() {
               <p className="text-base text-vx-muted leading-relaxed max-w-md">
                 {t("home.hero.body")}
               </p>
+              <Link
+                href="/solve"
+                id="solver-portal-link"
+                className="mt-3 inline-block text-xs text-vx-sage hover:underline"
+              >
+                {t("home.hero.solverCta")}
+              </Link>
             </div>
 
             {/* Stats */}
@@ -105,7 +113,7 @@ export default function HomePage() {
             </div>
 
             {/* Live feed */}
-            <div className="space-y-4">
+            <div id="live-feed-region" className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="eyebrow">{t("home.feed.title")}</div>
                 <Link href="/explore" className="text-xs text-vx-sage hover:underline">
@@ -117,7 +125,7 @@ export default function HomePage() {
           </div>
 
           {/* Right: swap card */}
-          <div className="lg:sticky lg:top-24">
+          <div id="swap-card-region" className="lg:sticky lg:top-24">
             <SwapCard />
 
             {/* Supported chains */}
@@ -145,6 +153,8 @@ export default function HomePage() {
 
       {/* ── Footer ── */}
       <Footer />
+
+      <OnboardingHints />
     </div>
   );
 }
