@@ -39,10 +39,15 @@ export function SwapCard({
   const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"][0]);
   const [dstToken, setDstToken] = useState(DST_TOKENS[0]);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
+  const [dstAddress, setDstAddress] = useState("");
+  const [slippagePct, setSlippagePct] = useState("0.5");
+  const [pastedAddress, setPastedAddress] = useState<string | null>(null);
+  const [showPasteConfirmation, setShowPasteConfirmation] = useState(false);
   const [showChainPicker, setShowChainPicker] = useState(false);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
   const chainToggleRef = useRef<HTMLButtonElement>(null);
   const chainPickerRef = useRef<HTMLDivElement>(null);
+  const dstAddressInputRef = useRef<HTMLInputElement>(null);
 
   const chain = CHAINS.find(c => c.id === srcChain)!;
 
@@ -119,6 +124,28 @@ export function SwapCard({
 
   const handleAmountChange = (raw: string) => {
     setSrcAmount(truncateToDecimals(raw, srcToken.decimals));
+  };
+
+  const handleAddressPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (pasted) {
+      e.preventDefault();
+      setPastedAddress(pasted);
+      setShowPasteConfirmation(true);
+    }
+  };
+
+  const confirmPastedAddress = () => {
+    if (pastedAddress) {
+      setDstAddress(pastedAddress);
+    }
+    setShowPasteConfirmation(false);
+    setPastedAddress(null);
+  };
+
+  const dismissPasteConfirmation = () => {
+    setShowPasteConfirmation(false);
+    setPastedAddress(null);
   };
 
   const handleSubmit = () => {
@@ -367,16 +394,44 @@ export function SwapCard({
           </div>
           <label htmlFor="dst-address" className="sr-only">{t("swap.destination.label")}</label>
           <input
+            ref={dstAddressInputRef}
             id="dst-address"
             type="text"
             value={dstAddress}
             onChange={e => setDstAddress(e.target.value.trim())}
+            onPaste={handleAddressPaste}
             placeholder={t("swap.destination.placeholder")}
             aria-invalid={Boolean(dstAddressError)}
             aria-describedby={dstAddressError ? "dst-address-error" : undefined}
             className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
           />
-          {dstAddressError && (
+          {showPasteConfirmation && pastedAddress && (
+            <div className="mt-2 p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg space-y-2">
+              <p className="text-xs text-amber-400/90">
+                Address pasted from clipboard. Please confirm:
+              </p>
+              <p className="text-xs font-mono text-vx-text break-all bg-vx-surface/50 p-2 rounded">
+                {pastedAddress.slice(0, 16)}...{pastedAddress.slice(-16)}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmPastedAddress}
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-medium transition-colors"
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissPasteConfirmation}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-vx-border hover:border-vx-sage/40 text-vx-muted hover:text-vx-text text-xs font-medium transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+          {dstAddressError && !showPasteConfirmation && (
             <p id="dst-address-error" role="alert" className="text-[11px] text-red-400">{dstAddressError}</p>
           )}
         </div>
