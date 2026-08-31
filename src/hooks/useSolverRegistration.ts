@@ -3,6 +3,7 @@ import { mutate } from "swr";
 import freighterApi from "@stellar/freighter-api";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { verifyContractAddresses } from "@/lib/transactionVerification";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 
@@ -60,6 +61,10 @@ export function useSolverRegistration() {
 
       setStatus("building");
       const { registrationId, unsignedXdr } = await registerSolver({ address, bondUsd });
+
+      verifyContractAddresses(unsignedXdr, [
+        process.env.NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT,
+      ]);
 
       setStatus("awaiting-signature");
       const signedXdr = await freighterApi.signTransaction(unsignedXdr, {

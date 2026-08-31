@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import { createIntent, submitIntent } from "@/lib/api";
+import { verifyContractAddresses } from "@/lib/transactionVerification";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import type { QuoteRequest } from "@/lib/types";
@@ -51,6 +52,10 @@ export function useSwapSubmission() {
         dstAddress: wallet.address,
       });
       setIntentId(newIntentId);
+
+      verifyContractAddresses(unsignedXdr, [
+        process.env.NEXT_PUBLIC_SETTLEMENT_CONTRACT,
+      ]);
 
       setStatus("awaiting-signature");
       const signedXdr = await freighterApi.signTransaction(unsignedXdr, {
