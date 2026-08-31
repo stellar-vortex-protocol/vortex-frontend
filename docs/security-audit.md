@@ -89,3 +89,132 @@ When logging data in this application:
 - Monitor for additional sensitive patterns to redact
 - Consider error reporting integration (e.g., Sentry) with redaction hooks
 - Periodic audits of logging statements during code reviews
+
+---
+
+# Security Audit: Environment Variable Exposure
+
+## Overview
+
+Next.js automatically inlines all `NEXT_PUBLIC_*` environment variables into the client bundle at build time. While this is necessary for publicly-accessible configuration, it creates a risk: if a sensitive value (API key, token, secret) is accidentally prefixed with `NEXT_PUBLIC_`, it will be permanently embedded in the browser bundle and exposed to all clients.
+
+## The Problem
+
+Without validation, a well-intentioned but uninformed contributor could write:
+
+```bash
+NEXT_PUBLIC_BACKEND_SECRET=my-secret-key  # ❌ DANGER: Now in client bundle!
+```
+
+This would be baked into every deployment, potentially compromising the application.
+
+## Solution
+
+A validation utility (`src/lib/envValidation.ts`) provides:
+
+- **Pattern Detection**: Flags `NEXT_PUBLIC_*` variables matching suspicious keywords
+- **Build-Time Enforcement**: Validation can be called during the build process
+- **Clear Error Messages**: Guides contributors on the issue and resolution
+
+### Suspicious Patterns
+
+The validator flags these patterns in `NEXT_PUBLIC_*` variable names:
+
+- `SECRET` - `NEXT_PUBLIC_API_SECRET` ❌
+- `KEY` - `NEXT_PUBLIC_PRIVATE_KEY` ❌
+- `TOKEN` - `NEXT_PUBLIC_AUTH_TOKEN` ❌
+- `PASSWORD` - `NEXT_PUBLIC_DB_PASSWORD` ❌
+- `PRIVATE` - `NEXT_PUBLIC_PRIVATE_DATA` ❌
+- `CREDENTIAL` - `NEXT_PUBLIC_CREDENTIAL` ❌
+- `BEARER` - `NEXT_PUBLIC_BEARER_TOKEN` ❌
+
+### Safe Variables
+
+These are acceptable as `NEXT_PUBLIC_*`:
+
+- `NEXT_PUBLIC_API_URL=http://localhost:4000` ✓
+- `NEXT_PUBLIC_WS_URL=ws://localhost:4000/ws` ✓
+- `NEXT_PUBLIC_NETWORK=testnet` ✓
+- `NEXT_PUBLIC_RELAY_HOST=relay.example.com` ✓
+
+## Implementation
+
+### Validation API
+
+```typescript
+import { validatePublicEnvVariables, enforcePublicEnvValidation } from '@/lib/envValidation';
+
+// Check for issues (returns array of errors)
+const errors = validatePublicEnvVariables(process.env);
+if (errors.length > 0) {
+  console.error('Environment variable issues found:', errors);
+}
+
+// Enforce validation (throws if issues found)
+enforcePublicEnvValidation(process.env);
+```
+
+### Build Integration
+
+The validation can be integrated into the build process by calling `enforcePublicEnvValidation()` in:
+
+- Pre-build scripts
+- Next.js config hooks
+- CI/CD pipelines
+- Pre-commit hooks
+
+### Example: next.config.js
+
+```javascript
+const { enforcePublicEnvValidation } = require('./src/lib/envValidation');
+
+enforcePublicEnvValidation(process.env);
+
+module.exports = {
+  // ... rest of Next.js config
+};
+```
+
+## Test Coverage
+
+The utility includes comprehensive tests in `src/lib/envValidation.test.ts`:
+
+- Pattern detection for all suspicious keywords
+- Case-insensitive matching
+- Validation of multiple variables
+- Error message verification
+- Test coverage for edge cases
+
+## Guidelines for Contributors
+
+### DO ✓
+
+- Use `NEXT_PUBLIC_` only for truly public configuration
+- Keep API URLs, hostnames, and network identifiers as public config
+- Review the `.env.example` file for acceptable variable names
+- Run validation before committing environment variable changes
+
+### DON'T ❌
+
+- Never prefix secrets, keys, tokens, or credentials with `NEXT_PUBLIC_`
+- Never put API keys, passwords, or private data in any environment variable visible in source control
+- Don't ignore validation warnings during development
+- Don't commit actual `.env` files (use `.env.example` instead)
+
+## What Constitutes a Secret?
+
+If you wouldn't paste it into a public Slack channel, it's a secret. This includes:
+
+- API keys and bearer tokens
+- Database passwords
+- Private cryptographic keys
+- Session tokens
+- Access credentials of any kind
+- Anything marked "Private", "Secret", or "Credential"
+
+## Future Considerations
+
+- Automate validation as part of CI/CD pipeline
+- Add pre-commit hooks to check new environment variables
+- Monitor for additional suspicious patterns based on incident analysis
+- Document approved public configuration patterns per team
