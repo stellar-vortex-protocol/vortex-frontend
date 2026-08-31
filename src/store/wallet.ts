@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import freighterApi from "@stellar/freighter-api";
 import { DEFAULT_LOCALE, translate } from "@/lib/i18n";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 export type WalletErrorKey =
   | "wallet.error.freighterUnavailable"
@@ -66,6 +67,14 @@ export const useWalletStore = create<WalletState>()(
           }
 
           const address = await freighterApi.requestAccess();
+
+          // Defense-in-depth: validate address format against postMessage bridge spoofing
+          if (!isValidStellarPublicKey(address)) {
+            throw new Error(
+              `Invalid address format received from wallet bridge: "${address}". This may indicate a compromised extension or browser issue.`
+            );
+          }
+
           const network = await freighterApi.getNetwork();
           const mismatch = network.toUpperCase() !== EXPECTED_NETWORK;
 
@@ -121,11 +130,19 @@ export const useWalletStore = create<WalletState>()(
           const isAppConnected = await freighterApi.isConnected();
           const allowed = isAppConnected && (await freighterApi.isAllowed());
           if (!allowed) {
-            set({ address: null, network: null, isConnected: false, error: null, networkMismatch: false, notInstalled: false });
+            set({ address: null, network: null, isConnected: false, error: null, networkMismatch: false, notInstalled: false, wasSessionCleared: true });
             return;
           }
 
           const address = await freighterApi.getPublicKey();
+
+          // Defense-in-depth: validate address format against postMessage bridge spoofing
+          if (!isValidStellarPublicKey(address)) {
+            throw new Error(
+              `Invalid address format received from wallet bridge during hydration: "${address}". Session cleared for safety.`
+            );
+          }
+
           const network = await freighterApi.getNetwork();
           const mismatch = network.toUpperCase() !== EXPECTED_NETWORK;
 
