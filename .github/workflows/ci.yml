@@ -32,3 +32,13 @@ jobs:
           path: coverage/
       - run: npm run build
       - run: node scripts/check-bundle-size.mjs
+      - name: Build with bundle analysis
+        run: npm run build
+        env:
+          ANALYZE: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-analysis-report
+          path: .next-analyze/
+          retention-days: 30

@@ -69,6 +69,18 @@ npm run dev    # http://localhost:3000
 | `npm run lint` | `next lint` |
 | `npm test` | Run the Vitest suite |
 
+### Bundle Analysis
+
+To generate a visual breakdown of the production bundle, build with the `ANALYZE=true` flag:
+
+```bash
+ANALYZE=true npm run build
+```
+
+This generates an interactive treemap visualization in `.next-analyze/` showing what modules contribute to bundle size. Open `client.html` in your browser to explore the breakdown.
+
+The CI pipeline automatically generates and uploads bundle analysis reports on every build as a downloadable artifact, making it easy to spot size regressions in pull requests.
+
 ## Troubleshooting
 
 ### Freighter not detected
