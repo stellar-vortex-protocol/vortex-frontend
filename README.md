@@ -106,6 +106,12 @@ npm run dev    # http://localhost:3000
 
 ## Contributing
 
+### Code Ownership & Review Requirements
+
+This repository uses a [CODEOWNERS](./.github/CODEOWNERS) file to automatically assign reviewers based on the paths changed in a pull request. Critical areas like wallet storage (`src/store/wallet.ts`), API logic (`src/lib/api.ts`), solver registration, and CI/CD workflows require approval from designated maintainers before merging.
+
+For more details, see the [CODEOWNERS](./.github/CODEOWNERS) file.
+
 ### Issue Complexity Labels
 
 Issues on the Wave tracker use the following complexity labels with corresponding point values to help contributors find tasks that match their availability:
