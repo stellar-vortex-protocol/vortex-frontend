@@ -24,6 +24,7 @@ describe("Nav", () => {
     renderNav({ variant: "home" });
     expect(screen.getByText("Explore")).toBeInTheDocument();
     expect(screen.getByText("Become a Solver")).toBeInTheDocument();
+    expect(screen.getByText("Contributors")).toBeInTheDocument();
     expect(screen.getByText("Connect Freighter")).toBeInTheDocument();
   });
 

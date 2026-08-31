@@ -16,6 +16,7 @@ type NavProps = { variant: "home" } | { variant: "breadcrumb"; label: string };
 const NAV_LINKS = [
   { href: "/explore", label: "explore" as const },
   { href: "/solve", label: "becomeSolver" as const },
+  { href: "/contributors", label: "contributors" as const },
 ];
 
 export function Nav(props: NavProps) {

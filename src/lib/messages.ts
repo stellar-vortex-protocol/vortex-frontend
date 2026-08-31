@@ -10,6 +10,7 @@ export const messages = {
     branding: "Vortex",
     explore: "Explore",
     becomeSolver: "Become a Solver",
+    contributors: "Contributors",
     docs: "Docs",
     openMenu: "Open menu",
     closeMenu: "Close menu",
