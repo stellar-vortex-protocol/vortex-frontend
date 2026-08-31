@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
+const NETWORK_CHECK_INTERVAL_MS = 8000;
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -13,6 +15,32 @@ function truncateAddress(address: string) {
 export function ConnectWalletButton({ compact = false }: { compact?: boolean }) {
   const { address, isConnected, isConnecting, error, networkMismatch, notInstalled, connect, disconnect } =
     useWalletStore();
+  const { t } = useTranslation();
+  const displayError = error;
+
+  // Detect a Freighter account/network switch that happens after connect,
+  // since the extension doesn't push change events. Only polls while
+  // connected, and never calls requestAccess() — that would pop the
+  // Freighter approval UI unprompted (see docs/wallet-hydration.md).
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const check = () => useWalletStore.getState().checkForChanges();
+    check();
+    const intervalId = setInterval(check, NETWORK_CHECK_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", check);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", check);
+    };
+  }, [isConnected]);
 
   const handleConnect = async () => {
     await connect();
@@ -41,13 +69,19 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
         </button>
 
         {networkMismatch && (
-          <p
-            role="alert"
-            className="text-xs text-yellow-400"
-          >
-            ⚠ Wrong network. Switch Freighter to{" "}
-            <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
-          </p>
+          <div role="alert" className="flex items-center gap-2 text-xs text-yellow-400">
+            <p>
+              ⚠ Wrong network. Switch Freighter to{" "}
+              <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
+            </p>
+            <button
+              type="button"
+              onClick={handleConnect}
+              className="underline hover:text-yellow-300 whitespace-nowrap"
+            >
+              Reconnect
+            </button>
+          </div>
         )}
       </div>
     );

@@ -6,6 +6,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
+import { EmptyState } from "@/components/EmptyState";
 import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
 import { CHAINS } from "@/lib/marketData";
@@ -69,12 +70,10 @@ export default function MyIntentsPage() {
         </div>
 
         {!isConnected ? (
-          <div className="card p-8 text-center">
-            <p className="text-sm text-vx-muted mb-4">
-              Connect your wallet to view your swap history.
-            </p>
-            <ConnectWalletButton />
-          </div>
+          <EmptyState
+            message="Connect your wallet to view your swap history."
+            action={<ConnectWalletButton />}
+          />
         ) : (
           <>
             {/* Filters */}
@@ -135,23 +134,21 @@ export default function MyIntentsPage() {
                 ))}
               </div>
             ) : error ? (
-              <div role="alert" className="card p-8 text-center text-sm text-vx-muted">
-                Couldn&apos;t load intents right now. Try again shortly.
-              </div>
+              <EmptyState variant="error" message="Couldn't load intents right now. Try again shortly." />
             ) : intents.length === 0 ? (
-              <div role="status" className="card p-8 text-center text-sm text-vx-muted">
-                <p className="mb-4">You haven&apos;t submitted any swaps yet.</p>
-                <Link
-                  href="/"
-                  className="inline-block px-4 py-2 rounded-lg border border-vx-sage/40 text-vx-text text-sm hover:border-vx-sage/70 transition-colors focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-ink rounded"
-                >
-                  Make your first swap
-                </Link>
-              </div>
+              <EmptyState
+                message="You haven't submitted any swaps yet."
+                action={
+                  <Link
+                    href="/"
+                    className="inline-block px-4 py-2 rounded-lg border border-vx-sage/40 text-vx-text text-sm hover:border-vx-sage/70 transition-colors focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-ink rounded"
+                  >
+                    Make your first swap
+                  </Link>
+                }
+              />
             ) : filtered.length === 0 ? (
-              <div role="status" className="card p-8 text-center text-sm text-vx-muted">
-                No intents match your filters.
-              </div>
+              <EmptyState message="No intents match your filters." />
             ) : (
               <div data-address={address} data-testid="intents-list" className="space-y-2" role="list">
                 {filtered.map((item) => (

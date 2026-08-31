@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { VortexLogo } from "./VortexLogo";
@@ -10,6 +10,7 @@ import { getMessage } from "@/lib/i18n-legacy";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useWalletStore } from "@/store/wallet";
+import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
 
 type NavProps = { variant: "home" } | { variant: "breadcrumb"; label: string };
 
@@ -18,11 +19,25 @@ const NAV_LINKS = [
   { href: "/solve", label: "becomeSolver" as const },
 ];
 
+const LOCALE_LABELS: Record<Locale, string> = {
+  en: "English",
+  es: "Español",
+};
+
 export function Nav(props: NavProps) {
   const maxWidth = props.variant === "home" ? "max-w-6xl" : "max-w-5xl";
   const [mobileOpen, setMobileOpen] = useState(false);
   const isConnected = useWalletStore((s) => s.isConnected);
   const pathname = usePathname();
+  const locale = useLocale();
+  const setLocale = useSetLocale();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const closeMobileMenu = useCallback(() => setMobileOpen(false), []);
+  const panelRef = useDismissableOverlay<HTMLDivElement>({
+    isOpen: mobileOpen,
+    onClose: closeMobileMenu,
+    triggerRef: toggleRef,
+  });
 
   return (
     <nav className="sticky top-0 z-50 border-b border-vx-border bg-vx-ink/80 backdrop-blur-md">

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
+import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
 
 type MotionPreference = "system" | "reduce" | "allow";
 
@@ -22,6 +23,13 @@ export function SettingsPanel() {
   const [motionPreference, setMotionPreference] = useState<MotionPreference>("system");
   const locale = useLocale();
   const setLocale = useSetLocale();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const closeSettings = useCallback(() => setOpen(false), []);
+  const panelRef = useDismissableOverlay<HTMLDivElement>({
+    isOpen: open,
+    onClose: closeSettings,
+    triggerRef: toggleRef,
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -43,6 +51,7 @@ export function SettingsPanel() {
   return (
     <div className="relative">
       <button
+        ref={toggleRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
@@ -54,7 +63,11 @@ export function SettingsPanel() {
 
       {open && (
         <div
+          ref={panelRef}
           id="settings-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings"
           className="absolute right-0 mt-2 w-64 rounded-xl border border-vx-border bg-vx-card p-4 shadow-xl"
         >
           <div className="space-y-4">

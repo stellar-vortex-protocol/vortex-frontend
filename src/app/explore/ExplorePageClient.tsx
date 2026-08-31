@@ -6,6 +6,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { SkeletonCard } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { useLiveIntents } from "@/hooks/useLiveIntents";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
@@ -123,13 +124,9 @@ export default function ExplorePageClient() {
         {isLoading && intents.length === 0 ? (
           <SkeletonCard rows={4} rowHeight="h-14" />
         ) : error ? (
-          <div className="card p-8 text-center text-sm text-vx-muted">
-            Couldn&apos;t load intents right now. Try again shortly.
-          </div>
+          <EmptyState variant="error" message="Couldn't load intents right now. Try again shortly." />
         ) : filtered.length === 0 ? (
-          <div className="card p-8 text-center text-sm text-vx-muted">
-            No intents match your filters.
-          </div>
+          <EmptyState message="No intents match your filters." />
         ) : (
           <>
             <div className="space-y-2">

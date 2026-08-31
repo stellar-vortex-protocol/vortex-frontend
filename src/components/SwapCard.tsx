@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useQuote } from "@/hooks/useQuote";
+import { useCallback, useRef, useState } from "react";
+import { useQuote, classifyQuoteError } from "@/hooks/useQuote";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
+import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
+import { SubmissionStepper } from "@/components/SubmissionStepper";
 import { useToastStore } from "@/store/toast";
+import { useWalletStore } from "@/store/wallet";
 import { CHAINS, SRC_TOKENS, DST_TOKENS } from "@/lib/marketData";
 import { formatCurrency, formatTokenAmount } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
@@ -14,6 +17,7 @@ import type { Quote, QuoteRequest } from "@/lib/types";
 
 export const DEFAULT_SLIPPAGE_PCT = 0.5;
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
+export const STALE_QUOTE_THRESHOLD_MS = 30_000;
 
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
@@ -39,53 +43,24 @@ export function SwapCard({
   const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"][0]);
   const [dstToken, setDstToken] = useState(DST_TOKENS[0]);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
+  const [dstAddress, setDstAddress] = useState("");
+  const [slippagePct, setSlippagePct] = useState(String(DEFAULT_SLIPPAGE_PCT));
   const [showChainPicker, setShowChainPicker] = useState(false);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
   const chainToggleRef = useRef<HTMLButtonElement>(null);
-  const chainPickerRef = useRef<HTMLDivElement>(null);
 
   const chain = CHAINS.find(c => c.id === srcChain)!;
 
-  const closeChainPicker = () => {
-    setShowChainPicker(false);
-    chainToggleRef.current?.focus();
-  };
-
-  useEffect(() => {
-    if (showChainPicker) {
-      chainPickerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    }
-  }, [showChainPicker]);
-
-  const handleChainPickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      closeChainPicker();
-      return;
-    }
-    if (e.key !== "Tab") return;
-    const focusable = chainPickerRef.current?.querySelectorAll<HTMLButtonElement>("button");
-    if (!focusable || focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
-
   const debouncedAmount = useDebouncedValue(srcAmount, 500);
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
-  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError } = useQuote(
+  const { quote: fetchedQuote, quoteFetchedAt, isLoading: quoteIsLoading, error: quoteError } = useQuote(
     hasAmount && !previewQuote
       ? { srcChain, srcToken: srcToken.symbol, srcAmount: debouncedAmount, dstToken: dstToken.symbol }
       : null
   );
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
+  const quoteErrorType = quoteError ? classifyQuoteError(quoteError) : null;
 
   const dstAddressError = dstAddress && !isValidStellarPublicKey(dstAddress)
     ? t("swap.destination.invalidAddress")
@@ -106,9 +81,11 @@ export function SwapCard({
     ? quote.priceImpactPct > HIGH_PRICE_IMPACT_THRESHOLD_PCT
     : false;
 
+  const networkMismatch = useWalletStore((s) => s.networkMismatch);
   const submission = useSwapSubmission();
   const isSubmitting = submission.status in SUBMISSION_LABEL_KEY;
-  const canSwap = Boolean(srcAmount) && parseFloat(srcAmount) > 0 && !quoting && !isSubmitting && !dstAddressError;
+  const canSwap =
+    Boolean(srcAmount) && parseFloat(srcAmount) > 0 && !quoting && !isSubmitting && !dstAddressError && !networkMismatch;
 
   /** Truncate a raw amount string to at most `decimals` decimal places. */
   function truncateToDecimals(value: string, decimals: number): string {
@@ -150,29 +127,15 @@ export function SwapCard({
   // order too, or keyboard users tab through invisible fields.
   const hiddenTabIndex = showChainPicker ? -1 : undefined;
 
-  const chainPickerRef = useRef<HTMLDivElement>(null);
-  const chainToggleRef = useRef<HTMLButtonElement>(null);
-
-  const closeChainPicker = () => {
+  const closeChainPicker = useCallback(() => {
     setShowChainPicker(false);
     chainToggleRef.current?.focus();
-  };
-
-  // Moves focus into the overlay when it opens, since its trigger becomes
-  // aria-hidden/untabbable the moment the main card is hidden behind it.
-  useEffect(() => {
-    if (!showChainPicker) return;
-    chainPickerRef.current?.querySelector<HTMLElement>("button")?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeChainPicker();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [showChainPicker]);
+  }, []);
+  const chainPickerRef = useDismissableOverlay<HTMLDivElement>({
+    isOpen: showChainPicker,
+    onClose: closeChainPicker,
+    triggerRef: chainToggleRef,
+  });
 
   return (
     <div className="relative">
@@ -183,7 +146,6 @@ export function SwapCard({
           role="dialog"
           aria-modal="true"
           aria-label={t("swap.chainPicker.title")}
-          onKeyDown={handleChainPickerKeyDown}
           className="absolute top-0 left-0 right-0 z-20 bg-vx-card border border-vx-border rounded-xl p-3 shadow-2xl animate-fade-up"
         >
           <div className="eyebrow mb-3 px-1">{t("swap.chainPicker.title")}</div>
@@ -431,6 +393,13 @@ export function SwapCard({
               ? t("swap.quote.noSolver")
               : t("swap.quote.unavailable")}
           </p>
+        )}
+
+        {/* Submission progress */}
+        {submission.status !== "idle" && submission.status !== "success" && (
+          <div className="px-1">
+            <SubmissionStepper status={submission.status} errorStep={submission.errorStep} />
+          </div>
         )}
 
         {/* Submission error */}

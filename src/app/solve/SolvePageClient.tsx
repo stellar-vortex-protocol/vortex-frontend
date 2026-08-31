@@ -7,6 +7,8 @@ import { useSolvers } from "@/hooks/useSolvers";
 import { useOpenIntents } from "@/hooks/useOpenIntents";
 import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
+import { SubmissionStepper } from "@/components/SubmissionStepper";
+import { useWalletStore } from "@/store/wallet";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { getMessage } from "@/i18n/messages";
@@ -47,8 +49,9 @@ export default function SolvePageClient() {
     bond && (isNaN(parseFloat(bond)) || parseFloat(bond) < MIN_BOND_USD)
       ? getMessage("solve.register.validation.minimumBond", { minBond: MIN_BOND_USD })
       : null;
+  const networkMismatch = useWalletStore((s) => s.networkMismatch);
   const canRegister =
-    Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering;
+    Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering && !networkMismatch;
 
   const handleRegister = () => {
     if (registration.status === "success") {
@@ -373,6 +376,10 @@ export default function SolvePageClient() {
                 <div>{getMessage("solve.register.info.slash")}</div>
                 <div>{getMessage("solve.register.info.withdraw")}</div>
               </div>
+
+              {registration.status !== "idle" && registration.status !== "success" && (
+                <SubmissionStepper status={registration.status} errorStep={registration.errorStep} />
+              )}
 
               {registration.status === "error" && (
                 <p role="alert" className="text-xs text-red-400">
