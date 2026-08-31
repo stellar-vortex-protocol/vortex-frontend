@@ -1,4 +1,5 @@
 import { messages } from "./messages";
+import { secureLogger } from "./secureLogging";
 
 type NestedKeyOf<T> = T extends Record<string, infer V>
   ? V extends Record<string, unknown>
@@ -18,7 +19,7 @@ export function getMessage(key: NestedKeyOf<typeof messages>): string {
   for (const part of parts) {
     value = value[part];
     if (value === undefined) {
-      console.warn(`Message key not found: ${key}`);
+      secureLogger.warn(`Message key not found: ${key}`);
       return key;
     }
   }
