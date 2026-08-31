@@ -4,12 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import type { Locale } from "@/lib/i18n";
 
-const { isConnectedMock, requestAccessMock, getNetworkMock, addToastMock } = vi.hoisted(() => ({
-  isConnectedMock: vi.fn(),
-  requestAccessMock: vi.fn(),
-  getNetworkMock: vi.fn(),
-  addToastMock: vi.fn(),
-}));
+const { isConnectedMock, requestAccessMock, getNetworkMock, addToastMock } =
+  vi.hoisted(() => ({
+    isConnectedMock: vi.fn(),
+    requestAccessMock: vi.fn(),
+    getNetworkMock: vi.fn(),
+    addToastMock: vi.fn(),
+  }));
 
 vi.mock("@stellar/freighter-api", () => ({
   default: {
@@ -32,7 +33,7 @@ function renderButton(locale: Locale = "en") {
   return render(
     <I18nProvider locale={locale}>
       <ConnectWalletButton />
-    </I18nProvider>
+    </I18nProvider>,
   );
 }
 
@@ -106,7 +107,7 @@ describe("ConnectWalletButton", () => {
     await waitFor(() => {
       expect(addToastMock).toHaveBeenCalledWith(
         "Freighter extension is not installed or enabled.",
-        "error"
+        "error",
       );
     });
   });
@@ -205,6 +206,8 @@ describe("ConnectWalletButton", () => {
     await waitFor(() => {
       expect(screen.getByText("Retry Connection")).toBeInTheDocument();
     });
-    expect(screen.queryByRole("link", { name: /install.*freighter/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /install.*freighter/i }),
+    ).not.toBeInTheDocument();
   });
 });

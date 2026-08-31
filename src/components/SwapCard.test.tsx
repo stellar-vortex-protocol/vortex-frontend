@@ -4,7 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { SWRConfig } from "swr";
 import type { Quote } from "@/lib/types";
 
-const { signTransactionMock } = vi.hoisted(() => ({ signTransactionMock: vi.fn() }));
+const { signTransactionMock } = vi.hoisted(() => ({
+  signTransactionMock: vi.fn(),
+}));
 vi.mock("@stellar/freighter-api", () => ({
   default: {
     isConnected: vi.fn(),
@@ -23,7 +25,7 @@ function renderSwapCard() {
   return render(
     <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
       <SwapCard />
-    </SWRConfig>
+    </SWRConfig>,
   );
 }
 
@@ -53,14 +55,18 @@ describe("SwapCard", () => {
 
   it("makes the source token picker a real, keyboard-operable button", () => {
     renderSwapCard();
-    const toggle = screen.getByRole("button", { name: "Select source token, currently USDC" });
+    const toggle = screen.getByRole("button", {
+      name: "Select source token, currently USDC",
+    });
     expect(toggle.tagName).toBe("BUTTON");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
   it("exposes a descriptive accessible name on the source chain select control", () => {
     renderSwapCard();
-    const toggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
+    const toggle = screen.getByRole("button", {
+      name: "Source chain, currently Ethereum",
+    });
     expect(toggle.tagName).toBe("BUTTON");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
@@ -69,14 +75,18 @@ describe("SwapCard", () => {
     renderSwapCard();
     const group = screen.getByRole("group", { name: "Destination token" });
     expect(group).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "XLM" })).toHaveAttribute("aria-pressed");
+    expect(screen.getByRole("button", { name: "XLM" })).toHaveAttribute(
+      "aria-pressed",
+    );
   });
 
   it("opening the chain picker with the keyboard moves focus into its search field", async () => {
     const user = userEvent.setup();
     renderSwapCard();
 
-    const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
+    const chainToggle = screen.getByRole("button", {
+      name: "Source chain, currently Ethereum",
+    });
     chainToggle.focus();
     await user.keyboard("{Enter}");
 
@@ -88,7 +98,9 @@ describe("SwapCard", () => {
     const user = userEvent.setup();
     renderSwapCard();
 
-    const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
+    const chainToggle = screen.getByRole("button", {
+      name: "Source chain, currently Ethereum",
+    });
     await user.click(chainToggle);
     expect(screen.getByRole("listbox", { name: "Select source chain" })).toBeInTheDocument();
 
@@ -102,7 +114,9 @@ describe("SwapCard", () => {
     const user = userEvent.setup();
     renderSwapCard();
 
-    const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
+    const chainToggle = screen.getByRole("button", {
+      name: "Source chain, currently Ethereum",
+    });
     await user.click(chainToggle);
 
     // Chains are listed as Ethereum, Base, … — one ArrowDown moves the roving index onto Base.
@@ -137,7 +151,7 @@ describe("SwapCard", () => {
       () => {
         expect(screen.getByText("Beta Liquidity Co")).toBeInTheDocument();
       },
-      { timeout: 2000 }
+      { timeout: 2000 },
     );
 
     expect(screen.getByText("1 USDC = 8.4600 XLM")).toBeInTheDocument();
@@ -166,9 +180,11 @@ describe("SwapCard", () => {
 
     await waitFor(
       () => {
-        expect(screen.getByRole("alert")).toHaveTextContent("High price impact above 3%");
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          "High price impact above 3%",
+        );
       },
-      { timeout: 2000 }
+      { timeout: 2000 },
     );
   });
 
@@ -190,35 +206,56 @@ describe("SwapCard", () => {
       () => {
         expect(screen.getByText(/Live quote unavailable/)).toBeInTheDocument();
       },
-      { timeout: 2000 }
+      { timeout: 2000 },
     );
   });
 
   it("submits a swap end-to-end for an already-connected wallet", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
-    (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.includes("/quote")) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            dstAmount: "497.1234",
-            solver: "Beta Liquidity Co",
-            fillTimeSeconds: 32,
-            priceImpactPct: 0.12,
-            protocolFeePct: 0.05,
-            rate: "1 USDC = 8.4600 XLM",
-          }),
-        };
-      }
-      if (url.includes("/intents") && init?.method === "POST" && !url.includes("/submit")) {
-        return { ok: true, status: 200, json: async () => ({ intentId: "intent-1", unsignedXdr: "unsigned-xdr" }) };
-      }
-      if (url.includes("/submit")) {
-        return { ok: true, status: 200, json: async () => ({ intentId: "intent-1", status: "pending" }) };
-      }
-      throw new Error(`Unexpected fetch: ${url}`);
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "TESTNET",
     });
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      async (url: string, init?: RequestInit) => {
+        if (url.includes("/quote")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              dstAmount: "497.1234",
+              solver: "Beta Liquidity Co",
+              fillTimeSeconds: 32,
+              priceImpactPct: 0.12,
+              protocolFeePct: 0.05,
+              rate: "1 USDC = 8.4600 XLM",
+            }),
+          };
+        }
+        if (
+          url.includes("/intents") &&
+          init?.method === "POST" &&
+          !url.includes("/submit")
+        ) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              intentId: "intent-1",
+              unsignedXdr: "unsigned-xdr",
+            }),
+          };
+        }
+        if (url.includes("/submit")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ intentId: "intent-1", status: "pending" }),
+          };
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      },
+    );
     signTransactionMock.mockResolvedValue("signed-xdr");
 
     const user = userEvent.setup();
@@ -226,7 +263,10 @@ describe("SwapCard", () => {
 
     const input = screen.getByPlaceholderText("0");
     await user.type(input, "500");
-    await waitFor(() => expect(screen.getByText("Beta Liquidity Co")).toBeInTheDocument(), { timeout: 2000 });
+    await waitFor(
+      () => expect(screen.getByText("Beta Liquidity Co")).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
 
     await user.clear(screen.getByLabelText("Slippage tolerance percent"));
     await user.type(screen.getByLabelText("Slippage tolerance percent"), "1");
@@ -238,13 +278,15 @@ describe("SwapCard", () => {
     await waitFor(() => {
       expect(screen.getByText(/Swap submitted/)).toBeInTheDocument();
     });
-    expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", { network: "TESTNET" });
+    expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", {
+      network: "TESTNET",
+    });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("/intents"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining('"minOut":"492.1522"'),
-      })
+      }),
     );
   });
 });

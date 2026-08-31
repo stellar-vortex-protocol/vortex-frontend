@@ -18,20 +18,17 @@ export const messages = {
         registerBond: {
           number: "01",
           title: "Register + Bond",
-          body:
-            "Deposit ≥50 USDC as a bond into the Vortex settlement contract. Your bond backs your reliability — failing to fill after accepting slashes 10%.",
+          body: "Deposit ≥50 USDC as a bond into the Vortex settlement contract. Your bond backs your reliability — failing to fill after accepting slashes 10%.",
         },
         watchIntentFeed: {
           number: "02",
           title: "Watch the intent feed",
-          body:
-            "Monitor the open intents API or WebSocket. When you see a profitable opportunity, claim exclusive fill rights for a 5-minute window.",
+          body: "Monitor the open intents API or WebSocket. When you see a profitable opportunity, claim exclusive fill rights for a 5-minute window.",
         },
         fillAndEarn: {
           number: "03",
           title: "Fill and earn",
-          body:
-            "Execute the source-chain leg, relay to Stellar, transfer dst tokens to the user. Earn the spread between your fill cost and the user's minimum.",
+          body: "Execute the source-chain leg, relay to Stellar, transfer dst tokens to the user. Earn the spread between your fill cost and the user's minimum.",
         },
       },
       tabs: {
@@ -42,7 +39,8 @@ export const messages = {
       },
       leaderboard: {
         title: "Active Solvers",
-        error: "Couldn't load the solver leaderboard right now. Try again shortly.",
+        error:
+          "Couldn't load the solver leaderboard right now. Try again shortly.",
         empty: "No active solvers yet.",
         fills: "Fills",
         volume: "Volume",
@@ -113,7 +111,10 @@ export const messages = {
 
 export const defaultLocale: Locale = "en";
 
-function getNestedMessage(localeMessages: Record<string, unknown>, key: string): string | undefined {
+function getNestedMessage(
+  localeMessages: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const parts = key.split(".");
   let current: unknown = localeMessages;
 
@@ -132,10 +133,12 @@ export function getMessage(
   localeOrValues?: Locale | TranslationValues,
   valuesOrLocale?: TranslationValues | Locale,
 ): string {
-  const locale = typeof localeOrValues === "string" ? localeOrValues : defaultLocale;
-  const values = typeof localeOrValues === "string"
-    ? (valuesOrLocale as TranslationValues | undefined)
-    : (localeOrValues as TranslationValues | undefined);
+  const locale =
+    typeof localeOrValues === "string" ? localeOrValues : defaultLocale;
+  const values =
+    typeof localeOrValues === "string"
+      ? (valuesOrLocale as TranslationValues | undefined)
+      : (localeOrValues as TranslationValues | undefined);
 
   const localeMessages = messages[locale] as Record<string, unknown>;
   const message = getNestedMessage(localeMessages, key);
@@ -152,6 +155,7 @@ export function getMessage(
 
 export function useMessages(locale: Locale = defaultLocale) {
   return {
-    t: (key: string, values?: TranslationValues) => getMessage(key, locale, values),
+    t: (key: string, values?: TranslationValues) =>
+      getMessage(key, locale, values),
   };
 }

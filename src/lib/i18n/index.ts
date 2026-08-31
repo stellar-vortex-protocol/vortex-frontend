@@ -25,7 +25,7 @@ export function getCatalog(locale: Locale): Catalog {
 export function interpolate(template: string, values?: MessageValues): string {
   if (!values) return template;
   return template.replace(/\{(\w+)\}/g, (token, name: string) =>
-    name in values ? String(values[name]) : token
+    name in values ? String(values[name]) : token,
   );
 }
 
@@ -33,7 +33,11 @@ export function interpolate(template: string, values?: MessageValues): string {
  * Looks a key up in `locale`, falling back to the default locale and then to the
  * key itself so a missing translation degrades instead of rendering "undefined".
  */
-export function translate(locale: Locale, key: MessageKey, values?: MessageValues): string {
+export function translate(
+  locale: Locale,
+  key: MessageKey,
+  values?: MessageValues,
+): string {
   const template = getCatalog(locale)[key] ?? getCatalog(DEFAULT_LOCALE)[key];
   if (template === undefined) return key;
   return interpolate(template, values);

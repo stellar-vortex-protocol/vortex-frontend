@@ -33,13 +33,16 @@ function renderSolvePage() {
     <>
       <SolvePage />
       <ToastViewport />
-    </>
+    </>,
   );
 }
 
 describe("solve page accept-intent flow (integration)", () => {
   beforeEach(() => {
-    useWalletStore.setState({ ...initialWalletState, isConnected: true, address: "GABC123" }, true);
+    useWalletStore.setState(
+      { ...initialWalletState, isConnected: true, address: "GABC123" },
+      true,
+    );
   });
 
   afterEach(() => {
@@ -55,18 +58,25 @@ describe("solve page accept-intent flow (integration)", () => {
       }
       throw new Error(`Unexpected fetch: ${path}`);
     });
-    acceptIntentMock.mockResolvedValue({ intentId: "a1b2", status: "accepted" });
+    acceptIntentMock.mockResolvedValue({
+      intentId: "a1b2",
+      status: "accepted",
+    });
 
     const user = userEvent.setup();
     renderSolvePage();
 
     await user.click(screen.getByRole("tab", { name: "intents" }));
-    await waitFor(() => expect(screen.getByText("500 USDC on ethereum")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("500 USDC on ethereum")).toBeInTheDocument(),
+    );
 
     await user.click(screen.getByText("Accept Intent →"));
 
     await waitFor(() => {
-      expect(screen.getByText("Intent accepted — you have exclusive fill rights.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Intent accepted — you have exclusive fill rights."),
+      ).toBeInTheDocument();
     });
     expect(acceptIntentMock).toHaveBeenCalledWith("a1b2", "GABC123");
 

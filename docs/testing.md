@@ -12,14 +12,14 @@
 
 Test files live next to the source they exercise:
 
-| Source | Test |
-|--------|------|
-| `src/hooks/useDebouncedValue.ts` | `src/hooks/useDebouncedValue.test.ts` |
-| `src/hooks/useLiveIntents.ts` | `src/hooks/useLiveIntents.test.ts` |
-| `src/components/ConnectWalletButton.tsx` | `src/components/ConnectWalletButton.test.tsx` |
-| `src/app/explore/[id]/page.tsx` | `src/app/explore/[id]/page.test.tsx` |
-| `src/store/wallet.ts` | `src/store/wallet.test.ts` |
-| `src/app/solve/accept-intent.integration.test.tsx` | co-located under the page dir |
+| Source                                             | Test                                          |
+| -------------------------------------------------- | --------------------------------------------- |
+| `src/hooks/useDebouncedValue.ts`                   | `src/hooks/useDebouncedValue.test.ts`         |
+| `src/hooks/useLiveIntents.ts`                      | `src/hooks/useLiveIntents.test.ts`            |
+| `src/components/ConnectWalletButton.tsx`           | `src/components/ConnectWalletButton.test.tsx` |
+| `src/app/explore/[id]/page.tsx`                    | `src/app/explore/[id]/page.test.tsx`          |
+| `src/store/wallet.ts`                              | `src/store/wallet.test.ts`                    |
+| `src/app/solve/accept-intent.integration.test.tsx` | co-located under the page dir                 |
 
 ## Naming
 

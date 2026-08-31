@@ -67,5 +67,8 @@ export function isValidStellarPublicKey(address: string): boolean {
   const checksum = decoded.slice(33, 35);
   const expectedChecksum = crc16xmodem(payload);
 
-  return checksum[0] === (expectedChecksum & 0xff) && checksum[1] === (expectedChecksum >>> 8);
+  return (
+    checksum[0] === (expectedChecksum & 0xff) &&
+    checksum[1] === expectedChecksum >>> 8
+  );
 }

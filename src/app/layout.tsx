@@ -13,12 +13,21 @@ const DESCRIPTION =
 // The canonical site URL — used in absolute OG image URLs.
 // Falls back to localhost for local dev; set NEXT_PUBLIC_SITE_URL in production.
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
+  process.env["NEXT_PUBLIC_SITE_URL"]?.replace(/\/$/, "") ??
+  "http://localhost:3000";
 
 export const metadata: Metadata = {
   title: { default: TITLE, template: "%s | Vortex" },
   description: DESCRIPTION,
-  keywords: ["stellar", "cross-chain", "bridge", "swap", "intents", "defi", "soroban"],
+  keywords: [
+    "stellar",
+    "cross-chain",
+    "bridge",
+    "swap",
+    "intents",
+    "defi",
+    "soroban",
+  ],
 
   // ── Favicon set ──────────────────────────────────────────────────────────────
   // Two SVG variants: dark background for dark browser chrome (prefers dark),
@@ -80,15 +89,17 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <body className="antialiased">
         <a
           href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200]
-                     focus:px-3 focus:py-2 focus:rounded-lg focus:bg-vx-card focus:text-vx-text
-                     focus:border focus:border-vx-sage/40"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-vx-card focus:text-vx-text focus:border focus:border-vx-sage/40"
         >
           Skip to main content
         </a>

@@ -8,14 +8,14 @@ function renderSettingsPanel() {
   return render(
     <I18nProvider locale="en">
       <SettingsPanel />
-    </I18nProvider>
+    </I18nProvider>,
   );
 }
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
     localStorage.clear();
-    delete document.documentElement.dataset.motion;
+    delete document.documentElement.dataset["motion"];
   });
 
   it("opens and shows locale and motion controls", async () => {
@@ -24,8 +24,12 @@ describe("SettingsPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
 
-    expect(screen.getByRole("combobox", { name: /switch language/i })).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /motion preference/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: /switch language/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: /motion preference/i }),
+    ).toBeInTheDocument();
   });
 
   it("updates shared locale state", async () => {
@@ -48,7 +52,7 @@ describe("SettingsPanel", () => {
     await user.selectOptions(select, "reduce");
 
     expect((select as HTMLSelectElement).value).toBe("reduce");
-    expect(document.documentElement.dataset.motion).toBe("reduce");
+    expect(document.documentElement.dataset["motion"]).toBe("reduce");
     expect(localStorage.getItem("vortex-motion-preference")).toBe("reduce");
   });
 });

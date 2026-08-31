@@ -28,11 +28,18 @@ export default function SolverDetailPage({ params }: { params: { address: string
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label={`Solver ${params.address.slice(0, 8)}`} />
+      <Nav
+        variant="breadcrumb"
+        label={`Solver ${params.address.slice(0, 8)}`}
+      />
 
-      <main id="main-content" className="max-w-3xl mx-auto px-3 sm:px-5 py-8 sm:py-12">
+      <main
+        id="main-content"
+        className="max-w-3xl mx-auto px-3 sm:px-5 py-8 sm:py-12"
+      >
         <Link
           href="/solve"
+          tabIndex={-1}
           className="text-xs text-vx-sage hover:underline mb-6 inline-block focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-ink rounded"
         >
           ← Back to solvers
@@ -41,7 +48,10 @@ export default function SolverDetailPage({ params }: { params: { address: string
         {!isValidAddress ? (
           <EmptyState variant="error" message="Invalid solver address format." />
         ) : isLoading ? (
-          <div className="card p-6 sm:p-8 space-y-3">
+          <div
+            className="card p-6 sm:p-8 space-y-3 animate-pulse"
+            data-testid="skeleton"
+          >
             <div className="h-6 w-2/3 bg-vx-surface rounded animate-pulse" />
             <div className="h-4 w-1/3 bg-vx-surface rounded animate-pulse" />
           </div>
@@ -82,13 +92,23 @@ export default function SolverDetailPage({ params }: { params: { address: string
                   { label: "Fills", value: solver.fills },
                   { label: "Failed", value: solver.failed },
                   { label: "Success Rate", value: `${solver.successRatePct}%` },
-                  { label: "Total Volume", value: usdCompact.format(solver.volumeUsd) },
-                  { label: "Avg Fill Time", value: `${solver.avgFillTimeSeconds}s` },
+                  {
+                    label: "Total Volume",
+                    value: usdCompact.format(solver.volumeUsd),
+                  },
+                  {
+                    label: "Avg Fill Time",
+                    value: `${solver.avgFillTimeSeconds}s`,
+                  },
                   { label: "Bond", value: usdCompact.format(solver.bondUsd) },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-vx-surface/40 rounded-lg p-3">
-                    <div className="eyebrow text-[10px] sm:text-xs mb-1">{label}</div>
-                    <div className="num text-xs sm:text-sm font-semibold text-vx-text">{value}</div>
+                    <div className="eyebrow text-[10px] sm:text-xs mb-1">
+                      {label}
+                    </div>
+                    <div className="num text-xs sm:text-sm font-semibold text-vx-text">
+                      {value}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -107,7 +127,9 @@ export default function SolverDetailPage({ params }: { params: { address: string
                       </span>
                     ))
                   ) : (
-                    <span className="text-xs text-vx-muted">No chains supported yet</span>
+                    <span className="text-xs text-vx-muted">
+                      No chains supported yet
+                    </span>
                   )}
                 </div>
               </div>
@@ -125,7 +147,9 @@ export default function SolverDetailPage({ params }: { params: { address: string
             {/* ── Fill history table ──────────────────────────────────────── */}
             <div className="card overflow-hidden">
               <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30">
-                <h2 className="text-sm font-semibold text-vx-text">Recent Fills by Solver</h2>
+                <h2 className="text-sm font-semibold text-vx-text">
+                  Recent Fills by Solver
+                </h2>
               </div>
 
               {historyLoading && fillHistory.length === 0 ? (
@@ -135,7 +159,10 @@ export default function SolverDetailPage({ params }: { params: { address: string
                   ))}
                 </div>
               ) : historyError ? (
-                <div role="alert" className="p-6 sm:p-8 text-center text-sm text-vx-muted">
+                <div
+                  role="alert"
+                  className="p-6 sm:p-8 text-center text-sm text-vx-muted"
+                >
                   Couldn&apos;t load fill history right now.
                 </div>
               ) : fillHistory.filter(item => item.solver === solver.address).length === 0 ? (
@@ -150,7 +177,7 @@ export default function SolverDetailPage({ params }: { params: { address: string
               ) : (
                 <div className="divide-y divide-vx-line">
                   {fillHistory
-                    .filter(item => item.solver === solver.address)
+                    .filter((item) => item.solver === solver.address)
                     .slice(0, 10)
                     .map(fill => (
                       <div
@@ -158,19 +185,19 @@ export default function SolverDetailPage({ params }: { params: { address: string
                         className="px-4 sm:px-5 py-4 hover:bg-vx-surface/30 transition-colors"
                       >
                         <div className="flex flex-col gap-2">
-                          <div className="flex items-start justify-between gap-2 min-w-0">
-                            <div className="min-w-0 flex-1">
-                              <div className="num text-xs text-vx-muted mb-1 truncate">
-                                ID: {fill.id}
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-vx-text truncate">
+                                {fill.srcAmount} {fill.srcToken} →{" "}
+                                {fill.dstToken}
                               </div>
-                              <div className="text-xs sm:text-sm font-medium text-vx-text capitalize">
-                                {fill.srcAmount} {fill.srcToken} → {fill.dstToken}
+                              <div className="text-xs text-vx-muted capitalize">
+                                {fill.srcChain}
                               </div>
                             </div>
-                            <IntentStatusBadge status={fill.status} />
-                          </div>
-                          <div className="text-xs text-vx-muted">
-                            {fill.srcChain} · {timeAgo(fill.createdAt)}
+                            <span className="text-xs text-vx-muted num flex-shrink-0">
+                              {timeAgo(fill.createdAt)}
+                            </span>
                           </div>
                         </div>
                       </div>

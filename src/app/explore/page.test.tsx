@@ -6,7 +6,7 @@ import type { FeedItem } from "@/lib/types";
 const { useLiveIntentsMock } = vi.hoisted(() => ({ useLiveIntentsMock: vi.fn() }));
 vi.mock("@/hooks/useLiveIntents", () => ({ useLiveIntents: useLiveIntentsMock }));
 
-import ExplorePage from "./page";
+import ExplorePage from "./ExplorePageClient";
 
 const intents: FeedItem[] = [
   {
@@ -50,25 +50,49 @@ describe("ExplorePage", () => {
   });
 
   it("shows a loading skeleton before the first fetch resolves", () => {
-    useLiveIntentsMock.mockReturnValue({ intents: [], isLoading: true, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents: [],
+      isLoading: true,
+      error: undefined,
+      isLive: false,
+    });
     const { container } = render(<ExplorePage />);
-    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("shows an empty state when there are no intents", () => {
-    useLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents: [],
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     render(<ExplorePage />);
-    expect(screen.getByText("No intents match your filters.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No intents match your filters."),
+    ).toBeInTheDocument();
   });
 
   it("shows an error state when the fetch fails", () => {
-    useLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: new Error("boom"), isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents: [],
+      isLoading: false,
+      error: new Error("boom"),
+      isLive: false,
+    });
     render(<ExplorePage />);
     expect(screen.getByText(/Couldn't load intents/)).toBeInTheDocument();
   });
 
   it("renders all intents by default and shows a Live indicator when the socket is open", () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: true });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: true,
+    });
     render(<ExplorePage />);
     expect(screen.getByText("500 USDC → USDC")).toBeInTheDocument();
     expect(screen.getByText("0.14 WETH → USDC")).toBeInTheDocument();
@@ -77,17 +101,30 @@ describe("ExplorePage", () => {
   });
 
   it("shows a Polling indicator when the socket is not open", () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     render(<ExplorePage />);
     expect(screen.getByText("Polling")).toBeInTheDocument();
   });
 
   it("filters by status, via its accessible label", async () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
-    await user.selectOptions(screen.getByLabelText("Filter by status"), "pending");
+    await user.selectOptions(
+      screen.getByLabelText("Filter by status"),
+      "pending",
+    );
 
     expect(screen.getByText("0.14 WETH → USDC")).toBeInTheDocument();
     expect(screen.queryByText("500 USDC → USDC")).not.toBeInTheDocument();
@@ -105,17 +142,30 @@ describe("ExplorePage", () => {
   });
 
   it("updates the URL when a filter changes", async () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
-    await user.selectOptions(screen.getByLabelText("Filter by status"), "pending");
+    await user.selectOptions(
+      screen.getByLabelText("Filter by status"),
+      "pending",
+    );
 
     expect(window.location.search).toBe("?status=pending");
   });
 
   it("filters by chain, via its accessible label", async () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
@@ -125,29 +175,85 @@ describe("ExplorePage", () => {
     expect(screen.queryByText("500 USDC → USDC")).not.toBeInTheDocument();
   });
 
-  it("exposes the active sort column via aria-sort, defaulting to newest-first on Time", () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
-    render(<ExplorePage />);
-
-    expect(screen.getByRole("columnheader", { name: /Time/ })).toHaveAttribute("aria-sort", "descending");
-    expect(screen.getByRole("columnheader", { name: /Amount/ })).toHaveAttribute("aria-sort", "none");
-  });
-
-  it("sorts by clicking the Time column header, updating aria-sort and row order", async () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+  it("exports CSV for the currently filtered rows", async () => {
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
-    expect(screen.getAllByRole("link").filter(a => a.getAttribute("href")?.startsWith("/explore/"))[0]).toHaveTextContent("0.14 WETH → USDC");
+    await user.selectOptions(
+      screen.getByLabelText("Filter by status"),
+      "pending",
+    );
+    await user.click(screen.getByRole("button", { name: "Export CSV" }));
+
+    expect(downloadCsvMock).toHaveBeenCalledWith(
+      "vortex-intents.csv",
+      [
+        "id,srcChain,srcToken,srcAmount,dstToken,solver,status,createdAt",
+        "2,base,WETH,0.14,USDC,Beta,pending,2026-07-14T00:05:00Z",
+      ].join("\n"),
+    );
+  });
+
+  it("exposes the active sort column via aria-sort, defaulting to newest-first on Time", () => {
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
+    render(<ExplorePage />);
+
+    expect(screen.getByRole("columnheader", { name: /Time/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    expect(
+      screen.getByRole("columnheader", { name: /Amount/ }),
+    ).toHaveAttribute("aria-sort", "none");
+  });
+
+  it("sorts by clicking the Time column header, updating aria-sort and row order", async () => {
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
+    const user = userEvent.setup();
+    render(<ExplorePage />);
+
+    expect(
+      screen
+        .getAllByRole("link")
+        .filter((a) => a.getAttribute("href")?.startsWith("/explore/"))[0],
+    ).toHaveTextContent("0.14 WETH → USDC");
 
     await user.click(screen.getByRole("button", { name: /Time/ }));
 
-    expect(screen.getByRole("columnheader", { name: /Time/ })).toHaveAttribute("aria-sort", "ascending");
-    expect(screen.getAllByRole("link").filter(a => a.getAttribute("href")?.startsWith("/explore/"))[0]).toHaveTextContent("500 USDC → USDC");
+    expect(screen.getByRole("columnheader", { name: /Time/ })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    expect(
+      screen
+        .getAllByRole("link")
+        .filter((a) => a.getAttribute("href")?.startsWith("/explore/"))[0],
+    ).toHaveTextContent("500 USDC → USDC");
   });
 
   it("sorts by triggering the Time column header via the keyboard", async () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
@@ -155,12 +261,24 @@ describe("ExplorePage", () => {
     timeButton.focus();
     await user.keyboard("{Enter}");
 
-    expect(screen.getByRole("columnheader", { name: /Time/ })).toHaveAttribute("aria-sort", "ascending");
-    expect(screen.getAllByRole("link").filter(a => a.getAttribute("href")?.startsWith("/explore/"))[0]).toHaveTextContent("500 USDC → USDC");
+    expect(screen.getByRole("columnheader", { name: /Time/ })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    expect(
+      screen
+        .getAllByRole("link")
+        .filter((a) => a.getAttribute("href")?.startsWith("/explore/"))[0],
+    ).toHaveTextContent("500 USDC → USDC");
   });
 
   it("sorts by the Amount column header", async () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     const user = userEvent.setup();
     render(<ExplorePage />);
 
@@ -168,25 +286,72 @@ describe("ExplorePage", () => {
     amountButton.focus();
     await user.keyboard("{Enter}");
 
-    expect(screen.getByRole("columnheader", { name: /Amount/ })).toHaveAttribute("aria-sort", "descending");
-    expect(screen.getAllByRole("link").filter(a => a.getAttribute("href")?.startsWith("/explore/"))[0]).toHaveTextContent("500 USDC → USDC");
+    expect(
+      screen.getByRole("columnheader", { name: /Amount/ }),
+    ).toHaveAttribute("aria-sort", "descending");
+    expect(
+      screen
+        .getAllByRole("link")
+        .filter((a) => a.getAttribute("href")?.startsWith("/explore/"))[0],
+    ).toHaveTextContent("500 USDC → USDC");
   });
 
   it("renders the results within a main landmark", () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     render(<ExplorePage />);
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
   });
 
-  it("links each row to its intent detail page", () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+  it("shows a back-to-top control after scrolling and returns to the top", async () => {
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
+    const scrollTo = vi
+      .spyOn(window, "scrollTo")
+      .mockImplementation(() => undefined);
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      value: 401,
+    });
+    const user = userEvent.setup();
     render(<ExplorePage />);
 
-    expect(screen.getByText("500 USDC → USDC").closest("a")).toHaveAttribute("href", "/explore/1");
+    fireEvent.scroll(window);
+    await user.click(screen.getByRole("button", { name: "Back to top" }));
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
+  });
+
+  it("links each row to its intent detail page", () => {
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
+    render(<ExplorePage />);
+
+    expect(screen.getByText("500 USDC → USDC").closest("a")).toHaveAttribute(
+      "href",
+      "/explore/1",
+    );
   });
 
   it("does not show pagination controls when everything fits on one page", () => {
-    useLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined, isLive: false });
+    useLiveIntentsMock.mockReturnValue({
+      intents,
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
     render(<ExplorePage />);
     expect(screen.queryByText(/Page \d+ of \d+/)).not.toBeInTheDocument();
   });
@@ -228,7 +393,10 @@ describe("ExplorePage", () => {
     await user.click(screen.getByText("Next"));
     expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByDisplayValue("Newest first"), "oldest");
+    await user.selectOptions(
+      screen.getByDisplayValue("Newest first"),
+      "oldest",
+    );
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
   });
 });

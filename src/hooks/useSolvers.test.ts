@@ -6,7 +6,11 @@ import { useSolvers } from "./useSolvers";
 import type { Solver } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(SWRConfig, { value: { provider: () => new Map(), dedupingInterval: 0 } }, children);
+  createElement(
+    SWRConfig,
+    { value: { provider: () => new Map(), dedupingInterval: 0 } },
+    children,
+  );
 
 describe("useSolvers", () => {
   beforeEach(() => {
@@ -54,7 +58,10 @@ describe("useSolvers", () => {
     await waitFor(() => expect(result.current.solvers).toEqual(solvers));
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeUndefined();
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/solvers"), expect.anything());
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/solvers"),
+      expect.anything(),
+    );
   });
 
   it("resolves to an empty array when no solvers are returned", async () => {

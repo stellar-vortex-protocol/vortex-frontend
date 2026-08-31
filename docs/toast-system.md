@@ -41,7 +41,7 @@ if (latestError) {
 
 The `variant` argument is a `ToastVariant`, defaulting to `"info"` when omitted:
 
-| variant   | when to use                              |
+| variant   | when to use                               |
 | --------- | ----------------------------------------- |
 | `success` | an action completed as expected           |
 | `error`   | an action failed and the user should know |

@@ -16,7 +16,13 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { buildIntentsCsv, downloadCsv } from "@/lib/csv";
 import type { IntentStatus } from "@/lib/types";
 
-const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
+const STATUS_OPTIONS: Array<IntentStatus | "all"> = [
+  "all",
+  "pending",
+  "accepted",
+  "filled",
+  "failed",
+];
 const PAGE_SIZE = 10;
 const DATE_RANGE_OPTIONS = [
   { value: "all", label: "All time" },
@@ -146,12 +152,16 @@ export default function MyIntentsPage() {
                 <select
                   id="my-status-filter"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as IntentStatus | "all")}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as IntentStatus | "all")
+                  }
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
-                      {s === "all" ? "All statuses" : s.charAt(0).toUpperCase() + s.slice(1)}
+                      {s === "all"
+                        ? "All statuses"
+                        : s.charAt(0).toUpperCase() + s.slice(1)}
                     </option>
                   ))}
                 </select>
@@ -167,7 +177,9 @@ export default function MyIntentsPage() {
                 >
                   <option value="all">All chains</option>
                   {CHAINS.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </label>

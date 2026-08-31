@@ -56,7 +56,12 @@ vi.mock("@/lib/xdrReview", () => {
 import { useWalletStore } from "@/store/wallet";
 import { classifySwapError, useSwapSubmission } from "./useSwapSubmission";
 
-const params = { srcChain: "ethereum", srcToken: "USDC", srcAmount: "500", dstToken: "XLM" };
+const params = {
+  srcChain: "ethereum",
+  srcToken: "USDC",
+  srcAmount: "500",
+  dstToken: "XLM",
+};
 const initialWalletState = useWalletStore.getState();
 const DECODED_STUB = {
   networkPassphrase: "Test SDF Network ; September 2015",
@@ -90,7 +95,11 @@ describe("useSwapSubmission", () => {
       isConnected: false,
       address: null,
       connect: vi.fn(async () => {
-        useWalletStore.setState({ isConnected: false, address: null, error: "User rejected access" });
+        useWalletStore.setState({
+          isConnected: false,
+          address: null,
+          error: "User rejected access",
+        });
       }),
     });
 
@@ -110,10 +119,17 @@ describe("useSwapSubmission", () => {
       address: null,
       network: null,
       connect: vi.fn(async () => {
-        useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+        useWalletStore.setState({
+          isConnected: true,
+          address: "GABC123",
+          network: "TESTNET",
+        });
       }),
     });
-    createIntentMock.mockResolvedValue({ intentId: "intent-1", unsignedXdr: "unsigned-xdr" });
+    createIntentMock.mockResolvedValue({
+      intentId: "intent-1",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
     verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitIntentMock.mockResolvedValue({ intentId: "intent-1", status: "pending" });
@@ -134,15 +150,29 @@ describe("useSwapSubmission", () => {
     expect(result.current.status).toBe("success");
     expect(result.current.intentId).toBe("intent-1");
     expect(result.current.error).toBeNull();
-    expect(addToastMock).toHaveBeenCalledWith("Swap submitted successfully.", "success");
+    expect(addToastMock).toHaveBeenCalledWith(
+      "Swap submitted successfully.",
+      "success",
+    );
   });
 
   it("skips reconnecting when the wallet is already connected", async () => {
     const connect = vi.fn();
-    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET", connect });
-    createIntentMock.mockResolvedValue({ intentId: "intent-2", unsignedXdr: "unsigned-xdr" });
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GXYZ999",
+      network: "TESTNET",
+      connect,
+    });
+    createIntentMock.mockResolvedValue({
+      intentId: "intent-2",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
-    submitIntentMock.mockResolvedValue({ intentId: "intent-2", status: "pending" });
+    submitIntentMock.mockResolvedValue({
+      intentId: "intent-2",
+      status: "pending",
+    });
 
     const { result } = renderHook(() => useSwapSubmission());
     await act(async () => {
@@ -154,8 +184,15 @@ describe("useSwapSubmission", () => {
   });
 
   it("surfaces an error when the user rejects the Freighter signature request", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET" });
-    createIntentMock.mockResolvedValue({ intentId: "intent-3", unsignedXdr: "unsigned-xdr" });
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GXYZ999",
+      network: "TESTNET",
+    });
+    createIntentMock.mockResolvedValue({
+      intentId: "intent-3",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockRejectedValue(new Error("User declined access"));
 
     const { result } = renderHook(() => useSwapSubmission());

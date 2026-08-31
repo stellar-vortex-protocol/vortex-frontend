@@ -68,7 +68,9 @@ export function useSolverRegistration() {
         await wallet.connect();
         wallet = useWalletStore.getState();
         if (!wallet.isConnected || !wallet.address) {
-          throw new Error(wallet.error ?? "Connect a wallet to register as a solver.");
+          throw new Error(
+            wallet.error ?? "Connect a wallet to register as a solver.",
+          );
         }
       }
 

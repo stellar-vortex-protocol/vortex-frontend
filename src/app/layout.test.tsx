@@ -17,7 +17,7 @@ describe("RootLayout", () => {
     render(
       <RootLayout>
         <p>Child content</p>
-      </RootLayout>
+      </RootLayout>,
     );
 
     expect(screen.getByText("Child content")).toBeInTheDocument();
@@ -27,10 +27,13 @@ describe("RootLayout", () => {
     render(
       <RootLayout>
         <div />
-      </RootLayout>
+      </RootLayout>,
     );
 
-    expect(screen.getByText("Skip to main content")).toHaveAttribute("href", "#main-content");
+    expect(screen.getByText("Skip to main content")).toHaveAttribute(
+      "href",
+      "#main-content",
+    );
   });
 
   it("mounts the global error capture hook", () => {

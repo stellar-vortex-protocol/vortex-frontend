@@ -14,7 +14,8 @@ export const en = {
   "wallet.connect.retry": "Retry Connection",
   "wallet.disconnect.cta": "Disconnect",
   "wallet.disconnect.aria": "Disconnect wallet {address}",
-  "wallet.error.freighterUnavailable": "Freighter extension is not installed or enabled.",
+  "wallet.error.freighterUnavailable":
+    "Freighter extension is not installed or enabled.",
   "wallet.error.connectFailed": "Failed to connect wallet.",
 
   "swap.chainPicker.title": "Select source chain",
@@ -78,7 +79,8 @@ export const en = {
 
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
-  "swap.destination.invalidAddress": "Enter a valid Stellar address (starts with G).",
+  "swap.destination.invalidAddress":
+    "Enter a valid Stellar address (starts with G).",
 
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
@@ -153,7 +155,8 @@ export const en = {
   "notFound.breadcrumb": "Not Found",
   "notFound.eyebrow": "404",
   "notFound.title": "Page not found",
-  "notFound.body": "The page you're looking for doesn't exist, or may have moved.",
+  "notFound.body":
+    "The page you're looking for doesn't exist, or may have moved.",
   "notFound.backHome": "← Back to Vortex",
 
   // ── Empty states ──────────────────────────────────────────────────────────

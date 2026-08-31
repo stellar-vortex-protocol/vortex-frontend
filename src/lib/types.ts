@@ -17,7 +17,7 @@ export type QuoteRequest = {
   srcToken: string;
   srcAmount: string;
   dstToken: string;
-  minOut?: string;
+  minOut?: string | undefined;
 };
 
 export type QuoteErrorType =
@@ -70,7 +70,7 @@ export type CreateIntentRequest = {
   srcToken: string;
   srcAmount: string;
   dstToken: string;
-  minOut?: string;
+  minOut?: string | undefined;
   dstAddress: string;
 };
 

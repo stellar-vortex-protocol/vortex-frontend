@@ -23,7 +23,7 @@ export function useCopyToClipboard() {
         return false;
       }
     },
-    [addToast]
+    [addToast],
   );
 
   return { copy, copied };

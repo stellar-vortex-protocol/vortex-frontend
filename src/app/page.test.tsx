@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { useIntentFeedMock } = vi.hoisted(() => ({ useIntentFeedMock: vi.fn() }));
+const { useIntentFeedMock } = vi.hoisted(() => ({
+  useIntentFeedMock: vi.fn(),
+}));
 vi.mock("@/hooks/useIntentFeed", () => ({ useIntentFeed: useIntentFeedMock }));
 // The swap card has its own suite; stub it so this one stays about the page shell.
 vi.mock("@/components/SwapCard", () => ({ SwapCard: () => <div data-testid="swap-card" /> }));
@@ -15,7 +17,11 @@ vi.mock("@/components/ActivityFeed", () => ({ ActivityFeed: () => <div data-test
 import HomePage from "./page";
 
 function renderHome() {
-  useIntentFeedMock.mockReturnValue({ items: [], isLoading: false, isLive: true });
+  useIntentFeedMock.mockReturnValue({
+    items: [],
+    isLoading: false,
+    isLive: true,
+  });
   return render(<HomePage />);
 }
 
@@ -33,14 +39,18 @@ describe("HomePage", () => {
   it("renders the hero copy in the default locale", () => {
     renderHome();
 
-    expect(screen.getByText("Stellar Agentic Hackathon 2025")).toBeInTheDocument();
+    expect(
+      screen.getByText("Stellar Agentic Hackathon 2025"),
+    ).toBeInTheDocument();
 
     // The headline keeps its two-line, two-colour markup, so assert each line.
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading).toHaveTextContent("Swap from any chain");
     expect(heading).toHaveTextContent("directly to Stellar.");
 
-    expect(screen.getByText(/Vortex is an intent-based cross-chain protocol\./)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Vortex is an intent-based cross-chain protocol\./),
+    ).toBeInTheDocument();
   });
 
   it("labels the stat tiles and keeps their values", () => {

@@ -67,7 +67,10 @@ describe("useAcceptIntent", () => {
 
   it("accepts an intent for an already-connected wallet, optimistically removing it from the open list", async () => {
     useWalletStore.setState({ isConnected: true, address: "GABC123" });
-    acceptIntentMock.mockResolvedValue({ intentId: "intent-1", status: "accepted" });
+    acceptIntentMock.mockResolvedValue({
+      intentId: "intent-1",
+      status: "accepted",
+    });
 
     const { result } = renderHook(() => useAcceptIntent());
     await act(async () => {
@@ -78,7 +81,10 @@ describe("useAcceptIntent", () => {
     expect(openIntentsStore.get(OPEN_INTENTS_KEY)).toEqual([{ id: "intent-4" }]);
     expect(result.current.error).toBeNull();
     expect(result.current.acceptingId).toBeNull();
-    expect(addToastMock).toHaveBeenCalledWith("Intent accepted — you have exclusive fill rights.", "success");
+    expect(addToastMock).toHaveBeenCalledWith(
+      "Intent accepted — you have exclusive fill rights.",
+      "success",
+    );
   });
 
   it("connects the wallet first when not already connected", async () => {
@@ -104,7 +110,11 @@ describe("useAcceptIntent", () => {
       isConnected: false,
       address: null,
       connect: vi.fn(async () => {
-        useWalletStore.setState({ isConnected: false, address: null, error: "User rejected access" });
+        useWalletStore.setState({
+          isConnected: false,
+          address: null,
+          error: "User rejected access",
+        });
       }),
     });
 

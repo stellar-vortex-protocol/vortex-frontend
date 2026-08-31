@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { isConnectedMock, requestAccessMock, getNetworkMock, isAllowedMock, getPublicKeyMock } = vi.hoisted(() => ({
+const {
+  isConnectedMock,
+  requestAccessMock,
+  getNetworkMock,
+  isAllowedMock,
+  getPublicKeyMock,
+} = vi.hoisted(() => ({
   isConnectedMock: vi.fn(),
   requestAccessMock: vi.fn(),
   getNetworkMock: vi.fn(),

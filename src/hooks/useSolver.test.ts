@@ -6,7 +6,11 @@ import { useSolver } from "./useSolver";
 import type { Solver } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(SWRConfig, { value: { provider: () => new Map(), dedupingInterval: 0 } }, children);
+  createElement(
+    SWRConfig,
+    { value: { provider: () => new Map(), dedupingInterval: 0 } },
+    children,
+  );
 
 const mockSolver: Solver = {
   name: "AlphaMax",
@@ -39,8 +43,9 @@ describe("useSolver", () => {
     (fetch as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
 
     const { result } = renderHook(
-      () => useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      { wrapper }
+      () =>
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+      { wrapper },
     );
 
     expect(result.current.solver).toBeUndefined();
@@ -56,21 +61,25 @@ describe("useSolver", () => {
     });
 
     const { result } = renderHook(
-      () => useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      { wrapper }
+      () =>
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+      { wrapper },
     );
 
     await waitFor(() => expect(result.current.solver).toEqual(mockSolver));
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeUndefined();
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/solvers/GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      expect.anything()
+      expect.stringContaining(
+        "/solvers/GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING",
+      ),
+      expect.anything(),
     );
   });
 
   it("uses the address in the request URL", async () => {
-    const customAddress = "GCUSTOM00000000000000000000000000000000000000000000000";
+    const customAddress =
+      "GCUSTOM00000000000000000000000000000000000000000000000";
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
@@ -82,7 +91,7 @@ describe("useSolver", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining(`/solvers/${customAddress}`),
-      expect.anything()
+      expect.anything(),
     );
   });
 
@@ -96,7 +105,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () => useSolver("NONEXISTENT0000000000000000000000000000000000000000000"),
-      { wrapper }
+      { wrapper },
     );
 
     await waitFor(() => expect(result.current.error).toBeDefined());
@@ -113,8 +122,9 @@ describe("useSolver", () => {
     });
 
     const { result } = renderHook(
-      () => useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      { wrapper }
+      () =>
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+      { wrapper },
     );
 
     await waitFor(() => expect(result.current.error).toBeDefined());
@@ -123,11 +133,14 @@ describe("useSolver", () => {
   });
 
   it("surfaces a network failure as an error", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Network error"));
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("Network error"),
+    );
 
     const { result } = renderHook(
-      () => useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      { wrapper }
+      () =>
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+      { wrapper },
     );
 
     await waitFor(() => expect(result.current.error).toBeDefined());
@@ -147,12 +160,18 @@ describe("useSolver", () => {
     });
 
     const { result } = renderHook(
-      () => useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      { wrapper }
+      () =>
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+      { wrapper },
     );
 
     await waitFor(() => expect(result.current.solver).toBeDefined());
-    expect(result.current.solver!.chains).toEqual(["ethereum", "polygon", "base", "arbitrum"]);
+    expect(result.current.solver!.chains).toEqual([
+      "ethereum",
+      "polygon",
+      "base",
+      "arbitrum",
+    ]);
   });
 
   it("returns an inactive solver correctly", async () => {
@@ -169,8 +188,9 @@ describe("useSolver", () => {
     });
 
     const { result } = renderHook(
-      () => useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
-      { wrapper }
+      () =>
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+      { wrapper },
     );
 
     await waitFor(() => expect(result.current.solver).toBeDefined());

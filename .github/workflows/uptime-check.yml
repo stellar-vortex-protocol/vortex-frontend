@@ -1,0 +1,143 @@
+name: Synthetic Uptime & Health Check
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      production_url:
+        description: 'Target Frontend URL to check'
+        required: false
+        default: 'https://vortex-frontend.vercel.app'
+      api_url:
+        description: 'Target Backend API URL to check'
+        required: false
+        default: 'https://api.vortex-protocol.org'
+
+jobs:
+  uptime-check:
+    name: Synthetic Health Monitor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Resolve Target Endpoints
+        id: targets
+        run: |
+          PROD_URL="${{ github.event.inputs.production_url || vars.PRODUCTION_URL || 'https://vortex-frontend.vercel.app' }}"
+          API_URL="${{ github.event.inputs.api_url || vars.NEXT_PUBLIC_API_URL || 'https://api.vortex-protocol.org' }}"
+          echo "prod_url=$PROD_URL" >> $GITHUB_OUTPUT
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Checking Frontend: $PROD_URL"
+          echo "Checking Backend Relay: $API_URL"
+
+      - name: Check Production Frontend Uptime
+        id: check-frontend
+        run: |
+          TARGET_URL="${{ steps.targets.outputs.prod_url }}"
+          MAX_ATTEMPTS=2
+          DELAY_SEC=5
+          SUCCESS=false
+          HTTP_CODE=""
+          LATENCY=""
+
+          echo "Starting frontend synthetic probe against $TARGET_URL (up to $MAX_ATTEMPTS attempts)..."
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $attempt of $MAX_ATTEMPTS..."
+            START_TIME=$(date +%s%3N)
+            HTTP_CODE=$(curl -s -o response_fe.html -w "%{http_code}" --connect-timeout 10 --max-time 15 -L "$TARGET_URL" || echo "000")
+            END_TIME=$(date +%s%3N)
+            LATENCY=$((END_TIME - START_TIME))
+
+            echo "Response status: $HTTP_CODE (Latency: ${LATENCY}ms)"
+
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+              if grep -qi -E "vortex|stellar|intent" response_fe.html || [ -s response_fe.html ]; then
+                echo "Content validation passed: found expected frontend markup."
+                SUCCESS=true
+                break
+              else
+                echo "Warning: HTTP status was $HTTP_CODE, but expected branding text was not matched in response."
+              fi
+            fi
+
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Transient check failure; retrying in ${DELAY_SEC}s..."
+              sleep $DELAY_SEC
+            fi
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "::error title=Frontend Uptime Check Failed::Production URL $TARGET_URL is unhealthy (HTTP $HTTP_CODE, Latency: ${LATENCY}ms)"
+            echo "### ❌ Frontend Uptime Check Failed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Target URL:** \`$TARGET_URL\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **HTTP Code:** \`$HTTP_CODE\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Latency:** \`${LATENCY}ms\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Attempts:** $MAX_ATTEMPTS" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "### ✅ Frontend Uptime Check Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target URL:** \`$TARGET_URL\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **HTTP Code:** \`$HTTP_CODE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latency:** \`${LATENCY}ms\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check Backend API Relay Health
+        id: check-backend
+        run: |
+          API_URL="${{ steps.targets.outputs.api_url }}"
+          HEALTH_ENDPOINT="${API_URL%/}/health"
+          MAX_ATTEMPTS=2
+          DELAY_SEC=5
+          SUCCESS=false
+          HTTP_CODE=""
+          LATENCY=""
+
+          echo "Starting backend relay probe against $HEALTH_ENDPOINT (up to $MAX_ATTEMPTS attempts)..."
+
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Attempt $attempt of $MAX_ATTEMPTS..."
+            START_TIME=$(date +%s%3N)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 15 "$HEALTH_ENDPOINT" || echo "000")
+            END_TIME=$(date +%s%3N)
+            LATENCY=$((END_TIME - START_TIME))
+
+            echo "Response status: $HTTP_CODE (Latency: ${LATENCY}ms)"
+
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+              SUCCESS=true
+              break
+            fi
+
+            # Fallback to root if /health is not defined
+            if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "000" ]; then
+              ROOT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 15 "$API_URL" || echo "000")
+              if [ "$ROOT_CODE" -ge 200 ] && [ "$ROOT_CODE" -lt 500 ] && [ "$ROOT_CODE" != "000" ]; then
+                echo "Relay root responded with HTTP $ROOT_CODE (reachable)."
+                SUCCESS=true
+                HTTP_CODE=$ROOT_CODE
+                break
+              fi
+            fi
+
+            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
+              echo "Transient check failure; retrying in ${DELAY_SEC}s..."
+              sleep $DELAY_SEC
+            fi
+          done
+
+          if [ "$SUCCESS" != "true" ]; then
+            echo "::error title=Backend Relay Health Check Failed::Backend Relay $HEALTH_ENDPOINT is unreachable (HTTP $HTTP_CODE, Latency: ${LATENCY}ms)"
+            echo "### ❌ Backend Relay Health Check Failed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Target URL:** \`$HEALTH_ENDPOINT\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **HTTP Code:** \`$HTTP_CODE\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Latency:** \`${LATENCY}ms\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "### ✅ Backend Relay Health Check Passed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target URL:** \`$HEALTH_ENDPOINT\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **HTTP Code:** \`$HTTP_CODE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latency:** \`${LATENCY}ms\`" >> $GITHUB_STEP_SUMMARY

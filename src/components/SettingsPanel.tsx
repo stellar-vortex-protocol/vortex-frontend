@@ -15,12 +15,13 @@ const LOCALE_LABELS: Record<Locale, string> = {
 const STORAGE_KEY = "vortex-motion-preference";
 
 function applyMotionPreference(preference: MotionPreference) {
-  document.documentElement.dataset.motion = preference;
+  document.documentElement.dataset["motion"] = preference;
 }
 
 export function SettingsPanel() {
   const [open, setOpen] = useState(false);
-  const [motionPreference, setMotionPreference] = useState<MotionPreference>("system");
+  const [motionPreference, setMotionPreference] =
+    useState<MotionPreference>("system");
   const locale = useLocale();
   const setLocale = useSetLocale();
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -36,7 +37,8 @@ export function SettingsPanel() {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    const preference = stored === "reduce" || stored === "allow" ? stored : "system";
+    const preference =
+      stored === "reduce" || stored === "allow" ? stored : "system";
     setMotionPreference(preference);
     applyMotionPreference(preference);
   }, []);
@@ -125,7 +127,11 @@ export function SettingsPanel() {
                 className="mt-1 w-full bg-vx-surface border border-vx-border rounded-md px-2 py-1 text-sm text-vx-text"
               >
                 {LOCALES.map((loc) => (
-                  <option key={loc} value={loc} className="bg-vx-ink text-vx-text">
+                  <option
+                    key={loc}
+                    value={loc}
+                    className="bg-vx-ink text-vx-text"
+                  >
                     {LOCALE_LABELS[loc]}
                   </option>
                 ))}
@@ -133,19 +139,30 @@ export function SettingsPanel() {
             </div>
 
             <div>
-              <label htmlFor="motion-preference" className="block text-xs font-medium text-vx-muted">
+              <label
+                htmlFor="motion-preference"
+                className="block text-xs font-medium text-vx-muted"
+              >
                 Motion
               </label>
               <select
                 id="motion-preference"
                 value={motionPreference}
-                onChange={(e) => handleMotionChange(e.target.value as MotionPreference)}
+                onChange={(e) =>
+                  handleMotionChange(e.target.value as MotionPreference)
+                }
                 aria-label="Motion preference"
                 className="mt-1 w-full bg-vx-surface border border-vx-border rounded-md px-2 py-1 text-sm text-vx-text"
               >
-                <option value="system" className="bg-vx-ink text-vx-text">Use system setting</option>
-                <option value="reduce" className="bg-vx-ink text-vx-text">Reduce motion</option>
-                <option value="allow" className="bg-vx-ink text-vx-text">Allow motion</option>
+                <option value="system" className="bg-vx-ink text-vx-text">
+                  Use system setting
+                </option>
+                <option value="reduce" className="bg-vx-ink text-vx-text">
+                  Reduce motion
+                </option>
+                <option value="allow" className="bg-vx-ink text-vx-text">
+                  Allow motion
+                </option>
               </select>
             </div>
           </div>

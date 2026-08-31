@@ -7,6 +7,7 @@ The frontend connects to a WebSocket endpoint defined by `NEXT_PUBLIC_WS_URL`. T
 JSON parsing. Each frame is expected to be a JSON object matched to the generic type `T`.
 
 **Connection behavior:**
+
 - Reconnect delay: 3 seconds
 - Malformed frames are silently ignored
 - Passing `null` as the URL tears down the socket and stays idle
@@ -43,16 +44,16 @@ Seeds from REST `/intents/feed` (`src/hooks/useActivityFeed.ts`) and layers live
 }
 ```
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `string` | Unique intent identifier |
-| `srcChain` | `string` | Source chain identifier |
-| `srcToken` | `string` | Source asset symbol |
-| `srcAmount` | `string` | Human-readable amount |
-| `dstToken` | `string` | Destination asset symbol |
-| `solver` | `string` | Solver name or address |
-| `status` | `string` | Enum: `pending`, `accepted`, `filled`, `failed` |
-| `createdAt` | `string` | ISO-8601 UTC timestamp |
+| Field       | Type     | Notes                                           |
+| ----------- | -------- | ----------------------------------------------- |
+| `id`        | `string` | Unique intent identifier                        |
+| `srcChain`  | `string` | Source chain identifier                         |
+| `srcToken`  | `string` | Source asset symbol                             |
+| `srcAmount` | `string` | Human-readable amount                           |
+| `dstToken`  | `string` | Destination asset symbol                        |
+| `solver`    | `string` | Solver name or address                          |
+| `status`    | `string` | Enum: `pending`, `accepted`, `filled`, `failed` |
+| `createdAt` | `string` | ISO-8601 UTC timestamp                          |
 
 ## App-Wide Status-Change Alerts
 

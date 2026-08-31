@@ -10,13 +10,15 @@ Closes #
 
 -
 
-## Testing
+## Testing & QA
 
-<!-- Describe how you tested this. Paste relevant test output or screenshots. -->
+<!-- Describe how you tested this. Paste relevant test output, screenshots, or staging demo links. -->
 
+- [ ] `npm run check:editorconfig` passes
+- [ ] `npm run typecheck` (`tsc --noEmit`) passes cleanly
+- [ ] `npm test` and `npm run test:coverage` pass
 - [ ] `npm run build` passes
-- [ ] `npx tsc --noEmit` passes
-- [ ] `npm test` passes (or note any skipped/unrelated failures)
+- [ ] Verified on local / staging environment with seeded data (where applicable)
 
 ## Preview
 
@@ -27,6 +29,7 @@ Closes #
 ## Checklist
 
 - [ ] Self-reviewed the diff
+- [ ] Formatting adheres to `.editorconfig`
 - [ ] Added or updated tests for new behaviour
-- [ ] No secrets or credentials committed
+- [ ] No secrets or credentials committed (used `.env.example` / `.env.staging.example` templates)
 - [ ] PR title follows conventional commits (`feat:`, `fix:`, `chore:`, etc.)

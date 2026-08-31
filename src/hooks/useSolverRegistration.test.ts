@@ -99,10 +99,17 @@ describe("useSolverRegistration", () => {
       address: null,
       network: null,
       connect: vi.fn(async () => {
-        useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+        useWalletStore.setState({
+          isConnected: true,
+          address: "GABC123",
+          network: "TESTNET",
+        });
       }),
     });
-    registerSolverMock.mockResolvedValue({ registrationId: "reg-1", unsignedXdr: "unsigned-xdr" });
+    registerSolverMock.mockResolvedValue({
+      registrationId: "reg-1",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
     verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockResolvedValue({ registrationId: "reg-1", status: "pending" });
@@ -122,7 +129,10 @@ describe("useSolverRegistration", () => {
     expect(submitSolverRegistrationMock).toHaveBeenCalledWith("reg-1", "signed-xdr");
     expect(mutateMock).toHaveBeenCalledWith("/solvers");
     expect(result.current.status).toBe("success");
-    expect(addToastMock).toHaveBeenCalledWith("Registered as a solver.", "success");
+    expect(addToastMock).toHaveBeenCalledWith(
+      "Registered as a solver.",
+      "success",
+    );
   });
 
   it("errors when wallet connection fails", async () => {
@@ -130,7 +140,11 @@ describe("useSolverRegistration", () => {
       isConnected: false,
       address: null,
       connect: vi.fn(async () => {
-        useWalletStore.setState({ isConnected: false, address: null, error: "User rejected access" });
+        useWalletStore.setState({
+          isConnected: false,
+          address: null,
+          error: "User rejected access",
+        });
       }),
     });
 
@@ -145,8 +159,15 @@ describe("useSolverRegistration", () => {
   });
 
   it("errors when the user declines the signature request", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
-    registerSolverMock.mockResolvedValue({ registrationId: "reg-2", unsignedXdr: "unsigned-xdr" });
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "TESTNET",
+    });
+    registerSolverMock.mockResolvedValue({
+      registrationId: "reg-2",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockRejectedValue(new Error("User declined access"));
 
     const { result } = renderHook(() => useSolverRegistration());
@@ -205,8 +226,15 @@ describe("useSolverRegistration", () => {
   });
 
   it("resets back to idle", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
-    registerSolverMock.mockResolvedValue({ registrationId: "reg-3", unsignedXdr: "unsigned-xdr" });
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "TESTNET",
+    });
+    registerSolverMock.mockResolvedValue({
+      registrationId: "reg-3",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
     verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockResolvedValue({ registrationId: "reg-3", status: "pending" });
@@ -224,8 +252,15 @@ describe("useSolverRegistration", () => {
   });
 
   it("surfaces a specific message when the address is already registered", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
-    registerSolverMock.mockResolvedValue({ registrationId: "reg-4", unsignedXdr: "unsigned-xdr" });
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "TESTNET",
+    });
+    registerSolverMock.mockResolvedValue({
+      registrationId: "reg-4",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
     verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockRejectedValue(new apiErrorMock("address already registered", 409));
@@ -236,13 +271,25 @@ describe("useSolverRegistration", () => {
     });
 
     expect(result.current.status).toBe("error");
-    expect(result.current.error).toBe("This address is already registered as a solver.");
-    expect(addToastMock).toHaveBeenCalledWith("This address is already registered as a solver.", "error");
+    expect(result.current.error).toBe(
+      "This address is already registered as a solver.",
+    );
+    expect(addToastMock).toHaveBeenCalledWith(
+      "This address is already registered as a solver.",
+      "error",
+    );
   });
 
   it("surfaces a specific message when the bond is insufficient", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
-    registerSolverMock.mockResolvedValue({ registrationId: "reg-5", unsignedXdr: "unsigned-xdr" });
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "TESTNET",
+    });
+    registerSolverMock.mockResolvedValue({
+      registrationId: "reg-5",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
     verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockRejectedValue(new apiErrorMock("insufficient bond", 400));
@@ -253,7 +300,12 @@ describe("useSolverRegistration", () => {
     });
 
     expect(result.current.status).toBe("error");
-    expect(result.current.error).toBe("Insufficient bond amount. The bond must meet the minimum required.");
-    expect(addToastMock).toHaveBeenCalledWith("Insufficient bond amount. The bond must meet the minimum required.", "error");
+    expect(result.current.error).toBe(
+      "Insufficient bond amount. The bond must meet the minimum required.",
+    );
+    expect(addToastMock).toHaveBeenCalledWith(
+      "Insufficient bond amount. The bond must meet the minimum required.",
+      "error",
+    );
   });
 });

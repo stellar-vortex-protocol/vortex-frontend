@@ -27,6 +27,8 @@ const LOCALE_LABELS: Record<Locale, string> = {
 export function Nav(props: NavProps) {
   const maxWidth = props.variant === "home" ? "max-w-6xl" : "max-w-5xl";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const isConnected = useWalletStore((s) => s.isConnected);
   const pathname = usePathname();
   const toggleRef = useRef<HTMLButtonElement | null>(null);
@@ -51,9 +53,16 @@ export function Nav(props: NavProps) {
 
   const closeMobileMenu = () => setMobileOpen(false);
 
+  const closeMobileMenu = () => {
+    setMobileOpen(false);
+    toggleRef.current?.focus();
+  };
+
   return (
     <nav className="sticky top-0 z-50 border-b border-vx-border bg-vx-ink/80 backdrop-blur-md">
-      <div className={`${maxWidth} mx-auto px-5 h-14 flex items-center justify-between`}>
+      <div
+        className={`${maxWidth} mx-auto px-5 h-14 flex items-center justify-between`}
+      >
         {props.variant === "home" ? (
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
@@ -102,11 +111,26 @@ export function Nav(props: NavProps) {
               aria-label={mobileOpen ? getMessage("nav.closeMenu") : getMessage("nav.openMenu")}
               className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg border border-vx-border text-vx-muted hover:text-vx-text transition-colors"
             >
-              <svg aria-hidden="true" className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
                 {mobileOpen ? (
-                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path
+                    d="M4 4l8 8M12 4l-8 8"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 ) : (
-                  <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path
+                    d="M2 4h12M2 8h12M2 12h12"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 )}
               </svg>
             </button>

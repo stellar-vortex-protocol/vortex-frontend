@@ -75,12 +75,12 @@ npm run dev    # http://localhost:3000
 
 ### Required Environment Variables
 
-| Variable | Where to get the value |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | URL of your running `vortex-backend` relay |
-| `NEXT_PUBLIC_WS_URL` | WebSocket URL of the relay (usually with `/ws` path) |
-| `NEXT_PUBLIC_NETWORK` | Stellar network: `testnet`, `futurenet`, or `mainnet` |
-| `NEXT_PUBLIC_SETTLEMENT_CONTRACT` | Settlement contract ID from `vortex-contract` deployment |
+| Variable                               | Where to get the value                                        |
+| -------------------------------------- | ------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`                  | URL of your running `vortex-backend` relay                    |
+| `NEXT_PUBLIC_WS_URL`                   | WebSocket URL of the relay (usually with `/ws` path)          |
+| `NEXT_PUBLIC_NETWORK`                  | Stellar network: `testnet`, `futurenet`, or `mainnet`         |
+| `NEXT_PUBLIC_SETTLEMENT_CONTRACT`      | Settlement contract ID from `vortex-contract` deployment      |
 | `NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT` | Solver registry contract ID from `vortex-contract` deployment |
 
 ---
@@ -147,13 +147,67 @@ If preview-specific variables are not set, the workflow uses sensible defaults p
 
 ### Scripts
 
-| Script | Description |
-|---|---|
-| `npm run dev` | Dev server |
-| `npm run build` | Production build |
-| `npm run start` | Serve the production build |
-| `npm run lint` | `next lint` |
-| `npm test` | Run the Vitest suite |
+| Script                       | Description                                                       |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `npm run dev`                | Start Next.js local development server                            |
+| `npm run build`              | Compile and bundle production application                         |
+| `npm run start`              | Serve production build locally                                    |
+| `npm run lint`               | Run ESLint across codebase                                        |
+| `npm run check:editorconfig` | Verify formatting consistency with `.editorconfig`                |
+| `npm run check:env`          | Validate that all referenced environment variables are documented |
+| `npm run typecheck`          | Run strict TypeScript typechecking (`tsc --noEmit`)               |
+| `npm test`                   | Run the Vitest test suite                                         |
+| `npm run test:coverage`      | Run tests with V8 coverage reports                                |
+
+---
+
+## Staging Environment & QA
+
+A dedicated staging environment is configured for demoing features, verifying pull requests, and QA testing against realistic synthetic datasets without requiring live mainnet funds or local relay infrastructure.
+
+### Connecting to Staging
+
+1. Copy the staging configuration template:
+   ```bash
+   cp .env.staging.example .env.local
+   ```
+2. Start the development server against the staging relay:
+   ```bash
+   npm run dev
+   ```
+
+### Staging Architecture & Synthetic Datasets
+
+The staging deployment targets Stellar Testnet and connects to a staging relay seeded with synthetic test datasets:
+
+- **Intents:** Spans all lifecycle states (`pending`, `accepted`, `filled`, `failed`) across supported chains (Stellar, Ethereum, Arbitrum, Polygon).
+- **Solvers:** Multiple solver profiles with varying bond sizes, completion volumes, and latency profiles to validate leaderboard rendering and edge cases.
+- **Data Seeding Script:** Maintainers can seed or reset staging data using:
+  ```bash
+  node scripts/seed-staging-data.mjs --api-url <STAGING_RELAY_URL>
+  ```
+
+---
+
+## Operations & Monitoring
+
+### Synthetic Uptime & Health Checks
+
+Production availability is monitored automatically via a scheduled GitHub Actions workflow (`.github/workflows/uptime-check.yml`):
+
+- **Frequency:** Probes every 30 minutes with `workflow_dispatch` manual trigger support.
+- **Frontend Probe:** Asserts HTTP `200` response and validates presence of core branding/HTML markup.
+- **Relay Health Probe:** Checks `NEXT_PUBLIC_API_URL/health` to ensure relay backend responsiveness.
+- **Transient Mitigation:** Executes automated retries with backoff before flagging incidents.
+
+---
+
+## Code Standards
+
+- **Formatting:** Enforced via `.editorconfig` (UTF-8, 2 spaces, LF line endings, trailing whitespace trimming). Validated in CI via `npm run check:editorconfig`.
+- **TypeScript:** Configured with hardened strictness flags (`noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`). Checked via `npm run typecheck`.
+
+---
 
 ### Bundle Analysis
 
@@ -253,11 +307,11 @@ For more details, see the [CODEOWNERS](./.github/CODEOWNERS) file.
 
 Issues on the Wave tracker use the following complexity labels with corresponding point values to help contributors find tasks that match their availability:
 
-| Label | Points | Description |
-|---|---|---|
-| Trivial | 1 | Small fix, typo, or minor change — quick to complete |
-| Medium | 3 | Feature work or bug fix requiring moderate investigation |
-| High | 5 | Significant implementation effort or architectural change |
+| Label   | Points | Description                                               |
+| ------- | ------ | --------------------------------------------------------- |
+| Trivial | 1      | Small fix, typo, or minor change — quick to complete      |
+| Medium  | 3      | Feature work or bug fix requiring moderate investigation  |
+| High    | 5      | Significant implementation effort or architectural change |
 
 See our repository [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for contribution rules and community standards.
 

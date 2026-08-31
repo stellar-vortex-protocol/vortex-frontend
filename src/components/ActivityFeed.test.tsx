@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import type { FeedItem } from "@/lib/types";
 
-const { useIntentFeedMock } = vi.hoisted(() => ({ useIntentFeedMock: vi.fn() }));
+const { useIntentFeedMock } = vi.hoisted(() => ({
+  useIntentFeedMock: vi.fn(),
+}));
 vi.mock("@/hooks/useIntentFeed", () => ({ useIntentFeed: useIntentFeedMock }));
 
 import { ActivityFeed } from "./ActivityFeed";
@@ -35,10 +37,17 @@ describe("ActivityFeed", () => {
   });
 
   it("shows the absolute timestamp for relative feed times", () => {
-    useIntentFeedMock.mockReturnValue({ items: [item], isLoading: false, isLive: true });
+    useIntentFeedMock.mockReturnValue({
+      items: [item],
+      isLoading: false,
+      isLive: true,
+    });
     render(<ActivityFeed />);
 
-    expect(screen.getByText(/ago$/)).toHaveAttribute("title", new Date(item.createdAt).toLocaleString());
+    expect(screen.getByText(/ago$/)).toHaveAttribute(
+      "title",
+      new Date(item.createdAt).toLocaleString(),
+    );
   });
 
   it("shows a Polling indicator when the socket is not open", () => {
@@ -59,7 +68,9 @@ describe("ActivityFeed", () => {
     useIntentFeedMock.mockReturnValue({ items: [], isLoading: false, error: new Error("boom"), isLive: false });
     render(<ActivityFeed />);
 
-    expect(screen.getByText("Live feed unavailable right now.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Live feed unavailable right now."),
+    ).toBeInTheDocument();
   });
 
   it("still renders cached items even if the latest refresh errored", () => {
@@ -67,6 +78,98 @@ describe("ActivityFeed", () => {
     render(<ActivityFeed />);
 
     expect(screen.getByText("500 USDC → USDC")).toBeInTheDocument();
-    expect(screen.queryByText("Live feed unavailable right now.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Live feed unavailable right now."),
+    ).not.toBeInTheDocument();
+  });
+
+  describe("live region announcements", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("does not announce the initial snapshot", () => {
+      useIntentFeedMock.mockReturnValue({
+        items: [item],
+        isLoading: false,
+        isLive: true,
+      });
+      render(<ActivityFeed />);
+
+      expect(screen.getByRole("status")).toHaveTextContent("");
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(screen.getByRole("status")).toHaveTextContent("");
+    });
+
+    it("announces a debounced summary once new items arrive over the socket", () => {
+      useIntentFeedMock.mockReturnValue({
+        items: [item],
+        isLoading: false,
+        isLive: true,
+      });
+      const { rerender } = render(<ActivityFeed />);
+
+      const secondItem: FeedItem = { ...item, id: "2" };
+      useIntentFeedMock.mockReturnValue({
+        items: [secondItem, item],
+        isLoading: false,
+        isLive: true,
+      });
+      rerender(<ActivityFeed />);
+
+      // Still debouncing — no announcement yet.
+      expect(screen.getByRole("status")).toHaveTextContent("");
+
+      act(() => {
+        vi.advanceTimersByTime(1499);
+      });
+      expect(screen.getByRole("status")).toHaveTextContent("");
+
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(screen.getByRole("status")).toHaveTextContent("1 new fill");
+    });
+
+    it("coalesces a burst of arrivals into a single summary announcement", () => {
+      useIntentFeedMock.mockReturnValue({
+        items: [item],
+        isLoading: false,
+        isLive: true,
+      });
+      const { rerender } = render(<ActivityFeed />);
+
+      const secondItem: FeedItem = { ...item, id: "2" };
+      useIntentFeedMock.mockReturnValue({
+        items: [secondItem, item],
+        isLoading: false,
+        isLive: true,
+      });
+      rerender(<ActivityFeed />);
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      const thirdItem: FeedItem = { ...item, id: "3" };
+      useIntentFeedMock.mockReturnValue({
+        items: [thirdItem, secondItem, item],
+        isLoading: false,
+        isLive: true,
+      });
+      rerender(<ActivityFeed />);
+
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+
+      expect(screen.getByRole("status")).toHaveTextContent("2 new fills");
+    });
   });
 });
