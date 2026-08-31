@@ -22,6 +22,9 @@ registrations. Part of the multi-repo Vortex stack — see also
 | `/explore` | `src/app/explore/page.tsx` | Browse all intents with status/chain filters, sorting, and pagination |
 | `/explore/[id]` | `src/app/explore/[id]/page.tsx` | Single intent detail, with a settlement tx link once filled |
 | `/solve` | `src/app/solve/page.tsx` | Solver leaderboard, open intents feed, and solver registration |
+| `/governance` | `src/app/governance/page.tsx` | Governance proposals list and voting overview |
+| `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread |
+| `/contributors` | `src/app/contributors/page.tsx` | Drips Wave contribution transparency dashboard parsing repository issue metrics |
 
 ---
 
@@ -116,8 +119,7 @@ Issues on the Wave tracker use the following complexity labels with correspondin
 | Medium | 3 | Feature work or bug fix requiring moderate investigation |
 | High | 5 | Significant implementation effort or architectural change |
 
-See the org-wide
-[CONTRIBUTING.md](https://github.com/stellar-vortex-protocol/.github/blob/main/CONTRIBUTING.md).
+See our repository [CONTRIBUTING.md](./CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) for contribution rules and community standards.
 
 ## License
 
