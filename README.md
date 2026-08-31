@@ -150,6 +150,23 @@ This project follows [Keep a Changelog](https://keepachangelog.com/) format with
 
 The workflow uses `conventional-changelog` to parse commits tagged with standard types (`feat:`, `fix:`, `docs:`, etc.) and sections them automatically into **Added**, **Fixed**, **Changed**, etc.
 
+### Dependency Management
+
+**Major version updates** — Dependabot automatically creates grouped PRs for major version updates to critical dependencies:
+
+- **@stellar/freighter-api** — Wallet interaction
+- **@stellar/stellar-sdk** — Stellar blockchain operations
+- **next** — Framework
+- **react** / **react-dom** — UI library
+
+Major-version PRs require special attention:
+1. Run the full Playwright test suite (`npm run test:e2e`) against all browsers
+2. Perform manual smoke tests on the swap flow and wallet integration
+3. Check for deprecation warnings in the browser console
+4. Review release notes for breaking changes affecting wallet operations
+
+Minor and patch updates are auto-grouped for routine review. Major updates are grouped separately to ensure they receive the scrutiny wallet-adjacent code demands.
+
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
