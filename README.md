@@ -137,6 +137,19 @@ Issues on the Wave tracker use the following complexity labels with correspondin
 See the org-wide
 [CONTRIBUTING.md](https://github.com/stellar-vortex-protocol/.github/blob/main/CONTRIBUTING.md).
 
+### Changelog Updates
+
+This project follows [Keep a Changelog](https://keepachangelog.com/) format with [Conventional Commits](https://www.conventionalcommits.org/).
+
+**Automated changelog generation** — Maintainers can trigger the [Update CHANGELOG workflow](.github/workflows/changelog.yml) via GitHub Actions to automatically generate changelog entries from merged commits since the last release:
+
+1. Go to the **Actions** tab → **Update CHANGELOG** workflow
+2. Click **Run workflow** and enter the release version (e.g., `0.2.0`)
+3. A PR will be created with the generated changelog entries
+4. Review, adjust if needed, and merge to proceed with the release
+
+The workflow uses `conventional-changelog` to parse commits tagged with standard types (`feat:`, `fix:`, `docs:`, etc.) and sections them automatically into **Added**, **Fixed**, **Changed**, etc.
+
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
