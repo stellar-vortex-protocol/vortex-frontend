@@ -81,6 +81,39 @@ This generates an interactive treemap visualization in `.next-analyze/` showing 
 
 The CI pipeline automatically generates and uploads bundle analysis reports on every build as a downloadable artifact, making it easy to spot size regressions in pull requests.
 
+### Visual Regression Testing
+
+Storybook components are tested for visual regressions using Playwright. This catches unintended CSS changes that might break component appearance.
+
+**Run locally:**
+
+```bash
+npm run storybook      # Start Storybook dev server on http://localhost:6006
+npm run build:storybook # Build Storybook static site
+npm run test:visual    # Run visual regression tests
+```
+
+**Workflow:**
+
+1. Tests run against the built Storybook (`storybook-static/`)
+2. Playwright captures screenshots of all story variants
+3. Screenshots are compared against baseline images
+4. Differences are reported as test failures
+5. CI artifacts include a visual regression report with diffs
+
+**First time setup / Updating baselines:**
+
+When adding new stories or intentionally changing component styles, update the baseline snapshots:
+
+```bash
+npm run build:storybook
+npm run test:visual -- --update
+```
+
+Commit the updated baseline images in `.storybook/playwright/` so future runs have a reference point.
+
+The CI pipeline runs visual regression tests on every build, preventing CSS regressions from reaching production.
+
 ## Troubleshooting
 
 ### Freighter not detected

@@ -49,3 +49,13 @@ jobs:
           name: bundle-analysis-report
           path: .next-analyze/
           retention-days: 30
+      - name: Build Storybook
+        run: npm run build:storybook
+      - name: Run visual regression tests
+        run: npm run test:visual
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: visual-regression-report
+          path: blob-report/
+          retention-days: 30
