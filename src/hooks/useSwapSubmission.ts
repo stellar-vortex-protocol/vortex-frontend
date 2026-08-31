@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import freighterApi from "@stellar/freighter-api";
 import { createIntent, submitIntent } from "@/lib/api";
+import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import type { QuoteRequest } from "@/lib/types";
@@ -56,6 +57,12 @@ export function useSwapSubmission() {
       const signedXdr = await freighterApi.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });
+
+      // Defense-in-depth: verify signed XDR matches unsigned (Issue #308)
+      const xdrVerification = verifySignedXdrMatches(unsignedXdr, signedXdr);
+      if (!xdrVerification.valid) {
+        throw new Error(xdrVerification.error ?? "Transaction verification failed. The signed transaction does not match what was reviewed.");
+      }
 
       setStatus("submitting");
       await submitIntent(newIntentId, signedXdr);

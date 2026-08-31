@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-const { signTransactionMock, registerSolverMock, submitSolverRegistrationMock, mutateMock, addToastMock, apiErrorMock } = vi.hoisted(() => ({
+const { signTransactionMock, registerSolverMock, submitSolverRegistrationMock, mutateMock, addToastMock, apiErrorMock, verifySignedXdrMatchesMock } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   registerSolverMock: vi.fn(),
   submitSolverRegistrationMock: vi.fn(),
   mutateMock: vi.fn(),
   addToastMock: vi.fn(),
+  verifySignedXdrMatchesMock: vi.fn(),
   apiErrorMock: class extends Error {
     status: number;
     constructor(message: string, status: number) {
@@ -25,6 +26,10 @@ vi.mock("@/lib/api", () => ({
   registerSolver: registerSolverMock,
   submitSolverRegistration: submitSolverRegistrationMock,
   ApiError: apiErrorMock,
+}));
+
+vi.mock("@/lib/xdrReview", () => ({
+  verifySignedXdrMatches: verifySignedXdrMatchesMock,
 }));
 
 vi.mock("swr", () => ({ mutate: mutateMock }));
@@ -58,6 +63,7 @@ describe("useSolverRegistration", () => {
     });
     registerSolverMock.mockResolvedValue({ registrationId: "reg-1", unsignedXdr: "unsigned-xdr" });
     signTransactionMock.mockResolvedValue("signed-xdr");
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockResolvedValue({ registrationId: "reg-1", status: "pending" });
 
     const { result } = renderHook(() => useSolverRegistration());
@@ -112,6 +118,7 @@ describe("useSolverRegistration", () => {
     useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
     registerSolverMock.mockResolvedValue({ registrationId: "reg-3", unsignedXdr: "unsigned-xdr" });
     signTransactionMock.mockResolvedValue("signed-xdr");
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockResolvedValue({ registrationId: "reg-3", status: "pending" });
 
     const { result } = renderHook(() => useSolverRegistration());
@@ -130,6 +137,7 @@ describe("useSolverRegistration", () => {
     useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
     registerSolverMock.mockResolvedValue({ registrationId: "reg-4", unsignedXdr: "unsigned-xdr" });
     signTransactionMock.mockResolvedValue("signed-xdr");
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockRejectedValue(new apiErrorMock("address already registered", 409));
 
     const { result } = renderHook(() => useSolverRegistration());
@@ -146,6 +154,7 @@ describe("useSolverRegistration", () => {
     useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
     registerSolverMock.mockResolvedValue({ registrationId: "reg-5", unsignedXdr: "unsigned-xdr" });
     signTransactionMock.mockResolvedValue("signed-xdr");
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitSolverRegistrationMock.mockRejectedValue(new apiErrorMock("insufficient bond", 400));
 
     const { result } = renderHook(() => useSolverRegistration());
