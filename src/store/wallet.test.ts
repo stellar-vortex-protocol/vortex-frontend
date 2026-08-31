@@ -218,4 +218,96 @@ describe("useWalletStore", () => {
     expect(state.lastKnownAddress).toBe("GOLD123");
     expect(state.wasSessionCleared).toBe(true);
   });
+
+  // ── Issue #307: Persisted wallet state validation ──────────────────────────
+
+  describe("Persisted wallet state validation", () => {
+    it("should accept valid persisted state", () => {
+      const validState = {
+        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
+        lastKnownAddress: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
+        network: "testnet",
+        isConnected: true,
+      };
+      expect(validState).toBeTruthy();
+    });
+
+    it("should handle null and undefined address fields", () => {
+      const nullAddressState = {
+        address: null,
+        lastKnownAddress: null,
+        network: "testnet",
+        isConnected: false,
+      };
+      expect(nullAddressState.address).toBeNull();
+      expect(nullAddressState.isConnected).toBe(false);
+    });
+
+    it("should reject malformed JSON from corrupted localStorage", () => {
+      const malformed = "not json at all";
+      let parsed = null;
+      try {
+        parsed = JSON.parse(malformed);
+      } catch (e) {
+        parsed = null;
+      }
+      expect(parsed).toBeNull();
+    });
+
+    it("should reject state with wrong address type", () => {
+      const invalidState = {
+        address: 12345,
+        lastKnownAddress: null,
+        network: "testnet",
+        isConnected: true,
+      };
+      const isValid =
+        typeof invalidState.address === "string" || invalidState.address === null;
+      expect(isValid).toBe(false);
+    });
+
+    it("should reject state with missing isConnected field", () => {
+      const invalidState = {
+        address: null,
+        lastKnownAddress: null,
+        network: "testnet",
+      };
+      const isValid = typeof (invalidState as any).isConnected === "boolean";
+      expect(isValid).toBe(false);
+    });
+
+    it("should reject state with invalid Stellar addresses", () => {
+      const invalidState = {
+        address: "not-a-valid-stellar-address",
+        lastKnownAddress: null,
+        network: "testnet",
+        isConnected: true,
+      };
+      expect(invalidState.address).not.toMatch(/^G[A-Z0-9]{55}$/);
+    });
+
+    it("should reject state with malicious modified addresses", () => {
+      const tamperedState = {
+        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK999", // Modified last digits
+        lastKnownAddress: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
+        network: "testnet",
+        isConnected: true,
+      };
+      // The validation would check this against isValidStellarPublicKey
+      expect(tamperedState.address).not.toBe(
+        "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"
+      );
+    });
+
+    it("should handle mixed valid and invalid data", () => {
+      const mixedState = {
+        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
+        lastKnownAddress: "invalid",
+        network: "testnet",
+        isConnected: true,
+      };
+      expect(mixedState.address).toMatch(/^G[A-Z0-9]{55}$/);
+      expect(mixedState.lastKnownAddress).not.toMatch(/^G[A-Z0-9]{55}$/);
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import freighterApi from "@stellar/freighter-api";
 import { DEFAULT_LOCALE, translate } from "@/lib/i18n";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 export type WalletErrorKey =
   | "wallet.error.freighterUnavailable"
@@ -9,6 +10,62 @@ export type WalletErrorKey =
 
 /** The network name the app expects, normalised to upper-case for comparison. */
 const EXPECTED_NETWORK = (process.env.NEXT_PUBLIC_NETWORK ?? "testnet").toUpperCase();
+
+function isValidPersistedState(state: unknown): state is {
+  address: string | null;
+  lastKnownAddress: string | null;
+  network: string | null;
+  isConnected: boolean;
+} {
+  if (typeof state !== "object" || state === null) {
+    return false;
+  }
+
+  const obj = state as Record<string, unknown>;
+
+  if (
+    typeof obj.address !== "string" &&
+    obj.address !== null &&
+    obj.address !== undefined
+  ) {
+    return false;
+  }
+
+  if (
+    typeof obj.lastKnownAddress !== "string" &&
+    obj.lastKnownAddress !== null &&
+    obj.lastKnownAddress !== undefined
+  ) {
+    return false;
+  }
+
+  if (
+    typeof obj.network !== "string" &&
+    obj.network !== null &&
+    obj.network !== undefined
+  ) {
+    return false;
+  }
+
+  if (typeof obj.isConnected !== "boolean") {
+    return false;
+  }
+
+  const address = obj.address;
+  if (typeof address === "string" && !isValidStellarPublicKey(address)) {
+    return false;
+  }
+
+  const lastKnownAddress = obj.lastKnownAddress;
+  if (
+    typeof lastKnownAddress === "string" &&
+    !isValidStellarPublicKey(lastKnownAddress)
+  ) {
+    return false;
+  }
+
+  return true;
+}
 
 export type WalletState = {
   address: string | null;
@@ -137,7 +194,20 @@ export const useWalletStore = create<WalletState>()(
     }),
     {
       name: "vortex-wallet",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => localStorage, {
+        reviver: (key, value) => {
+          if (key === "") {
+            if (!isValidPersistedState(value)) {
+              console.warn(
+                "Persisted wallet state failed validation, reverting to default",
+                value
+              );
+              return undefined;
+            }
+          }
+          return value;
+        },
+      }),
       partialize: (state) => ({
         address: state.address,
         lastKnownAddress: state.lastKnownAddress,
