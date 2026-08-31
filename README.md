@@ -124,6 +124,12 @@ This repository uses a [CODEOWNERS](./.github/CODEOWNERS) file to automatically 
 
 For more details, see the [CODEOWNERS](./.github/CODEOWNERS) file.
 
+### Security Practices
+
+- **Pinned Actions**: All GitHub Actions used in CI/CD workflows are pinned to specific commit SHAs (not mutable version tags) to prevent supply-chain attacks. Version comments are included for readability.
+- **Dependabot**: Automatically maintains SHA pins via weekly GitHub Actions updates. Review and merge Dependabot PRs to stay current with security patches.
+- **Minimal Permissions**: Workflows declare only the minimum required permissions (`contents: read`, `checks: write`) following the principle of least privilege.
+
 ### Issue Complexity Labels
 
 Issues on the Wave tracker use the following complexity labels with corresponding point values to help contributors find tasks that match their availability:
