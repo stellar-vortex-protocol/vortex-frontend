@@ -6,11 +6,8 @@ labels: bug
 assignees: ""
 ---
 
-**⚠️ SECURITY VULNERABILITY?**
-
-If you've discovered a security vulnerability, **do not file a public issue**. Instead, please follow our [Security Policy](../../SECURITY.md) to report it privately.
-
----
+> For suspected security vulnerabilities, do not use this public template.
+> Please follow the [security policy](../../SECURITY.md) and report privately.
 
 ## Description
 

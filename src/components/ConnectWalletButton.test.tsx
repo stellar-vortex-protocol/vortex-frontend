@@ -111,6 +111,37 @@ describe("ConnectWalletButton", () => {
     });
   });
 
+  it("surfaces a real (non-undefined) toast message when connect() rejects", async () => {
+    isConnectedMock.mockResolvedValue(true);
+    requestAccessMock.mockRejectedValue(new Error("User declined access"));
+
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByText("Connect Freighter"));
+
+    await waitFor(() => {
+      expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
+    });
+    // Regression guard for the original bug: the toast text must never be the
+    // string "undefined" (from a missing translation key or an undeclared var).
+    for (const [message] of addToastMock.mock.calls) {
+      expect(message).toBeTruthy();
+      expect(message).not.toBe("undefined");
+    }
+  });
+
+  it("puts the underlying failure text in the retry button's tooltip", async () => {
+    isConnectedMock.mockResolvedValue(true);
+    requestAccessMock.mockRejectedValue(new Error("User declined access"));
+
+    const user = userEvent.setup();
+    renderButton();
+    await user.click(screen.getByText("Connect Freighter"));
+
+    const retry = await screen.findByText("Retry Connection");
+    expect(retry.closest("button")).toHaveAttribute("title", "User declined access");
+  });
+
   // ── Issue #1: network-mismatch warning ───────────────────────────────────
 
   it("shows a network-mismatch warning when connected to the wrong network", async () => {

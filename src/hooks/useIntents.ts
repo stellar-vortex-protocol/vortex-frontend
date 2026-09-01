@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
+import { swrRetryConfig } from "@/hooks/useRetry";
 import type { FeedItem } from "@/lib/types";
 
 // No polling needed — useLiveIntents layers a WebSocket subscription on top
@@ -13,6 +14,7 @@ export function useIntents() {
   const { data, error, isLoading } = useSWR<FeedItem[]>("/intents", fetcher, {
     refreshInterval: 0,
     dedupingInterval: 8_000,
+    ...swrRetryConfig,
   });
 
   return { intents: data ?? [], isLoading, error };

@@ -18,7 +18,8 @@ registrations. Part of the multi-repo Vortex stack — see also
 
 | Route | File | Description |
 |---|---|---|
-| `/` | `src/app/page.tsx` | Swap interface, live fills feed, intent pipeline overview |
+| `/` | `src/app/page.tsx` | Swap interface, live fills feed, and intent pipeline overview |
+| `/analytics` | `src/app/analytics/page.tsx` | Protocol aggregation view for volume, route trends, and status distribution over the loaded live intent feed |
 | `/explore` | `src/app/explore/page.tsx` | Browse all intents with status/chain filters, sorting, and pagination |
 | `/explore/[id]` | `src/app/explore/[id]/page.tsx` | Single intent detail, with a settlement tx link once filled |
 | `/solve` | `src/app/solve/page.tsx` | Solver leaderboard, open intents feed, and solver registration |
@@ -181,9 +182,11 @@ Issues on the Wave tracker use the following complexity labels with correspondin
 See the org-wide
 [CONTRIBUTING.md](https://github.com/stellar-vortex-protocol/.github/blob/main/CONTRIBUTING.md).
 
-### Security
+## Security
 
-If you discover a security vulnerability, please report it privately according to our [Security Policy](./SECURITY.md) instead of using the public issue tracker.
+Please read the [security policy](./SECURITY.md) before reporting a potential
+vulnerability. Use GitHub's private vulnerability reporting flow rather than a
+public issue for security-sensitive details.
 
 ## License
 

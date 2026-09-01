@@ -9,39 +9,41 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Vortex palette: deep navy, sage accents
-        "vx-ink":    "#080C14",
-        "vx-base":   "#0C1120",
-        "vx-surface":"#111827",
-        "vx-card":   "#161E2E",
-        "vx-border": "rgba(255,255,255,0.07)",
-        "vx-line":   "rgba(255,255,255,0.04)",
+        // ── Vortex semantic palette ──────────────────────────────────────────
+        // All values are CSS-variable references so that globals.css can switch
+        // the entire palette by redefining the variables in a light-theme block.
+        "vx-ink":     "var(--vx-ink)",
+        "vx-base":    "var(--vx-base)",
+        "vx-surface": "var(--vx-surface)",
+        "vx-card":    "var(--vx-card)",
+        "vx-border":  "var(--vx-border)",
+        "vx-line":    "var(--vx-line)",
 
         // Primary: sage green (Stellar brand adjacent)
-        "vx-sage":     "#4CEBA8",
-        "vx-sage-dim": "#2A8A62",
-        "vx-sage-bg":  "rgba(76,235,168,0.08)",
+        "vx-sage":     "var(--vx-sage)",
+        "vx-sage-dim": "var(--vx-sage-dim)",
+        "vx-sage-bg":  "var(--vx-sage-bg)",
 
         // Accent: soft lavender for source chain
-        "vx-lav":      "#A78BFA",
-        "vx-lav-dim":  "#5B3F8C",
-        "vx-lav-bg":   "rgba(167,139,250,0.08)",
+        "vx-lav":     "var(--vx-lav)",
+        "vx-lav-dim": "var(--vx-lav-dim)",
+        "vx-lav-bg":  "var(--vx-lav-bg)",
 
         // State colors
-        "vx-amber":    "#F5A623",
-        "vx-rose":     "#F87171",
+        "vx-amber": "var(--vx-amber)",
+        "vx-rose":  "var(--vx-rose)",
 
         // Text
-        "vx-text":     "#E8EDF5",
-        "vx-muted":    "#6B7A8E",
-        "vx-dim":      "#374151",
+        "vx-text":  "var(--vx-text)",
+        "vx-muted": "var(--vx-muted)",
+        "vx-dim":   "var(--vx-dim)",
       },
       fontFamily: {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "JetBrains Mono", "monospace"],
       },
       backgroundImage: {
-        "vx-gradient": "linear-gradient(135deg, rgba(76,235,168,0.06) 0%, rgba(167,139,250,0.06) 100%)",
+        "vx-gradient":      "linear-gradient(135deg, rgba(76,235,168,0.06) 0%, rgba(167,139,250,0.06) 100%)",
         "vx-card-gradient": "linear-gradient(160deg, rgba(76,235,168,0.03) 0%, transparent 60%)",
       },
       keyframes: {
