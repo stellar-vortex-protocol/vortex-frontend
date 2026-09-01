@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
+import { swrRetryConfig } from "@/hooks/useRetry";
 import type { FeedItem } from "@/lib/types";
 
 // refreshInterval is intentionally 0 (disabled) because useIntentFeed layers
@@ -14,6 +15,7 @@ export function useActivityFeed() {
   const { data, error, isLoading } = useSWR<FeedItem[]>("/intents/feed", fetcher, {
     refreshInterval: 0,
     dedupingInterval: 8_000,
+    ...swrRetryConfig,
   });
 
   return { items: data ?? [], isLoading, error };

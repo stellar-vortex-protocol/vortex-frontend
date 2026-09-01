@@ -9,6 +9,7 @@ export const messages = {
   nav: {
     branding: "Vortex",
     explore: "Explore",
+    analytics: "Analytics",
     becomeSolver: "Become a Solver",
     docs: "Docs",
     openMenu: "Open menu",

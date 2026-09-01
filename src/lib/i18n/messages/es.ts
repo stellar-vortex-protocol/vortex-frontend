@@ -18,6 +18,15 @@ export const es = {
   "wallet.error.connectFailed": "No se pudo conectar la billetera.",
 
   "swap.chainPicker.title": "Seleccionar cadena origen",
+  "swap.destination.label": "Dirección de destino",
+  "swap.destination.placeholder": "G...",
+  "swap.destination.invalidAddress": "Ingresa una dirección Stellar válida (comienza con G).",
+
+  "activityFeed.status.live": "En vivo",
+  "activityFeed.status.polling": "Actualizando",
+  "activityFeed.error.unavailable": "El feed en vivo no está disponible ahora.",
+  "activityFeed.empty": "Aún no hay llenados.",
+  "activityFeed.item.route": "{chain} · vía {solver}",
 
   "swap.from.label": "De",
   "swap.from.amountLabel": "Cantidad a intercambiar",
@@ -25,6 +34,9 @@ export const es = {
   "swap.from.selectChain": "Cadena origen, actualmente {name}",
   "swap.from.selectToken": "Seleccionar token origen, actualmente {symbol}",
   "swap.from.approxValue": "≈ ${value}",
+
+  "swap.prices.estimated": "est.",
+  "swap.prices.asOf": "Precio estimado al {date}. La cotización en vivo actualizará esto cuando esté disponible.",
 
   "swap.to.label": "A",
   "swap.to.tokenGroup": "Token de destino",
@@ -44,13 +56,14 @@ export const es = {
   "swap.quote.protocolFee": "Comisión de protocolo",
   "swap.quote.protocolFeeValue": "{percent}%",
   "swap.quote.rate": "Tasa",
+
+  "swap.quote.fillTime.tooltip": "Tiempo estimado para que un solver complete tu swap después de enviarlo. El tiempo real puede variar.",
+  "swap.quote.priceImpact.tooltip": "Cuánto mueve tu operación el precio efectivo respecto al precio de mercado. Un impacto alto significa que recibirás menos que la tasa de mercado.",
+  "swap.quote.protocolFee.tooltip": "Pequeño porcentaje de comisión que cobra el protocolo Vortex en cada swap liquidado. Se deduce del monto de destino.",
   "swap.quote.unavailable": "Cotización en tiempo real no disponible — mostrando tasa estimada.",
-  "swap.quote.noSolver": "No hay ningún solver disponible para esta ruta en este momento.",
-  "swap.quote.staleWarning": "La cotización está desactualizada. Espera una actualización antes de continuar.",
-  "swap.quote.expiresIn": "Se actualiza en {seconds}s",
-  "swap.quote.expired": "Cotización expirada",
-  "swap.quote.refreshCta": "Actualizar cotización",
+  "swap.quote.noSolver": "No hay solvers disponibles para esta ruta en este momento.",
   "swap.quote.highPriceImpactWarning": "Impacto de precio alto por encima de {threshold}% — revisa antes de intercambiar.",
+  "swap.quote.staleWarning": "La cotización está desactualizada. Espera a que se recargue antes de enviar.",
 
   "swap.submit.connecting": "Conectando billetera…",
   "swap.submit.building": "Preparando swap…",
@@ -64,9 +77,13 @@ export const es = {
 
   "swap.destination.label": "Dirección de destino",
   "swap.destination.placeholder": "G...",
-  "swap.destination.invalidAddress": "Ingresa una dirección Stellar válida (comienza con G).",
+  "swap.destination.invalidAddress": "Ingresa una dirección de Stellar válida (empieza con G).",
 
   "swap.disclaimer": "El swap se liquida directamente en Stellar · Sin tokens envueltos · Protegido por bonos de solver",
+
+  "swap.destination.label": "Dirección de destino",
+  "swap.destination.placeholder": "G...",
+  "swap.destination.invalidAddress": "Ingresa una dirección Stellar válida (comienza con G).",
 
   "home.hero.eyebrow": "Stellar Agentic Hackathon 2025",
   "home.hero.titleLine1": "Intercambia desde cualquier cadena",
@@ -95,63 +112,40 @@ export const es = {
   "home.chains.title": "Cadenas soportadas",
   "home.chains.stellarDestination": "Stellar (dest.)",
 
-  "notFound.breadcrumb": "No Encontrado",
-  "notFound.eyebrow": "404",
-  "notFound.title": "Página no encontrada",
-  "notFound.body": "La página que buscas no existe o puede haber sido movida.",
   "notFound.backHome": "← Volver a Vortex",
 
-  "solve.nav.label": "Portal de Solver",
-  "solve.hero.eyebrow": "Red de Solvers",
-  "solve.hero.title": "Conviértete en Solver de Vortex",
-  "solve.hero.description":
-    "Los solvers son creadores de mercado competitivos que cumplen las intenciones de swap de los usuarios. Deposita un bono en USDC, observa el feed de intenciones abiertas y gana comisiones por cada cumplimiento.",
-  "solve.steps.registerBond.number": "01",
-  "solve.steps.registerBond.title": "Registrar + Bono",
-  "solve.steps.registerBond.body":
-    "Deposita ≥50 USDC como bono en el contrato de liquidación de Vortex. Tu bono respalda tu fiabilidad — no cumplir tras aceptar penaliza el 10%.",
-  "solve.steps.watchIntentFeed.number": "02",
-  "solve.steps.watchIntentFeed.title": "Observa el feed de intenciones",
-  "solve.steps.watchIntentFeed.body":
-    "Monitorea la API o WebSocket de intenciones abiertas. Cuando veas una oportunidad rentable, reclama derechos exclusivos de cumplimiento por una ventana de 5 minutos.",
-  "solve.steps.fillAndEarn.number": "03",
-  "solve.steps.fillAndEarn.title": "Cumple y gana",
-  "solve.steps.fillAndEarn.body":
-    "Ejecuta el tramo en la cadena origen, transmite a Stellar, transfiere los tokens de destino al usuario. Gana la diferencia entre tu costo de cumplimiento y el mínimo del usuario.",
-  "solve.tabs.ariaLabel": "Secciones del portal de solver",
-  "solve.tabs.leaderboard": "clasificación",
-  "solve.tabs.intents": "intenciones",
-  "solve.tabs.register": "registrar",
-  "solve.leaderboard.title": "Solvers Activos",
-  "solve.leaderboard.error": "No se pudo cargar la clasificación de solvers. Inténtalo de nuevo pronto.",
-  "solve.leaderboard.empty": "Aún no hay solvers activos.",
-  "solve.leaderboard.fills": "Cumplimientos",
-  "solve.leaderboard.volume": "Volumen",
-  "solve.leaderboard.avgTime": "Tiempo Medio",
-  "solve.leaderboard.success": "Éxito",
-  "solve.intents.title": "Intenciones Abiertas",
-  "solve.intents.available": "{count} disponibles",
-  "solve.intents.error": "No se pudieron cargar las intenciones abiertas. Inténtalo de nuevo pronto.",
-  "solve.intents.empty": "No hay intenciones abiertas ahora — vuelve pronto.",
-  "solve.intents.accept": "Aceptar Intención →",
-  "solve.intents.accepting": "Aceptando…",
-  "solve.intents.id": "ID: {id}",
-  "solve.intents.details": "Mínimo: {minOut} {dstToken} · Expira en {timeRemaining}",
-  "solve.register.title": "Registrarse como Solver",
-  "solve.register.description": "Deposita un bono en USDC para empezar a cumplir intenciones.",
-  "solve.register.addressLabel": "Dirección Stellar",
-  "solve.register.bondLabel": "Monto del Bono (USDC)",
-  "solve.register.addressPlaceholder": "G...",
-  "solve.register.bondPlaceholder": "Mínimo 50 USDC",
-  "solve.register.info.minimumBond": "• Bono mínimo: 50 USDC",
-  "solve.register.info.slash": "• Penalización por incumplimiento: 10% del bono",
-  "solve.register.info.withdraw": "• Retira el bono en cualquier momento cuando esté inactivo",
-  "solve.register.button.connect": "Conectar Freighter para Registrarse",
-  "solve.register.button.registered": "Registrado ✓ — registrar otro",
-  "solve.register.states.connecting": "Conectando billetera…",
-  "solve.register.states.building": "Preparando registro…",
-  "solve.register.states.awaitingSignature": "Confirmar en Freighter…",
-  "solve.register.states.submitting": "Enviando…",
-  "solve.register.validation.invalidAddress": "Ingresa una dirección Stellar válida (comienza con G).",
-  "solve.register.validation.minimumBond": "El bono mínimo es {minBond} USDC.",
+  // ── Estados vacíos ─────────────────────────────────────────────────────────
+
+  // /explore — filtros sin resultados
+  "explore.empty.title": "Ninguna intención coincide con tus filtros",
+  "explore.empty.message": "Intenta ajustar o borrar los filtros de estado y cadena para ver más resultados.",
+  "explore.empty.clearFilters": "Limpiar filtros",
+
+  // /explore — error al cargar
+  "explore.error.title": "No se pudieron cargar las intenciones",
+  "explore.error.message": "Algo salió mal al obtener las intenciones. Verifica tu conexión e inténtalo de nuevo.",
+
+  // /my-intents — sin intenciones aún
+  "myIntents.empty.title": "Sin swaps aún",
+  "myIntents.empty.message": "No has enviado ningún swap desde esta billetera. Haz tu primer swap para empezar.",
+  "myIntents.empty.cta": "Hacer mi primer swap →",
+
+  // /my-intents — filtros sin resultados
+  "myIntents.filterEmpty.title": "Ninguna intención coincide con tus filtros",
+  "myIntents.filterEmpty.message": "Prueba con un filtro de estado o cadena diferente, o limpia todos los filtros para ver todo.",
+  "myIntents.filterEmpty.clearFilters": "Limpiar filtros",
+
+  // ActivityFeed — vacío en despliegue nuevo
+  "activityFeed.empty.title": "Sin actividad aún",
+  "activityFeed.empty.message": "Esperando las primeras intenciones de swap. Envía un swap para comenzar.",
+  "activityFeed.empty.cta": "Hacer swap ahora →",
+
+  "activityFeed.status.live": "En vivo",
+  "activityFeed.status.polling": "Consultando",
+  "activityFeed.error.unavailable": "Feed en vivo no disponible ahora mismo.",
+  "activityFeed.item.route": "{chain} · vía {solver}",
+
+  // solve/[address] — historial de llenados vacío
+  "solverDetail.fillHistory.empty.title": "Sin llenados aún",
+  "solverDetail.fillHistory.empty.message": "Una vez que este solver empiece a aceptar y llenar intenciones, su historial aparecerá aquí.",
 } as const;

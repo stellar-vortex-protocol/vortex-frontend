@@ -1,6 +1,8 @@
 "use client";
 
+import React, { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { SwapCard } from "@/components/SwapCard";
@@ -50,6 +52,25 @@ function IntentPipeline() {
       ))}
     </div>
   );
+}
+
+// ─── Prefill-aware swap card ───────────────────────────────────────────────────
+// Reads ?srcChain=&srcToken=&amount=&dstToken= from the URL and passes them as
+// initial values. Any missing or invalid param falls back to SwapCard defaults.
+// Wrapped in Suspense because useSearchParams requires it in Next.js 14.
+
+function SwapCardWithPrefill() {
+  const params = useSearchParams();
+  const props: React.ComponentProps<typeof SwapCard> = {};
+  const srcChain = params.get("srcChain");
+  const srcToken = params.get("srcToken");
+  const amount   = params.get("amount");
+  const dstToken = params.get("dstToken");
+  if (srcChain) props.initialChain    = srcChain;
+  if (srcToken) props.initialSrcToken = srcToken;
+  if (amount)   props.initialAmount   = amount;
+  if (dstToken) props.initialDstToken = dstToken;
+  return <SwapCard {...props} />;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -118,7 +139,9 @@ export default function HomePage() {
 
           {/* Right: swap card */}
           <div className="lg:sticky lg:top-24">
-            <SwapCard />
+            <Suspense fallback={<SwapCard />}>
+              <SwapCardWithPrefill />
+            </Suspense>
 
             {/* Supported chains */}
             <div className="mt-5">

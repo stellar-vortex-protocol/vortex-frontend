@@ -35,6 +35,25 @@ function crc16xmodem(bytes: Uint8Array): number {
   return crc;
 }
 
+/**
+ * Shortens a Stellar address (or any opaque identifier such as a tx hash) for
+ * display, keeping `prefix` leading and `suffix` trailing characters joined by
+ * an ellipsis — e.g. `GABC...3456`.
+ *
+ * This is the single source of truth for address truncation; call sites must not
+ * re-implement their own slice logic. Inputs that are empty or already no longer
+ * than `prefix + suffix` are returned unchanged so we never produce a string
+ * that is longer than (or as long as) the original.
+ */
+export function truncateAddress(
+  address: string,
+  opts: { prefix?: number; suffix?: number } = {}
+): string {
+  const { prefix = 4, suffix = 4 } = opts;
+  if (!address || address.length <= prefix + suffix) return address;
+  return `${address.slice(0, prefix)}...${address.slice(-suffix)}`;
+}
+
 export function isValidStellarPublicKey(address: string): boolean {
   if (address.length !== 56 || address[0] !== "G") return false;
 

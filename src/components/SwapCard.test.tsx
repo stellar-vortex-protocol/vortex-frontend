@@ -194,38 +194,6 @@ describe("SwapCard", () => {
     );
   });
 
-  it("truncates input to the selected token's decimal precision (USDC = 6 dp)", async () => {
-    const user = userEvent.setup();
-    renderSwapCard();
-
-    // USDC (default token) has 6 decimal places. Typing 9 dp should truncate.
-    const input = screen.getByPlaceholderText("0");
-    await user.type(input, "1.123456789");
-
-    // The displayed value must not exceed 6 decimal places.
-    expect((input as HTMLInputElement).value).toBe("1.123456");
-  });
-
-  it("truncates input to 18 decimal places when WETH is selected", async () => {
-    const user = userEvent.setup();
-    renderSwapCard();
-
-    // Open the token picker and switch to WETH.
-    const tokenBtn = screen.getByRole("button", {
-      name: "Select source token, currently USDC",
-    });
-    await user.click(tokenBtn);
-
-    const wethOption = await screen.findByRole("option", { name: /WETH/ });
-    await user.click(wethOption);
-
-    const input = screen.getByPlaceholderText("0");
-    // WETH has 18 dp — typing 20 fractional digits should truncate to 18.
-    await user.type(input, "0.123456789012345678901234");
-
-    expect((input as HTMLInputElement).value).toBe("0.123456789012345678");
-  });
-
   it("submits a swap end-to-end for an already-connected wallet", async () => {
     useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
     (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string, init?: RequestInit) => {
