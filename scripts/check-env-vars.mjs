@@ -88,7 +88,50 @@ walk(join(ROOT, "src"), (filePath) => {
   }
 });
 
-// ── 3. Report ────────────────────────────────────────────────────────────────
+// ── 3. Check for insecure schemes in production ──────────────────────────────
+
+const IS_PRODUCTION_BUILD = process.env.NODE_ENV === "production";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "";
+
+const insecureSchemes = [];
+
+if (IS_PRODUCTION_BUILD) {
+  const isLocalhost = (url) => {
+    try {
+      const parsed = new URL(url);
+      return (
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "[::1]"
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  if (API_URL && !isLocalhost(API_URL)) {
+    if (API_URL.startsWith("http://")) {
+      insecureSchemes.push({
+        var: "NEXT_PUBLIC_API_URL",
+        url: API_URL,
+        issue: 'uses "http://" instead of "https://"',
+      });
+    }
+  }
+
+  if (WS_URL && !isLocalhost(WS_URL)) {
+    if (WS_URL.startsWith("ws://")) {
+      insecureSchemes.push({
+        var: "NEXT_PUBLIC_WS_URL",
+        url: WS_URL,
+        issue: 'uses "ws://" instead of "wss://"',
+      });
+    }
+  }
+}
+
+// ── 4. Report ────────────────────────────────────────────────────────────────
 
 /** @type {Array<{varName: string, locations: string[]}>} */
 const undocumented = [];
@@ -98,12 +141,10 @@ for (const [varName, locations] of usedVars) {
   }
 }
 
-if (undocumented.length === 0) {
-  console.log(
-    `✅  All ${usedVars.size} env var(s) used in source are documented in .env.example.`
-  );
-  process.exit(0);
-} else {
+let hasErrors = false;
+
+if (undocumented.length > 0) {
+  hasErrors = true;
   console.error(
     `❌  ${undocumented.length} env var(s) used in source are NOT documented in .env.example:\n`
   );
@@ -116,5 +157,31 @@ if (undocumented.length === 0) {
   console.error(
     "\nAdd the missing variable(s) to .env.example (with an inline comment explaining their purpose) and re-run this check."
   );
+}
+
+if (insecureSchemes.length > 0) {
+  hasErrors = true;
+  console.error(
+    `❌  ${insecureSchemes.length} security issue(s) detected in production build:\n`
+  );
+  for (const { var: varName, url, issue } of insecureSchemes) {
+    console.error(`  ${varName}: ${issue}`);
+    console.error(`    Current value: ${url}`);
+  }
+  console.error(
+    "\nIn production, all remote URLs must use secure schemes (https:// for API, wss:// for WebSocket)."
+  );
+  console.error("Localhost (127.0.0.1, localhost, [::1]) is exempt for testing.");
+}
+
+if (hasErrors) {
   process.exit(1);
 }
+
+console.log(
+  `✅  All ${usedVars.size} env var(s) used in source are documented in .env.example.`
+);
+if (IS_PRODUCTION_BUILD) {
+  console.log("✅  No insecure schemes detected in production build.");
+}
+process.exit(0);

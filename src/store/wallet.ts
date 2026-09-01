@@ -19,6 +19,62 @@ export const PERSIST_KEY = "vortex-wallet";
 /** The network name the app expects, normalised to upper-case for comparison. */
 const EXPECTED_NETWORK = (process.env.NEXT_PUBLIC_NETWORK ?? "testnet").toUpperCase();
 
+function isValidPersistedState(state: unknown): state is {
+  address: string | null;
+  lastKnownAddress: string | null;
+  network: string | null;
+  isConnected: boolean;
+} {
+  if (typeof state !== "object" || state === null) {
+    return false;
+  }
+
+  const obj = state as Record<string, unknown>;
+
+  if (
+    typeof obj.address !== "string" &&
+    obj.address !== null &&
+    obj.address !== undefined
+  ) {
+    return false;
+  }
+
+  if (
+    typeof obj.lastKnownAddress !== "string" &&
+    obj.lastKnownAddress !== null &&
+    obj.lastKnownAddress !== undefined
+  ) {
+    return false;
+  }
+
+  if (
+    typeof obj.network !== "string" &&
+    obj.network !== null &&
+    obj.network !== undefined
+  ) {
+    return false;
+  }
+
+  if (typeof obj.isConnected !== "boolean") {
+    return false;
+  }
+
+  const address = obj.address;
+  if (typeof address === "string" && !isValidStellarPublicKey(address)) {
+    return false;
+  }
+
+  const lastKnownAddress = obj.lastKnownAddress;
+  if (
+    typeof lastKnownAddress === "string" &&
+    !isValidStellarPublicKey(lastKnownAddress)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export type WalletState = {
   address: string | null;
   lastKnownAddress: string | null;
