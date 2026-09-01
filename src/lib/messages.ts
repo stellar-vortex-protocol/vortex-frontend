@@ -11,6 +11,7 @@ export const messages = {
     explore: "Explore",
     analytics: "Analytics",
     becomeSolver: "Become a Solver",
+    contributors: "Contributors",
     docs: "Docs",
     openMenu: "Open menu",
     closeMenu: "Close menu",

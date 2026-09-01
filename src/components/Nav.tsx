@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { href: "/explore", label: "explore" as const },
   { href: "/analytics", label: "analytics" as const },
   { href: "/solve", label: "becomeSolver" as const },
+  { href: "/contributors", label: "contributors" as const },
 ];
 
 const LOCALE_LABELS: Record<Locale, string> = {
