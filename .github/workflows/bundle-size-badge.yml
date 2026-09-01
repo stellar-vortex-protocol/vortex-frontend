@@ -1,0 +1,84 @@
+name: Bundle Size Badge
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  bundle-size-badge:
+    name: Generate Bundle Size Badge
+    runs-on: ubuntu-latest
+    # Only run on main branch, and only if CI workflow succeeded
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Calculate bundle size
+        id: bundle
+        run: |
+          node scripts/check-bundle-size.mjs > /tmp/bundle-output.txt 2>&1 || true
+          BUNDLE_LINE=$(grep "Client JS bundle size:" /tmp/bundle-output.txt)
+          # Extract size in KB from "Client JS bundle size: XXX.X KB (limit: YYY.Y KB)"
+          BUNDLE_KB=$(echo "$BUNDLE_LINE" | sed -E 's/.*: ([0-9.]+) KB.*/\1/')
+          echo "bundle_kb=$BUNDLE_KB" >> $GITHUB_OUTPUT
+
+      - name: Create badge SVG
+        run: |
+          BUNDLE_KB=${{ steps.bundle.outputs.bundle_kb }}
+          
+          # Determine color based on bundle size (under 1.2MB is green, 1.2-1.4 is yellow, over 1.4 is red)
+          if (( $(echo "$BUNDLE_KB < 1200" | bc -l) )); then
+            COLOR="brightgreen"
+          elif (( $(echo "$BUNDLE_KB < 1400" | bc -l) )); then
+            COLOR="yellow"
+          else
+            COLOR="red"
+          fi
+          
+          # Create badge SVG
+          cat > bundle-size-badge.svg << EOF
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="130" height="20" role="img" aria-label="bundle size: ${BUNDLE_KB} KB">
+            <title>bundle size: ${BUNDLE_KB} KB</title>
+            <linearGradient id="s" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb"/>
+              <stop offset="1" stop-color="#999"/>
+            </linearGradient>
+            <clipPath id="r">
+              <rect width="130" height="20" rx="3" fill="#fff"/>
+            </clipPath>
+            <g clip-path="url(#r)">
+              <rect width="80" height="20" fill="#555"/>
+              <rect x="80" width="50" height="20" fill="#$COLOR"/>
+              <rect width="130" height="20" fill="url(#s)" opacity="0.1"/>
+            </g>
+            <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+              <text aria-hidden="true" x="405" y="150" fill="#010101" fill-opacity="0.3" transform="scale(.1)" textLength="700">bundle size</text>
+              <text x="405" y="140" transform="scale(.1)" fill="#fff" textLength="700">bundle size</text>
+              <text aria-hidden="true" x="1035" y="150" fill="#010101" fill-opacity="0.3" transform="scale(.1)" textLength="400">${BUNDLE_KB} KB</text>
+              <text x="1035" y="140" transform="scale(.1)" fill="#fff" textLength="400">${BUNDLE_KB} KB</text>
+            </g>
+          </svg>
+          EOF
+
+      - name: Commit badge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add bundle-size-badge.svg
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update bundle size badge" && git push)

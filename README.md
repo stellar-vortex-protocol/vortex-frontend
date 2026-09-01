@@ -3,6 +3,8 @@
 **Swap UI + solver portal for [Vortex Protocol](https://github.com/stellar-vortex-protocol).**
 
 [![CI](https://github.com/stellar-vortex-protocol/vortex-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/stellar-vortex-protocol/vortex-frontend/actions/workflows/ci.yml)
+[![Coverage](./coverage-badge.svg)](./coverage/)
+[![Bundle Size](./bundle-size-badge.svg)](./scripts/check-bundle-size.mjs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 Next.js 14 app providing the user-facing swap interface, intent explorer,
