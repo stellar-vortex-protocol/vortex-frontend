@@ -15,7 +15,7 @@ function quoteKey(params: QuoteRequest | null): string | null {
   return `/quote?${search.toString()}`;
 }
 
-function classifyQuoteError(err: unknown): QuoteErrorType {
+export function classifyQuoteError(err: unknown): QuoteErrorType {
   if (err instanceof Error) {
     const body = err.message.toLowerCase();
     if (

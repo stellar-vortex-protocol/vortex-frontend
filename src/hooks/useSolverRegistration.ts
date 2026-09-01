@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { mutate } from "swr";
 import { walletAdapter } from "@/lib/wallet";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
@@ -49,14 +49,22 @@ function RegistrationErrorMessage(err: unknown): string {
 export function useSolverRegistration() {
   const [status, setStatus] = useState<SolverRegistrationStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [errorStep, setErrorStep] = useState<SolverRegistrationStatus | null>(null);
+  const stepRef = useRef<SolverRegistrationStatus>("idle");
+
+  const advance = useCallback((next: SolverRegistrationStatus) => {
+    stepRef.current = next;
+    setStatus(next);
+  }, []);
 
   const register = useCallback(async (address: string, bondUsd: number) => {
     setError(null);
+    setErrorStep(null);
 
     try {
       let wallet = useWalletStore.getState();
       if (!wallet.isConnected || !wallet.address) {
-        setStatus("connecting");
+        advance("connecting");
         await wallet.connect();
         wallet = useWalletStore.getState();
         if (!wallet.isConnected || !wallet.address) {
@@ -64,7 +72,7 @@ export function useSolverRegistration() {
         }
       }
 
-      setStatus("building");
+      advance("building");
       const { registrationId, unsignedXdr } = await registerSolver({ address, bondUsd });
 
       // ── #244: XDR review step ──────────────────────────────────────────────
@@ -90,20 +98,23 @@ export function useSolverRegistration() {
       await submitSolverRegistration(registrationId, signedXdr);
       await mutate("/solvers");
 
-      setStatus("success");
+      advance("success");
       useToastStore.getState().addToast("Registered as a solver.", "success");
     } catch (err) {
       const message = RegistrationErrorMessage(err);
-      setStatus("error");
+      setErrorStep(stepRef.current);
+      advance("error");
       setError(message);
       useToastStore.getState().addToast(message, "error");
     }
-  }, []);
+  }, [advance]);
 
   const reset = useCallback(() => {
+    stepRef.current = "idle";
     setStatus("idle");
     setError(null);
+    setErrorStep(null);
   }, []);
 
-  return { status, error, register, reset };
+  return { status, error, errorStep, register, reset };
 }

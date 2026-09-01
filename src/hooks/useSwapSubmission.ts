@@ -90,6 +90,12 @@ export function useSwapSubmission() {
   const [error, setError] = useState<string | null>(null);
   const [errorKind, setErrorKind] = useState<SwapErrorKind | null>(null);
   const [intentId, setIntentId] = useState<string | null>(null);
+  const stepRef = useRef<SwapSubmissionStatus>("idle");
+
+  const advance = useCallback((next: SwapSubmissionStatus) => {
+    stepRef.current = next;
+    setStatus(next);
+  }, []);
 
   const submit = useCallback(async (params: QuoteRequest) => {
     if (PENDING_STATUSES.includes(status)) {
@@ -103,7 +109,7 @@ export function useSwapSubmission() {
     try {
       let wallet = useWalletStore.getState();
       if (!wallet.isConnected || !wallet.address) {
-        setStatus("connecting");
+        advance("connecting");
         await wallet.connect();
         wallet = useWalletStore.getState();
         if (!wallet.isConnected || !wallet.address) {
@@ -111,7 +117,7 @@ export function useSwapSubmission() {
         }
       }
 
-      setStatus("building");
+      advance("building");
       const { intentId: newIntentId, unsignedXdr } = await createIntent({
         ...params,
         dstAddress: wallet.address,
@@ -144,7 +150,7 @@ export function useSwapSubmission() {
       setStatus("submitting");
       await submitIntent(newIntentId, signedXdr);
 
-      setStatus("success");
+      advance("success");
       useToastStore.getState().addToast("Swap submitted successfully.", "success");
     } catch (err) {
       const message =
@@ -161,6 +167,7 @@ export function useSwapSubmission() {
   }, [status]);
 
   const reset = useCallback(() => {
+    stepRef.current = "idle";
     setStatus("idle");
     setError(null);
     setErrorKind(null);

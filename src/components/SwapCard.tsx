@@ -296,7 +296,6 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           role="dialog"
           aria-modal="true"
           aria-label={t("swap.chainPicker.title")}
-          onKeyDown={handleChainPickerKeyDown}
           className="absolute top-0 left-0 right-0 z-20 bg-vx-card border border-vx-border rounded-xl p-3 shadow-2xl animate-fade-up"
         >
           <div className="eyebrow mb-3 px-1">{t("swap.chainPicker.title")}</div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
+import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
 
 type MotionPreference = "system" | "reduce" | "allow";
 
@@ -22,6 +23,13 @@ export function SettingsPanel() {
   const [motionPreference, setMotionPreference] = useState<MotionPreference>("system");
   const locale = useLocale();
   const setLocale = useSetLocale();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const closeSettings = useCallback(() => setOpen(false), []);
+  const panelRef = useDismissableOverlay<HTMLDivElement>({
+    isOpen: open,
+    onClose: closeSettings,
+    triggerRef: toggleRef,
+  });
 
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);

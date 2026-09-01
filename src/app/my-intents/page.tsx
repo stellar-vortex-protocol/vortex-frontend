@@ -6,6 +6,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
+import { EmptyState } from "@/components/EmptyState";
 import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
 import { useIntent } from "@/hooks/useIntent";
@@ -131,12 +132,10 @@ export default function MyIntentsPage() {
         </div>
 
         {!isConnected ? (
-          <div className="card p-8 text-center">
-            <p className="text-sm text-vx-muted mb-4">
-              Connect your wallet to view your swap history.
-            </p>
-            <ConnectWalletButton />
-          </div>
+          <EmptyState
+            message="Connect your wallet to view your swap history."
+            action={<ConnectWalletButton />}
+          />
         ) : (
           <>
             {/* Filters */}

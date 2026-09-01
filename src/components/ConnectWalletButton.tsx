@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
+const NETWORK_CHECK_INTERVAL_MS = 8000;
 
 export function ConnectWalletButton({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();

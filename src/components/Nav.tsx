@@ -8,6 +8,7 @@ import { ConnectWalletButton } from "./ConnectWalletButton";
 import { SettingsPanel } from "./SettingsPanel";
 import { getMessage } from "@/lib/i18n-legacy";
 import { useWalletStore } from "@/store/wallet";
+import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
 
 type NavProps = { variant: "home" } | { variant: "breadcrumb"; label: string };
 

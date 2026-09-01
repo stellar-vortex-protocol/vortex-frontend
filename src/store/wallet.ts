@@ -123,6 +123,7 @@ export type WalletState = {
    * use this to show an install link instead of a generic retry CTA.
    */
   notInstalled: boolean;
+  errorKey: WalletErrorKey | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   hydrate: () => Promise<void>;
@@ -147,6 +148,7 @@ export const useWalletStore = create<WalletState>()(
       errorKey: null,
       networkMismatch: false,
       notInstalled: false,
+      errorKey: null,
 
       connect: async () => {
         set({
@@ -205,6 +207,29 @@ export const useWalletStore = create<WalletState>()(
             networkMismatch: false,
             notInstalled: false,
           });
+        }
+      },
+
+      checkForChanges: async () => {
+        const state = get();
+        if (!state.isConnected) return;
+        try {
+          const isAppConnected = await freighterApi.isConnected();
+          const allowed = isAppConnected && (await freighterApi.isAllowed());
+          // Don't clear the session here: an extension that's momentarily
+          // locked isn't the same as the user revoking access, and connect()
+          // already owns the "not installed" flow.
+          if (!allowed) return;
+
+          const address = await freighterApi.getPublicKey();
+          const network = await freighterApi.getNetwork();
+          const mismatch = network.toUpperCase() !== EXPECTED_NETWORK;
+
+          if (address !== state.address || network !== state.network || mismatch !== state.networkMismatch) {
+            set({ address, lastKnownAddress: address, network, networkMismatch: mismatch });
+          }
+        } catch {
+          // Freighter unreachable mid-check; leave existing state as-is.
         }
       },
 

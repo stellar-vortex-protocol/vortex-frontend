@@ -8,6 +8,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { SkeletonCard } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
 import { useLiveIntents } from "@/hooks/useLiveIntents";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";

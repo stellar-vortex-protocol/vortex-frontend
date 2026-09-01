@@ -105,8 +105,9 @@ export default function SolvePageClient() {
     bond && (isNaN(parseFloat(bond)) || parseFloat(bond) < MIN_BOND_USD)
       ? t("solve.register.validation.minimumBond", { minBond: MIN_BOND_USD })
       : null;
+  const networkMismatch = useWalletStore((s) => s.networkMismatch);
   const canRegister =
-    Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering;
+    Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering && !networkMismatch;
 
   const sortedSolvers = [...solvers].sort((a, b) => {
     if (!sortKey || sortDir === "none") return 0;
@@ -583,6 +584,10 @@ export default function SolvePageClient() {
                 <div>{t("solve.register.info.slash")}</div>
                 <div>{t("solve.register.info.withdraw")}</div>
               </div>
+
+              {registration.status !== "idle" && registration.status !== "success" && (
+                <SubmissionStepper status={registration.status} errorStep={registration.errorStep} />
+              )}
 
               {registration.status === "error" && (
                 <p role="alert" className="text-xs text-red-400">

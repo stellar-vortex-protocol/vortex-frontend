@@ -39,22 +39,16 @@ export default function SolverDetailPage({ params }: { params: { address: string
         </Link>
 
         {!isValidAddress ? (
-          <div role="alert" className="card p-6 sm:p-8 text-center text-sm text-vx-muted">
-            Invalid solver address format.
-          </div>
+          <EmptyState variant="error" message="Invalid solver address format." />
         ) : isLoading ? (
           <div className="card p-6 sm:p-8 space-y-3">
             <div className="h-6 w-2/3 bg-vx-surface rounded animate-pulse" />
             <div className="h-4 w-1/3 bg-vx-surface rounded animate-pulse" />
           </div>
         ) : error ? (
-          <div role="alert" className="card p-6 sm:p-8 text-center text-sm text-vx-muted">
-            Couldn&apos;t load solver details right now. Try again shortly.
-          </div>
+          <EmptyState variant="error" message="Couldn't load solver details right now. Try again shortly." />
         ) : !solver ? (
-          <div role="alert" className="card p-6 sm:p-8 text-center text-sm text-vx-muted">
-            No solver found at that address.
-          </div>
+          <EmptyState variant="error" message="No solver found at that address." />
         ) : (
           <>
             {/* Header card */}
