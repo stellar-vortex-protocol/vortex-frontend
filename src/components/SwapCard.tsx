@@ -140,6 +140,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   };
 
   const handleSubmit = () => {
+    setHasAttemptedSubmit(true);
     if (onPreviewSubmit) {
       onPreviewSubmit({
         srcChain,
@@ -462,6 +463,51 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         </button>
 
         <p className="text-center text-[11px] text-vx-muted/70">{t("swap.disclaimer")}</p>
+      </div>
+
+      {/* Mobile sticky action bar — only visible below md breakpoint */}
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30
+                   bg-vx-card/95 backdrop-blur-sm
+                   border-t border-vx-border
+                   px-4 pt-3 pb-safe"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        aria-hidden={showChainPicker}
+      >
+        <button
+          type="button"
+          tabIndex={showChainPicker ? -1 : undefined}
+          className="btn-swap"
+          disabled={!canSwap && submission.status !== "success"}
+          aria-busy={isSubmitting}
+          onClick={handleSubmit}
+        >
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              </svg>
+              {t(SUBMISSION_LABEL_KEY[submission.status]!)}
+            </span>
+          ) : submission.status === "success" ? (
+            t("swap.submit.success")
+          ) : quoting ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              </svg>
+              {t("swap.submit.findingRoute")}
+            </span>
+          ) : canSwap ? (
+            t(submission.status === "error" ? "swap.submit.retryCta" : "swap.submit.cta", {
+              amount: srcAmount,
+              srcToken: srcToken.symbol,
+              dstToken: dstToken.symbol,
+            })
+          ) : (
+            t("swap.submit.enterAmount")
+          )}
+        </button>
       </div>
     </div>
   );

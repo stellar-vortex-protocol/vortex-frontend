@@ -246,3 +246,10 @@ html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-mo
 html[data-motion="allow"] *, html[data-motion="allow"] *::before, html[data-motion="allow"] *::after {
   scroll-behavior: smooth;
 }
+
+/* Safe-area padding for notched/dynamic-island iOS devices */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}

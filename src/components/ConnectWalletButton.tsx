@@ -51,6 +51,12 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
           <span aria-hidden="true" className="hidden group-hover:inline group-focus-visible:inline">Disconnect</span>
         </button>
 
+        <QrCode
+          value={address}
+          label={`QR code for wallet address ${truncateAddress(address)}`}
+          size={160}
+        />
+
         {networkMismatch && (
           <p role="alert" className="text-xs text-yellow-400">
             ⚠ Wrong network. Switch Freighter to <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
