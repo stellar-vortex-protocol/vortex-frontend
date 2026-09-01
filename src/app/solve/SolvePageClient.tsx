@@ -24,6 +24,7 @@ const usdCompact = (value: number) =>
   });
 
 const MIN_BOND_USD = 50;
+const ONBOARDING_DISMISSED_KEY = "vortex_solver_onboarding_dismissed";
 
 /** Shape of the persisted registration draft. */
 type RegistrationDraft = {
@@ -75,6 +76,26 @@ export default function SolvePageClient() {
       clearDraft();
     }
   }, [registration.status, clearDraft]);
+
+  const [onboardingDismissed, setOnboardingDismissed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+    }
+    return false;
+  });
+
+  const isAlreadyRegistered = Boolean(
+    address && solvers.some((s) => s.address.toLowerCase() === address.toLowerCase())
+  );
+  const showOnboardingExpanded = !onboardingDismissed && !isAlreadyRegistered;
+
+  const toggleOnboarding = () => {
+    const nextState = !onboardingDismissed;
+    setOnboardingDismissed(nextState);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ONBOARDING_DISMISSED_KEY, String(nextState));
+    }
+  };
 
   const addressError =
     address && !isValidStellarPublicKey(address)
@@ -445,8 +466,64 @@ export default function SolvePageClient() {
             id="panel-register"
             role="tabpanel"
             aria-labelledby="tab-register"
-            className="max-w-md"
+            className="max-w-xl space-y-6"
           >
+            {/* Solver Onboarding Checklist & Readiness Section */}
+            <div className="card p-4 sm:p-6 bg-vx-card border border-vx-border rounded-xl">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-vx-sage animate-pulse" />
+                  <h3 className="text-sm font-semibold text-vx-text">
+                    {getMessage("solve.onboarding.title")}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleOnboarding}
+                  className="text-xs text-vx-sage hover:underline focus:outline-none font-medium"
+                >
+                  {showOnboardingExpanded
+                    ? getMessage("solve.onboarding.dismiss")
+                    : getMessage("solve.onboarding.show")}
+                </button>
+              </div>
+
+              <p className="text-xs text-vx-muted mb-4 leading-relaxed">
+                {getMessage("solve.onboarding.description")}
+              </p>
+
+              {showOnboardingExpanded && (
+                <div className="space-y-4 pt-2 border-t border-vx-line">
+                  <div className="bg-vx-surface/40 p-3.5 rounded-lg border border-vx-border/50">
+                    <h4 className="text-xs font-semibold text-vx-text mb-1">
+                      {getMessage("solve.onboarding.bondTitle")}
+                    </h4>
+                    <p className="text-xs text-vx-muted leading-relaxed">
+                      {getMessage("solve.onboarding.bondBody")}
+                    </p>
+                  </div>
+
+                  <div className="bg-vx-surface/40 p-3.5 rounded-lg border border-vx-border/50">
+                    <h4 className="text-xs font-semibold text-vx-text mb-1">
+                      {getMessage("solve.onboarding.metricsTitle")}
+                    </h4>
+                    <p className="text-xs text-vx-muted leading-relaxed">
+                      {getMessage("solve.onboarding.metricsBody")}
+                    </p>
+                  </div>
+
+                  <div className="bg-vx-surface/40 p-3.5 rounded-lg border border-vx-border/50">
+                    <h4 className="text-xs font-semibold text-vx-text mb-1">
+                      {getMessage("solve.onboarding.expectationsTitle")}
+                    </h4>
+                    <p className="text-xs text-vx-muted leading-relaxed">
+                      {getMessage("solve.onboarding.expectationsBody")}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="card p-4 sm:p-6 space-y-4 sm:space-y-5">
               <div>
                 <h3 className="text-base font-semibold text-vx-text mb-1">
