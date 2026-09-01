@@ -1,14 +1,16 @@
 import { useCallback, useState } from "react";
-import freighterApi from "@stellar/freighter-api";
-import { ApiError, TimeoutError, createIntent, submitIntent } from "@/lib/api";
+import { walletAdapter } from "@/lib/wallet";
+import { createIntent, submitIntent } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { decodeXdr, validateSwapXdr, XdrMismatchError } from "@/lib/xdrReview";
 import type { QuoteRequest } from "@/lib/types";
 
 export type SwapSubmissionStatus =
   | "idle"
   | "connecting"
   | "building"
+  | "reviewing"
   | "awaiting-signature"
   | "submitting"
   | "success"
@@ -17,6 +19,7 @@ export type SwapSubmissionStatus =
 const PENDING_STATUSES: SwapSubmissionStatus[] = [
   "connecting",
   "building",
+  "reviewing",
   "awaiting-signature",
   "submitting",
 ];
@@ -114,8 +117,20 @@ export function useSwapSubmission() {
       });
       setIntentId(newIntentId);
 
+      // ── #244: XDR review step ──────────────────────────────────────────────
+      // Decode the XDR the relay returned before handing it to Freighter.
+      // A decode failure or a mismatch against the user's submitted params is
+      // a hard stop — we never fall back to signing an unvalidated XDR.
+      setStatus("reviewing");
+      const decoded = decodeXdr(unsignedXdr, wallet.network);
+      validateSwapXdr(decoded, {
+        srcAmount: params.srcAmount,
+        dstAddress: wallet.address,
+      });
+      // ──────────────────────────────────────────────────────────────────────
+
       setStatus("awaiting-signature");
-      const signedXdr = await freighterApi.signTransaction(unsignedXdr, {
+      const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });
 
@@ -125,13 +140,18 @@ export function useSwapSubmission() {
       setStatus("success");
       useToastStore.getState().addToast("Swap submitted successfully.", "success");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to submit swap.";
+      const message =
+        err instanceof XdrMismatchError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Failed to submit swap.";
       setStatus("error");
       setError(message);
       setErrorKind(classifySwapError(err));
       useToastStore.getState().addToast(message, "error");
     }
-  }, []);
+  }, [status]);
 
   const reset = useCallback(() => {
     setStatus("idle");

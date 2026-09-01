@@ -6,6 +6,9 @@ labels: bug
 assignees: ""
 ---
 
+> For suspected security vulnerabilities, do not use this public template.
+> Please follow the [security policy](../../SECURITY.md) and report privately.
+
 ## Description
 
 <!-- What happened, and what did you expect to happen instead? -->

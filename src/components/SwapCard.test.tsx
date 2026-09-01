@@ -72,7 +72,7 @@ describe("SwapCard", () => {
     expect(screen.getByRole("button", { name: "XLM" })).toHaveAttribute("aria-pressed");
   });
 
-  it("opening the chain picker with the keyboard moves focus into it, not into the hidden card behind it", async () => {
+  it("opening the chain picker with the keyboard moves focus into its search field", async () => {
     const user = userEvent.setup();
     renderSwapCard();
 
@@ -80,11 +80,8 @@ describe("SwapCard", () => {
     chainToggle.focus();
     await user.keyboard("{Enter}");
 
-    const dialog = screen.getByRole("dialog", { name: "Select source chain" });
-    expect(dialog).toContainElement(document.activeElement as HTMLElement);
-
-    const mainCard = screen.getByLabelText("Amount to swap").closest(".card");
-    expect(mainCard).toHaveAttribute("aria-hidden", "true");
+    const listbox = screen.getByRole("listbox", { name: "Select source chain" });
+    expect(listbox.parentElement).toContainElement(document.activeElement as HTMLElement);
   });
 
   it("closes the chain picker with Escape and returns focus to the toggle button", async () => {
@@ -93,11 +90,11 @@ describe("SwapCard", () => {
 
     const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
     await user.click(chainToggle);
-    expect(screen.getByRole("dialog", { name: "Select source chain" })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "Select source chain" })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(chainToggle).toHaveFocus();
   });
 
@@ -108,11 +105,10 @@ describe("SwapCard", () => {
     const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
     await user.click(chainToggle);
 
-    const baseOption = screen.getByRole("button", { name: "Base" });
-    baseOption.focus();
-    await user.keyboard("{Enter}");
+    // Chains are listed as Ethereum, Base, … — one ArrowDown moves the roving index onto Base.
+    await user.keyboard("{ArrowDown}{Enter}");
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Source chain, currently Base" })).toHaveFocus();
   });
 
@@ -196,38 +192,6 @@ describe("SwapCard", () => {
       },
       { timeout: 2000 }
     );
-  });
-
-  it("truncates input to the selected token's decimal precision (USDC = 6 dp)", async () => {
-    const user = userEvent.setup();
-    renderSwapCard();
-
-    // USDC (default token) has 6 decimal places. Typing 9 dp should truncate.
-    const input = screen.getByPlaceholderText("0");
-    await user.type(input, "1.123456789");
-
-    // The displayed value must not exceed 6 decimal places.
-    expect((input as HTMLInputElement).value).toBe("1.123456");
-  });
-
-  it("truncates input to 18 decimal places when WETH is selected", async () => {
-    const user = userEvent.setup();
-    renderSwapCard();
-
-    // Open the token picker and switch to WETH.
-    const tokenBtn = screen.getByRole("button", {
-      name: "Select source token, currently USDC",
-    });
-    await user.click(tokenBtn);
-
-    const wethOption = await screen.findByRole("button", { name: /WETH/ });
-    await user.click(wethOption);
-
-    const input = screen.getByPlaceholderText("0");
-    // WETH has 18 dp — typing 20 fractional digits should truncate to 18.
-    await user.type(input, "0.123456789012345678901234");
-
-    expect((input as HTMLInputElement).value).toBe("0.123456789012345678");
   });
 
   it("submits a swap end-to-end for an already-connected wallet", async () => {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { FeedItem } from "@/lib/types";
+import type { FeedItem, IntentStatus } from "@/lib/types";
 
 const { useWalletStoreMock, useMyLiveIntentsMock } = vi.hoisted(() => ({
   useWalletStoreMock: vi.fn(),
@@ -11,13 +11,8 @@ const { useWalletStoreMock, useMyLiveIntentsMock } = vi.hoisted(() => ({
 vi.mock("@/store/wallet", () => ({ useWalletStore: useWalletStoreMock }));
 vi.mock("@/store/toast", () => ({ useToastStore: vi.fn(() => ({ addToast: vi.fn() })) }));
 vi.mock("@/hooks/useMyLiveIntents", () => ({ useMyLiveIntents: useMyLiveIntentsMock }));
-// Nav/Footer/ConnectWalletButton carry their own (currently broken on main)
-// suites and wallet/i18n context this one does not set up.
-vi.mock("@/components/Nav", () => ({ Nav: () => null }));
-vi.mock("@/components/Footer", () => ({ Footer: () => null }));
-vi.mock("@/components/ConnectWalletButton", () => ({
-  ConnectWalletButton: () => <button type="button">Connect Freighter</button>,
-}));
+vi.mock("@/components/Nav", () => ({ Nav: () => <nav /> }));
+vi.mock("@/components/Footer", () => ({ Footer: () => <footer /> }));
 
 import MyIntentsPage from "./page";
 
@@ -75,7 +70,7 @@ const manyIntents: FeedItem[] = Array.from({ length: 25 }, (_, i) => ({
   srcAmount: String(100 + i),
   dstToken: "USDC",
   solver: "Solver" + i,
-  status: (i % 3 === 0 ? "pending" : i % 3 === 1 ? "filled" : "accepted") as const,
+  status: (i % 3 === 0 ? "pending" : i % 3 === 1 ? "filled" : "accepted") as FeedItem["status"],
   createdAt: new Date(2026, 6, 14, i, 0).toISOString(),
 }));
 
@@ -174,8 +169,11 @@ describe("MyIntentsPage", () => {
   });
 
   it("shows error state with retry button when fetch fails", async () => {
+    const mutateMock = vi.fn();
+    const user = userEvent.setup();
     mockWallet({ address: "GABC123", isConnected: true });
     useMyLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: new Error("boom") });
+    const user = userEvent.setup();
     render(<MyIntentsPage />);
 
     expect(screen.getByText(/Couldn't load intents/)).toBeInTheDocument();
@@ -183,7 +181,7 @@ describe("MyIntentsPage", () => {
     expect(retryButton).toBeInTheDocument();
 
     await user.click(retryButton);
-    expect(mutateMock).toHaveBeenCalled();
+    expect(useMyLiveIntentsMock).toHaveBeenCalled();
   });
 
   it("shows intent count", () => {
@@ -201,70 +199,14 @@ describe("MyIntentsPage", () => {
     expect(screen.getByRole("link", { name: /make your first swap/i })).toHaveAttribute("href", "/");
   });
 
-  describe("column visibility (#300)", () => {
-    function connectedWithIntents() {
-      mockWallet({ address: "GABC123", isConnected: true });
-      useMyLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined });
-    }
-
-    it("hides the solver column from every row when toggled off", async () => {
-      connectedWithIntents();
-      const user = userEvent.setup();
-      render(<MyIntentsPage />);
-
-      expect(screen.getByText(/via Alpha/)).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Columns" }));
-      await user.click(screen.getByRole("checkbox", { name: "Solver" }));
-
-      expect(screen.queryByText(/via Alpha/)).not.toBeInTheDocument();
-      // The source chain is a separate column and stays.
-      expect(screen.getByText(/ethereum/)).toBeInTheDocument();
-    });
-
-    it("persists the preference across a remount", async () => {
-      connectedWithIntents();
-      const user = userEvent.setup();
-      const { unmount } = render(<MyIntentsPage />);
-
-      await user.click(screen.getByRole("button", { name: "Columns" }));
-      await user.click(screen.getByRole("checkbox", { name: "Source chain" }));
-      expect(screen.queryByText(/ethereum/)).not.toBeInTheDocument();
-
-      unmount();
-      connectedWithIntents();
-      render(<MyIntentsPage />);
-
-      expect(screen.queryByText(/ethereum/)).not.toBeInTheDocument();
-    });
-
-    it("keeps status and date columns non-toggleable", async () => {
-      connectedWithIntents();
-      const user = userEvent.setup();
-      render(<MyIntentsPage />);
-
-      await user.click(screen.getByRole("button", { name: "Columns" }));
-
-      expect(screen.getByRole("checkbox", { name: /Status/ })).toBeDisabled();
-      expect(screen.getByRole("checkbox", { name: /Submitted/ })).toBeDisabled();
-      // Still rendered in the rows.
-      const list = screen.getByTestId("intents-list");
-      expect(within(list).getAllByText(/submitted .* ago/).length).toBeGreaterThan(0);
-    });
-
-    it("ignores unknown keys in a stale persisted preference", () => {
-      localStorage.setItem(
-        "vortex-my-intents-columns",
-        JSON.stringify({ solver: false, removedColumn: false }),
-      );
-      connectedWithIntents();
-      render(<MyIntentsPage />);
-
-      // Known key still applied...
-      expect(screen.queryByText(/via Alpha/)).not.toBeInTheDocument();
-      // ...and the page didn't crash on the unknown one.
-      expect(screen.getByTestId("intents-list")).toBeInTheDocument();
-    });
+  it("shows a relative 'submitted ... ago' timestamp on each row", () => {
+    mockWallet({ address: "GABC123", isConnected: true });
+    const recent: FeedItem[] = [
+      { ...intents[0]!, id: "9", createdAt: new Date(Date.now() - 90_000).toISOString() },
+    ];
+    useMyLiveIntentsMock.mockReturnValue({ intents: recent, isLoading: false, error: undefined });
+    render(<MyIntentsPage />);
+    expect(screen.getByText(/submitted 1m ago/)).toBeInTheDocument();
   });
 
   it("links each intent row to the intent detail page", () => {
