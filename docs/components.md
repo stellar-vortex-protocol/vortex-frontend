@@ -77,3 +77,39 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 - On a failed `connect()` call, it also pushes an error toast via
   [`useToastStore`](../src/store/toast.ts) — you don't need to handle connection
   errors yourself when using this component.
+
+## `Tooltip`
+
+[`src/components/Tooltip.tsx`](../src/components/Tooltip.tsx)
+
+Accessible WAI-ARIA tooltip component. Shown on hover and keyboard focus
+(never mouse-only), dismissed via Escape, and associated to its trigger via
+`aria-describedby`. Includes basic viewport-edge collision handling and a
+tap-to-toggle affordance for touch devices.
+
+```tsx
+import { Tooltip } from "@/components/Tooltip";
+
+<Tooltip content="Protocol fee is deducted from the destination amount.">
+  <span className="underline decoration-dotted cursor-help">Protocol fee</span>
+</Tooltip>
+```
+
+**Props**
+
+| prop        | type        | required | default  | notes                                                                                |
+| ----------- | ----------- | -------- | -------- | ------------------------------------------------------------------------------------ |
+| `content`   | `ReactNode` | yes      | —        | The tooltip text or element shown in the popover.                                    |
+| `children`  | `ReactElement` | yes   | —        | Single trigger element. Must accept `ref`, `aria-describedby`, focus/blur/mouse handlers. |
+| `placement` | `"top" \| "bottom"` | no | `"top"` | Preferred placement; auto-flips when close to viewport edge.                        |
+
+**Behaviour**
+
+- Hover or keyboard focus opens the tooltip; losing either closes it.
+- Pressing Escape dismisses the tooltip from anywhere on the page.
+- Touch: tap the trigger to toggle the tooltip open/closed.
+- The trigger receives `aria-describedby` pointing to the tooltip while it is visible.
+- Does not trap focus or interfere with Tab order.
+- Currently applied to `Price impact`, `Protocol fee`, and `Est. fill time` in
+  SwapCard's quote details panel. See `Tooltip.stories.tsx` for interactive examples.
+

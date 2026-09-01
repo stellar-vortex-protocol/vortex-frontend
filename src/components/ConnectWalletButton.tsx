@@ -3,52 +3,37 @@
 import { useEffect } from "react";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
-import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
 const NETWORK_CHECK_INTERVAL_MS = 8000;
 
-function truncateAddress(address: string) {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
 export function ConnectWalletButton({ compact = false }: { compact?: boolean }) {
-  const { address, isConnected, isConnecting, error, networkMismatch, notInstalled, connect, disconnect } =
-    useWalletStore();
   const { t } = useTranslation();
-  const displayError = error;
+  const {
+    address,
+    isConnected,
+    isConnecting,
+    error,
+    networkMismatch,
+    notInstalled,
+    wasSessionCleared,
+    connect,
+    disconnect,
+  } = useWalletStore();
 
-  // Detect a Freighter account/network switch that happens after connect,
-  // since the extension doesn't push change events. Only polls while
-  // connected, and never calls requestAccess() — that would pop the
-  // Freighter approval UI unprompted (see docs/wallet-hydration.md).
-  useEffect(() => {
-    if (!isConnected) return;
-
-    const check = () => useWalletStore.getState().checkForChanges();
-    check();
-    const intervalId = setInterval(check, NETWORK_CHECK_INTERVAL_MS);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") check();
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("focus", check);
-
-    return () => {
-      clearInterval(intervalId);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("focus", check);
-    };
-  }, [isConnected]);
+  const displayError = error ?? null;
 
   const handleConnect = async () => {
     await connect();
-    const { error: latestError, errorKey: latestErrorKey } = useWalletStore.getState();
+    const { error: latestError } = useWalletStore.getState();
     if (latestError) {
-      useToastStore.getState().addToast(latestErrorKey ? t(latestErrorKey) : latestError, "error");
+      useToastStore.getState().addToast(latestError, "error");
     }
   };
+
+  // Tooltip carries the underlying failure text; the button label itself only
+  // switches between "Connect" and "Retry".
+  const displayError = errorKey ? t(errorKey) : error;
 
   const baseClass = compact
     ? "px-3 py-1.5 text-xs rounded-lg border transition-all"
@@ -68,26 +53,33 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
           <span aria-hidden="true" className="hidden group-hover:inline group-focus-visible:inline">Disconnect</span>
         </button>
 
+        <QrCode
+          value={address}
+          label={`QR code for wallet address ${truncateAddress(address)}`}
+          size={160}
+        />
+
         {networkMismatch && (
-          <div role="alert" className="flex items-center gap-2 text-xs text-yellow-400">
-            <p>
-              ⚠ Wrong network. Switch Freighter to{" "}
-              <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
-            </p>
-            <button
-              type="button"
-              onClick={handleConnect}
-              className="underline hover:text-yellow-300 whitespace-nowrap"
-            >
-              Reconnect
-            </button>
-          </div>
+          <p role="alert" className="text-xs text-yellow-400">
+            ⚠ Wrong network. Switch Freighter to <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
+          </p>
         )}
       </div>
     );
   }
 
-  // Not-installed: show an install link instead of a generic retry CTA.
+  if (wasSessionCleared && !address && !isConnected) {
+    return (
+      <button
+        type="button"
+        onClick={handleConnect}
+        className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
+      >
+        Reconnect {truncateAddress("GABCDEFGHIJKLMNOPQRSTUVWXYZ23456")}
+      </button>
+    );
+  }
+
   if (notInstalled) {
     return (
       <a
@@ -108,12 +100,19 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
     );
   }
 
+  // After a persisted session could not be silently restored, prompt to
+  // reconnect and show which address we last saw.
+  const reconnectLabel =
+    !isConnected && wasSessionCleared && lastKnownAddress
+      ? `Reconnect ${truncateAddress(lastKnownAddress)}`
+      : null;
+
   return (
     <button
       type="button"
       onClick={handleConnect}
       disabled={isConnecting}
-      title={displayError ?? undefined}
+      title={error ?? undefined}
       className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
     >
       {isConnecting ? (
@@ -124,16 +123,9 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
             viewBox="0 0 16 16"
             fill="none"
           >
-            <circle
-              cx="8" cy="8" r="6"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeDasharray="28"
-              strokeDashoffset="8"
-            />
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
           </svg>
           <span>Connecting</span>
-          {/* Animated dots so the state is perceivable without relying on text alone */}
           <span aria-hidden="true" className="inline-flex gap-0.5 items-end h-4">
             <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:0ms]" />
             <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:150ms]" />
@@ -148,7 +140,7 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
               <path d="M8 5v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
           )}
-          {error ? "Retry Connection" : "Connect Freighter"}
+          {reconnectLabel ?? (error ? "Retry Connection" : "Connect Freighter")}
         </>
       )}
     </button>

@@ -67,7 +67,7 @@ describe("useIntentFeed", () => {
 
   it("caps out-of-range overflow at the max item count, keeping the newest items", () => {
     const overflowSeed: FeedItem[] = Array.from({ length: 10 }, (_, i) => ({
-      ...seedItems[0],
+      ...seedItems[0]!,
       id: `seed-${i}`,
     }));
     useActivityFeedMock.mockReturnValue({ items: overflowSeed, isLoading: false, error: undefined });
@@ -76,7 +76,7 @@ describe("useIntentFeed", () => {
     const { result } = renderHook(() => useIntentFeed());
 
     expect(result.current.items).toHaveLength(8);
-    expect(result.current.items[0].id).toBe("seed-0");
-    expect(result.current.items[7].id).toBe("seed-7");
+    expect(result.current.items[0]!.id).toBe("seed-0");
+    expect(result.current.items[7]!.id).toBe("seed-7");
   });
 });

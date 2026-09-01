@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Nav } from "@/components/Nav";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useSolvers } from "@/hooks/useSolvers";
 import { useOpenIntents } from "@/hooks/useOpenIntents";
 import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
-import { SubmissionStepper } from "@/components/SubmissionStepper";
+import { useLocalStorageDraft } from "@/hooks/useLocalStorageDraft";
 import { useWalletStore } from "@/store/wallet";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
-import { getMessage } from "@/i18n/messages";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
+import type { MessageKey } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/format";
+import { sanitizeDisplayText } from "@/lib/textSafety";
 import Link from "next/link";
 
 const usdCompact = (value: number) =>
@@ -22,6 +24,13 @@ const usdCompact = (value: number) =>
   });
 
 const MIN_BOND_USD = 50;
+const ONBOARDING_DISMISSED_KEY = "vortex_solver_onboarding_dismissed";
+
+/** Shape of the persisted registration draft. */
+type RegistrationDraft = {
+  address: string;
+  bond: string;
+};
 
 const REGISTRATION_LABEL: Record<string, string> = {
   connecting: getMessage("solve.register.states.connecting"),
@@ -31,33 +40,106 @@ const REGISTRATION_LABEL: Record<string, string> = {
 };
 
 export default function SolvePageClient() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
   const { accept, acceptingId, error: acceptError } = useAcceptIntent();
 
-  const [address, setAddress] = useState("");
-  const [bond, setBond] = useState("");
+  // Draft persistence — scoped to the currently connected wallet so that
+  // switching wallets never silently restores the wrong address.
+  const connectedAddress = useWalletStore((s) => s.address);
+  const [draft, setDraft, clearDraft] = useLocalStorageDraft<RegistrationDraft>(
+    "vortex:solver-registration-draft",
+    connectedAddress ?? null,
+  );
+
+  const [address, setAddress] = useState(draft?.address ?? "");
+  const [bond, setBond] = useState(draft?.bond ?? "");
+
+  // Sync form fields into the draft whenever they change.
+  const handleAddressChange = (value: string) => {
+    setAddress(value);
+    setDraft({ address: value, bond });
+  };
+  const handleBondChange = (value: string) => {
+    setBond(value);
+    setDraft({ address, bond: value });
+  };
+
   const registration = useSolverRegistration();
-  const isRegistering = registration.status in REGISTRATION_LABEL;
+  const isRegistering = registration.status in REGISTRATION_LABEL_KEY;
+
+  // Clear draft after successful submission.
+  useEffect(() => {
+    if (registration.status === "success") {
+      clearDraft();
+    }
+  }, [registration.status, clearDraft]);
+
+  const [onboardingDismissed, setOnboardingDismissed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+    }
+    return false;
+  });
+
+  const isAlreadyRegistered = Boolean(
+    address && solvers.some((s) => s.address.toLowerCase() === address.toLowerCase())
+  );
+  const showOnboardingExpanded = !onboardingDismissed && !isAlreadyRegistered;
+
+  const toggleOnboarding = () => {
+    const nextState = !onboardingDismissed;
+    setOnboardingDismissed(nextState);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ONBOARDING_DISMISSED_KEY, String(nextState));
+    }
+  };
 
   const addressError =
     address && !isValidStellarPublicKey(address)
-      ? getMessage("solve.register.validation.invalidAddress")
+      ? t("solve.register.validation.invalidAddress")
       : null;
   const bondError =
     bond && (isNaN(parseFloat(bond)) || parseFloat(bond) < MIN_BOND_USD)
-      ? getMessage("solve.register.validation.minimumBond", { minBond: MIN_BOND_USD })
+      ? t("solve.register.validation.minimumBond", { minBond: MIN_BOND_USD })
       : null;
   const networkMismatch = useWalletStore((s) => s.networkMismatch);
   const canRegister =
     Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering && !networkMismatch;
+
+  const sortedSolvers = [...solvers].sort((a, b) => {
+    if (!sortKey || sortDir === "none") return 0;
+    const aVal = a[sortKey];
+    const bVal = b[sortKey];
+    // Stable numeric comparison
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    return 0;
+  });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else if (sortDir === "desc") {
+      setSortDir("none");
+      setSortKey(null);
+    } else {
+      setSortDir("asc");
+    }
+  };
 
   const handleRegister = () => {
     if (registration.status === "success") {
       registration.reset();
       setAddress("");
       setBond("");
+      clearDraft();
       return;
     }
     if (!canRegister) return;
@@ -66,7 +148,7 @@ export default function SolvePageClient() {
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label={getMessage("solve.nav.label")} />
+      <Nav variant="breadcrumb" label={t("solve.nav.label")} />
 
       <main id="main-content" className="max-w-5xl mx-auto px-3 sm:px-5 py-8 sm:py-12">
         <div className="mb-8 sm:mb-10">
@@ -84,19 +166,19 @@ export default function SolvePageClient() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-8 sm:mb-10">
           {[
             {
-              n: getMessage("solve.steps.registerBond.number"),
-              title: getMessage("solve.steps.registerBond.title"),
-              body: getMessage("solve.steps.registerBond.body"),
+              n: t("solve.steps.registerBond.number"),
+              title: t("solve.steps.registerBond.title"),
+              body: t("solve.steps.registerBond.body"),
             },
             {
-              n: getMessage("solve.steps.watchIntentFeed.number"),
-              title: getMessage("solve.steps.watchIntentFeed.title"),
-              body: getMessage("solve.steps.watchIntentFeed.body"),
+              n: t("solve.steps.watchIntentFeed.number"),
+              title: t("solve.steps.watchIntentFeed.title"),
+              body: t("solve.steps.watchIntentFeed.body"),
             },
             {
-              n: getMessage("solve.steps.fillAndEarn.number"),
-              title: getMessage("solve.steps.fillAndEarn.title"),
-              body: getMessage("solve.steps.fillAndEarn.body"),
+              n: t("solve.steps.fillAndEarn.number"),
+              title: t("solve.steps.fillAndEarn.title"),
+              body: t("solve.steps.fillAndEarn.body"),
             },
           ].map((item) => (
             <div key={item.n} className="card p-4 sm:p-5">
@@ -113,22 +195,22 @@ export default function SolvePageClient() {
           aria-label="Solver portal sections"
           className="flex gap-1 mb-6 bg-vx-surface/50 p-1 rounded-lg w-fit overflow-x-auto"
         >
-          {(["leaderboard", "intents", "register"] as const).map((t) => (
+          {(["leaderboard", "intents", "register"] as const).map((tabId) => (
             <button
-              key={t}
+              key={tabId}
               type="button"
               role="tab"
-              id={`tab-${t}`}
-              aria-selected={tab === t}
-              aria-controls={`panel-${t}`}
-              onClick={() => setTab(t)}
+              id={`tab-${tabId}`}
+              aria-selected={tab === tabId}
+              aria-controls={`panel-${tabId}`}
+              onClick={() => setTab(tabId)}
               className={`px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium capitalize transition-all whitespace-nowrap
-                ${tab === t
+                ${tab === tabId
                   ? "bg-vx-card text-vx-text border border-vx-border"
                   : "text-vx-muted hover:text-vx-text"
                 }`}
             >
-              {getMessage(`solve.tabs.${t}`)}
+              {t(`solve.tabs.${tabId}`)}
             </button>
           ))}
         </div>
@@ -141,10 +223,80 @@ export default function SolvePageClient() {
             aria-labelledby="tab-leaderboard"
             className="card overflow-hidden"
           >
-            <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30">
-              <span className="text-sm font-semibold text-vx-text">
-                {getMessage("solve.leaderboard.title")}
-              </span>
+            <div className="px-3 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-vx-text">
+                  {getMessage("solve.leaderboard.title")}
+                </span>
+                <div className="hidden sm:flex items-center gap-1" role="group" aria-label="Sort leaderboard">
+                  {([
+                    ["fills",                "Fills"],
+                    ["volumeUsd",            "Volume"],
+                    ["avgFillTimeSeconds",   "Avg Time"],
+                    ["successRatePct",       "Success %"],
+                  ] as [SortKey, string][]).map(([key, label]) => {
+                    const isActive = sortKey === key && sortDir !== "none";
+                    const ariaSortValue: "ascending" | "descending" | "none" =
+                      sortKey === key && sortDir !== "none"
+                        ? sortDir === "asc" ? "ascending" : "descending"
+                        : "none";
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        aria-sort={ariaSortValue}
+                        aria-label={`Sort by ${label}${
+                          sortKey === key && sortDir !== "none"
+                            ? sortDir === "asc" ? ", ascending" : ", descending"
+                            : ""
+                        }`}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors
+                          ${
+                            isActive
+                              ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
+                              : "text-vx-muted hover:text-vx-text border border-transparent hover:border-vx-border"
+                          }`}
+                      >
+                        {label}
+                        <SortIcon direction={sortKey === key ? sortDir : "none"} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Mobile sort: compact dropdown alternative */}
+              <div className="flex sm:hidden items-center gap-1 mt-2 flex-wrap" role="group" aria-label="Sort leaderboard">
+                {([
+                  ["fills",                "Fills"],
+                  ["volumeUsd",            "Volume"],
+                  ["avgFillTimeSeconds",   "Avg Time"],
+                  ["successRatePct",       "Success %"],
+                ] as [SortKey, string][]).map(([key, label]) => {
+                  const isActive = sortKey === key && sortDir !== "none";
+                  const ariaSortValue: "ascending" | "descending" | "none" =
+                    sortKey === key && sortDir !== "none"
+                      ? sortDir === "asc" ? "ascending" : "descending"
+                      : "none";
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleSort(key)}
+                      aria-sort={ariaSortValue}
+                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors
+                        ${
+                          isActive
+                            ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
+                            : "text-vx-muted hover:text-vx-text border border-transparent hover:border-vx-border"
+                        }`}
+                    >
+                      {label}
+                      <SortIcon direction={sortKey === key ? sortDir : "none"} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {solversLoading && solvers.length === 0 ? (
@@ -153,15 +305,15 @@ export default function SolvePageClient() {
               </div>
             ) : solversError ? (
               <div className="p-8 text-center text-sm text-vx-muted">
-                {getMessage("solve.leaderboard.error")}
+                {t("solve.leaderboard.error")}
               </div>
             ) : solvers.length === 0 ? (
               <div className="p-8 text-center text-sm text-vx-muted">
-                {getMessage("solve.leaderboard.empty")}
+                {t("solve.leaderboard.empty")}
               </div>
             ) : (
               <div className="divide-y divide-vx-line">
-                {solvers.map((s, i) => (
+                {sortedSolvers.map((s, i) => (
                   <Link
                     key={s.address}
                     href={`/solve/${s.address}`}
@@ -173,7 +325,7 @@ export default function SolvePageClient() {
                           {String(i + 1).padStart(2, "0")}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-vx-text truncate">{s.name}</div>
+                          <div className="text-sm font-semibold text-vx-text truncate">{sanitizeDisplayText(s.name)}</div>
                           <div className="num text-xs text-vx-muted truncate">{s.address}</div>
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {s.chains.map((c) => (
@@ -191,7 +343,7 @@ export default function SolvePageClient() {
                         <div>
                           <div className="num text-xs sm:text-sm font-semibold text-vx-text">{s.fills}</div>
                           <div className="eyebrow text-[10px] sm:text-xs">
-                            {getMessage("solve.leaderboard.fills")}
+                            {t("solve.leaderboard.fills")}
                           </div>
                         </div>
                         <div>
@@ -199,7 +351,7 @@ export default function SolvePageClient() {
                             {usdCompact(s.volumeUsd)}
                           </div>
                           <div className="eyebrow text-[10px] sm:text-xs">
-                            {getMessage("solve.leaderboard.volume")}
+                            {t("solve.leaderboard.volume")}
                           </div>
                         </div>
                         <div>
@@ -207,7 +359,7 @@ export default function SolvePageClient() {
                             {s.avgFillTimeSeconds}s
                           </div>
                           <div className="eyebrow text-[10px] sm:text-xs">
-                            {getMessage("solve.leaderboard.avgTime")}
+                            {t("solve.leaderboard.avgTime")}
                           </div>
                         </div>
                         <div>
@@ -219,7 +371,7 @@ export default function SolvePageClient() {
                             {s.successRatePct}%
                           </div>
                           <div className="eyebrow text-[10px] sm:text-xs">
-                            {getMessage("solve.leaderboard.success")}
+                            {t("solve.leaderboard.success")}
                           </div>
                         </div>
                       </div>
@@ -241,11 +393,11 @@ export default function SolvePageClient() {
           >
             <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30 flex items-center justify-between">
               <span className="text-sm font-semibold text-vx-text">
-                {getMessage("solve.intents.title")}
+                {t("solve.intents.title")}
               </span>
               <span className="chip bg-vx-sage-bg text-vx-sage text-[10px]">
                 <span className="w-1.5 h-1.5 rounded-full bg-vx-sage animate-pulse" />
-                {getMessage("solve.intents.available", { count: openIntents.length })}
+                {t("solve.intents.available", { count: openIntents.length })}
               </span>
             </div>
 
@@ -261,11 +413,11 @@ export default function SolvePageClient() {
               </div>
             ) : intentsError ? (
               <div className="p-8 text-center text-sm text-vx-muted">
-                {getMessage("solve.intents.error")}
+                {t("solve.intents.error")}
               </div>
             ) : openIntents.length === 0 ? (
               <div className="p-8 text-center text-sm text-vx-muted">
-                {getMessage("solve.intents.empty")}
+                {t("solve.intents.empty")}
               </div>
             ) : (
               <div className="divide-y divide-vx-line">
@@ -276,13 +428,13 @@ export default function SolvePageClient() {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="num text-xs text-vx-muted mb-1 capitalize">
-                        {getMessage("solve.intents.id", { id: intent.id })}
+                        {t("solve.intents.id", { id: intent.id })}
                       </div>
                       <div className="text-sm font-medium text-vx-text capitalize">
                         {intent.srcAmount} {intent.srcToken} on {intent.srcChain}
                       </div>
                       <div className="text-xs text-vx-muted">
-                        {getMessage("solve.intents.details", {
+                        {t("solve.intents.details", {
                           minOut: intent.minOut,
                           dstToken: intent.dstToken,
                           timeRemaining: timeRemaining(intent.deadline),
@@ -299,8 +451,8 @@ export default function SolvePageClient() {
                                  w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
                     >
                       {acceptingId === intent.id
-                        ? getMessage("solve.intents.accepting")
-                        : getMessage("solve.intents.accept")}
+                        ? t("solve.intents.accepting")
+                        : t("solve.intents.accept")}
                     </button>
                   </div>
                 ))}
@@ -315,25 +467,81 @@ export default function SolvePageClient() {
             id="panel-register"
             role="tabpanel"
             aria-labelledby="tab-register"
-            className="max-w-md"
+            className="max-w-xl space-y-6"
           >
+            {/* Solver Onboarding Checklist & Readiness Section */}
+            <div className="card p-4 sm:p-6 bg-vx-card border border-vx-border rounded-xl">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-vx-sage animate-pulse" />
+                  <h3 className="text-sm font-semibold text-vx-text">
+                    {getMessage("solve.onboarding.title")}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleOnboarding}
+                  className="text-xs text-vx-sage hover:underline focus:outline-none font-medium"
+                >
+                  {showOnboardingExpanded
+                    ? getMessage("solve.onboarding.dismiss")
+                    : getMessage("solve.onboarding.show")}
+                </button>
+              </div>
+
+              <p className="text-xs text-vx-muted mb-4 leading-relaxed">
+                {getMessage("solve.onboarding.description")}
+              </p>
+
+              {showOnboardingExpanded && (
+                <div className="space-y-4 pt-2 border-t border-vx-line">
+                  <div className="bg-vx-surface/40 p-3.5 rounded-lg border border-vx-border/50">
+                    <h4 className="text-xs font-semibold text-vx-text mb-1">
+                      {getMessage("solve.onboarding.bondTitle")}
+                    </h4>
+                    <p className="text-xs text-vx-muted leading-relaxed">
+                      {getMessage("solve.onboarding.bondBody")}
+                    </p>
+                  </div>
+
+                  <div className="bg-vx-surface/40 p-3.5 rounded-lg border border-vx-border/50">
+                    <h4 className="text-xs font-semibold text-vx-text mb-1">
+                      {getMessage("solve.onboarding.metricsTitle")}
+                    </h4>
+                    <p className="text-xs text-vx-muted leading-relaxed">
+                      {getMessage("solve.onboarding.metricsBody")}
+                    </p>
+                  </div>
+
+                  <div className="bg-vx-surface/40 p-3.5 rounded-lg border border-vx-border/50">
+                    <h4 className="text-xs font-semibold text-vx-text mb-1">
+                      {getMessage("solve.onboarding.expectationsTitle")}
+                    </h4>
+                    <p className="text-xs text-vx-muted leading-relaxed">
+                      {getMessage("solve.onboarding.expectationsBody")}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="card p-4 sm:p-6 space-y-4 sm:space-y-5">
               <div>
                 <h3 className="text-base font-semibold text-vx-text mb-1">
-                  {getMessage("solve.register.title")}
+                  {t("solve.register.title")}
                 </h3>
-                <p className="text-xs text-vx-muted">{getMessage("solve.register.description")}</p>
+                <p className="text-xs text-vx-muted">{t("solve.register.description")}</p>
               </div>
 
               <div>
                 <label htmlFor="solver-address" className="eyebrow block mb-2 text-xs">
-                  {getMessage("solve.register.addressLabel")}
+                  {t("solve.register.addressLabel")}
                 </label>
                 <input
                   id="solver-address"
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value.trim())}
+                  onChange={(e) => handleAddressChange(e.target.value.trim())}
                   placeholder={getMessage("solve.register.addressPlaceholder")}
                   aria-invalid={Boolean(addressError)}
                   aria-describedby={addressError ? "solver-address-error" : undefined}
@@ -350,13 +558,13 @@ export default function SolvePageClient() {
 
               <div>
                 <label htmlFor="solver-bond" className="eyebrow block mb-2 text-xs">
-                  {getMessage("solve.register.bondLabel")}
+                  {t("solve.register.bondLabel")}
                 </label>
                 <input
                   id="solver-bond"
                   type="number"
                   value={bond}
-                  onChange={(e) => setBond(e.target.value)}
+                  onChange={(e) => handleBondChange(e.target.value)}
                   placeholder={getMessage("solve.register.bondPlaceholder")}
                   aria-invalid={Boolean(bondError)}
                   aria-describedby={bondError ? "solver-bond-error" : undefined}
@@ -372,9 +580,9 @@ export default function SolvePageClient() {
               </div>
 
               <div className="bg-vx-surface/50 rounded-lg p-3 text-xs text-vx-muted space-y-1">
-                <div>{getMessage("solve.register.info.minimumBond")}</div>
-                <div>{getMessage("solve.register.info.slash")}</div>
-                <div>{getMessage("solve.register.info.withdraw")}</div>
+                <div>{t("solve.register.info.minimumBond")}</div>
+                <div>{t("solve.register.info.slash")}</div>
+                <div>{t("solve.register.info.withdraw")}</div>
               </div>
 
               {registration.status !== "idle" && registration.status !== "success" && (
@@ -395,10 +603,10 @@ export default function SolvePageClient() {
                 className="btn-swap"
               >
                 {isRegistering
-                  ? REGISTRATION_LABEL[registration.status]
+                  ? t(REGISTRATION_LABEL_KEY[registration.status]!)
                   : registration.status === "success"
-                  ? getMessage("solve.register.button.registered")
-                  : getMessage("solve.register.button.connect")}
+                  ? t("solve.register.button.registered")
+                  : t("solve.register.button.connect")}
               </button>
             </div>
           </div>

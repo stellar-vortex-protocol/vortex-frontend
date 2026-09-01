@@ -1,0 +1,14 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http"
+    }
+  ],
+  "replacementPatterns": [],
+  "retryOn429": false,
+  "retryCount": 0,
+  "fallbackRetryDelay": "0s",
+  "timeout": "10s",
+  "retryOn": [404],
+  "aliveStatusCodes": [200, 206]
+}
