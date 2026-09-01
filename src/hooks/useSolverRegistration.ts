@@ -3,6 +3,7 @@ import { mutate } from "swr";
 import { walletAdapter } from "@/lib/wallet";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { decodeXdr, validateRegistrationXdr, XdrMismatchError } from "@/lib/xdrReview";
@@ -78,6 +79,12 @@ export function useSolverRegistration() {
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });
+
+      // Defense-in-depth: verify signed XDR matches unsigned (Issue #308)
+      const xdrVerification = verifySignedXdrMatches(unsignedXdr, signedXdr);
+      if (!xdrVerification.valid) {
+        throw new Error(xdrVerification.error ?? "Transaction verification failed. The signed transaction does not match what was reviewed.");
+      }
 
       setStatus("submitting");
       await submitSolverRegistration(registrationId, signedXdr);

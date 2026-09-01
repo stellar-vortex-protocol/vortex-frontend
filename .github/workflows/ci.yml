@@ -17,10 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
+      - name: Check dependencies for supply-chain security (Issue #311)
+        run: node scripts/check-dependencies.mjs
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GITHUB_ACTOR: ${{ github.actor }}
       - run: npm ci
       - run: npm run check:env
       - run: npm run check:i18n

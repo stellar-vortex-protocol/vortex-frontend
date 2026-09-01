@@ -30,6 +30,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/xdrReview", () => ({
+  verifySignedXdrMatches: verifySignedXdrMatchesMock,
+}));
+
 vi.mock("@/store/toast", () => ({
   useToastStore: { getState: () => ({ addToast: addToastMock }) },
 }));
@@ -111,6 +115,7 @@ describe("useSwapSubmission", () => {
     });
     createIntentMock.mockResolvedValue({ intentId: "intent-1", unsignedXdr: "unsigned-xdr" });
     signTransactionMock.mockResolvedValue("signed-xdr");
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
     submitIntentMock.mockResolvedValue({ intentId: "intent-1", status: "pending" });
 
     const { result } = renderHook(() => useSwapSubmission());
@@ -230,5 +235,26 @@ describe("useSwapSubmission", () => {
 
     expect(result.current.status).toBe("idle");
     expect(result.current.intentId).toBeNull();
+  });
+
+  // Issue #308: XDR structural integrity verification
+  it("rejects a swap when the signed XDR fails verification", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET" });
+    createIntentMock.mockResolvedValue({ intentId: "intent-5", unsignedXdr: "unsigned-xdr" });
+    signTransactionMock.mockResolvedValue("tampered-signed-xdr");
+    verifySignedXdrMatchesMock.mockReturnValue({
+      valid: false,
+      error: "Transaction verification failed. The signed transaction does not match what was reviewed.",
+    });
+
+    const { result } = renderHook(() => useSwapSubmission());
+    await act(async () => {
+      await result.current.submit(params);
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.error).toMatch(/verification failed/i);
+    expect(submitIntentMock).not.toHaveBeenCalled();
+    expect(addToastMock).toHaveBeenCalledWith(expect.stringMatching(/verification failed/i), "error");
   });
 });

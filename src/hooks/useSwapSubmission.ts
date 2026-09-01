@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { walletAdapter } from "@/lib/wallet";
 import { createIntent, submitIntent } from "@/lib/api";
+import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { decodeXdr, validateSwapXdr, XdrMismatchError } from "@/lib/xdrReview";
@@ -133,6 +134,12 @@ export function useSwapSubmission() {
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });
+
+      // Defense-in-depth: verify signed XDR matches unsigned (Issue #308)
+      const xdrVerification = verifySignedXdrMatches(unsignedXdr, signedXdr);
+      if (!xdrVerification.valid) {
+        throw new Error(xdrVerification.error ?? "Transaction verification failed. The signed transaction does not match what was reviewed.");
+      }
 
       setStatus("submitting");
       await submitIntent(newIntentId, signedXdr);
