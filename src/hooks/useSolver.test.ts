@@ -187,7 +187,7 @@ describe("useSolver", () => {
 
     const { result, rerender } = renderHook(
       ({ address }: { address: string | null }) => useSolver(address),
-      { wrapper, initialProps: { address: "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING" } }
+      { wrapper, initialProps: { address: "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING" as string | null } }
     );
 
     await waitFor(() => expect(result.current.solver).toBeDefined());

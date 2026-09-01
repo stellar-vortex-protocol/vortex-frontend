@@ -43,4 +43,24 @@ describe("ToastViewport", () => {
 
     expect(screen.queryByText("Dismiss me")).not.toBeInTheDocument();
   });
+
+  it("uses role=alert for error toasts and role=status for others", () => {
+    useToastStore.getState().addToast("Something failed", "error");
+    useToastStore.getState().addToast("All good", "success");
+    render(<ToastViewport />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Something failed");
+    expect(screen.getByRole("status")).toHaveTextContent("All good");
+  });
+
+  it("dismisses the focused toast on Escape", async () => {
+    useToastStore.getState().addToast("Escape me");
+    const user = userEvent.setup();
+    render(<ToastViewport />);
+
+    screen.getByLabelText("Dismiss notification").focus();
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByText("Escape me")).not.toBeInTheDocument();
+  });
 });

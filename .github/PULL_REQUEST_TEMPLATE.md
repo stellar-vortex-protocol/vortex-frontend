@@ -18,14 +18,11 @@ Closes #
 - [ ] `npx tsc --noEmit` passes
 - [ ] `npm test` passes (or note any skipped/unrelated failures)
 
-## Dependencies
+## Preview
 
-<!-- If this PR updates or adds any dependencies, document them here for supply-chain security. -->
-<!-- Especially important for @stellar/freighter-api and @stellar/stellar-sdk. -->
+🚀 **Live Preview**: A staging preview will automatically deploy once CI completes. The preview URL will appear as a comment below. Visit it to visually review your changes against the staging backend.
 
-- [ ] No dependency changes in this PR
-- [ ] Dependencies updated; justified in changes above
-- [ ] I have reviewed and documented any dependency changes
+> **Note**: Fork PRs cannot use preview deployments for security reasons. Please run `npm run dev` locally to test.
 
 ## Checklist
 
