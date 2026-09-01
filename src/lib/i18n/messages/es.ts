@@ -27,6 +27,9 @@ export const es = {
   "swap.from.selectToken": "Seleccionar token origen, actualmente {symbol}",
   "swap.from.approxValue": "≈ ${value}",
 
+  "swap.prices.estimated": "est.",
+  "swap.prices.asOf": "Precio estimado al {date}. La cotización en vivo actualizará esto cuando esté disponible.",
+
   "swap.to.label": "A",
   "swap.to.tokenGroup": "Token de destino",
   "swap.to.quoteLoading": "Cargando cotización…",
@@ -44,6 +47,10 @@ export const es = {
   "swap.quote.protocolFee": "Comisión de protocolo",
   "swap.quote.protocolFeeValue": "{percent}%",
   "swap.quote.rate": "Tasa",
+
+  "swap.quote.fillTime.tooltip": "Tiempo estimado para que un solver complete tu swap después de enviarlo. El tiempo real puede variar.",
+  "swap.quote.priceImpact.tooltip": "Cuánto mueve tu operación el precio efectivo respecto al precio de mercado. Un impacto alto significa que recibirás menos que la tasa de mercado.",
+  "swap.quote.protocolFee.tooltip": "Pequeño porcentaje de comisión que cobra el protocolo Vortex en cada swap liquidado. Se deduce del monto de destino.",
   "swap.quote.unavailable": "Cotización en tiempo real no disponible — mostrando tasa estimada.",
   "swap.quote.noSolver": "No hay solvers disponibles para esta ruta en este momento.",
   "swap.quote.highPriceImpactWarning": "Impacto de precio alto por encima de {threshold}% — revisa antes de intercambiar.",

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
+import { useRecentChains } from "@/hooks/useRecentChains";
 import { useToastStore } from "@/store/toast";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
@@ -92,9 +93,15 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
   const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError, quoteFetchedAt } = useQuote(
     hasAmount && !previewQuote
-      ? { srcChain, srcToken: srcToken.symbol, srcAmount: debouncedAmount, dstToken: dstToken.symbol }
-      : null
+      ? {
+          srcChain,
+          srcToken: srcToken.symbol,
+          srcAmount: debouncedAmount,
+          dstToken: dstToken.symbol,
+        }
+      : null,
   );
+
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
 
@@ -127,7 +134,12 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
   const isSubmitting = submission.status in SUBMISSION_LABEL_KEY;
-  const canSwap = Boolean(srcAmount) && parseFloat(srcAmount) > 0 && !quoting && !isSubmitting && !dstAddressError;
+  const canSwap =
+    Boolean(srcAmount) &&
+    parseFloat(srcAmount) > 0 &&
+    !quoting &&
+    !isSubmitting &&
+    !dstAddressError;
 
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
@@ -185,6 +197,40 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           className="absolute top-0 left-0 right-0 z-20 bg-vx-card border border-vx-border rounded-xl p-3 shadow-2xl animate-fade-up"
         >
           <div className="eyebrow mb-3 px-1">{t("swap.chainPicker.title")}</div>
+
+          {/* ── #284 Recent chains quick-select row ── */}
+          {recentChains.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] text-vx-muted/70 uppercase tracking-wide px-1 mb-1.5">
+                {t("swap.chainPicker.recent")}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {recentChains.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleSelectChain(c.id)}
+                    aria-label={t("swap.chainPicker.selectChain", { name: c.name })}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all
+                      ${srcChain === c.id
+                        ? "border-vx-sage/40 bg-vx-sage-bg text-vx-sage"
+                        : "border-vx-border text-vx-muted hover:text-vx-text bg-vx-surface/50"
+                      }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: c.color }}
+                    />
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 border-t border-vx-border/50" />
+            </div>
+          )}
+
+          {/* Full grid (always visible) */}
           <div className="grid grid-cols-2 gap-2">
             {CHAINS.map(c => (
               <button
@@ -223,16 +269,27 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               aria-label={t("swap.from.selectChain", { name: chain.name })}
               className="chain-badge cursor-pointer hover:bg-vx-lav/15 transition-colors"
             >
-              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: chain.color }} />
+              <span
+                aria-hidden="true"
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: chain.color }}
+              />
               {chain.name}
               <svg aria-hidden="true" className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path
+                  d="M3 4.5L6 7.5L9 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
 
           <div className="flex items-center gap-3">
-            <label htmlFor="src-amount" className="sr-only">{t("swap.from.amountLabel")}</label>
+            <label htmlFor="src-amount" className="sr-only">
+              {t("swap.from.amountLabel")}
+            </label>
             <input
               id="src-amount"
               type="number"
@@ -251,12 +308,25 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               aria-expanded={showTokenPicker}
               aria-label={t("swap.from.selectToken", { symbol: srcToken.symbol })}
             >
-              <span aria-hidden="true" className="w-6 h-6 rounded-full bg-vx-lav/20 flex items-center justify-center text-xs font-bold text-vx-lav">
+              <span
+                aria-hidden="true"
+                className="w-6 h-6 rounded-full bg-vx-lav/20 flex items-center justify-center text-xs font-bold text-vx-lav"
+              >
                 {srcToken.symbol[0]}
               </span>
               <span className="font-semibold text-sm text-vx-text">{srcToken.symbol}</span>
-              <svg aria-hidden="true" className="w-3.5 h-3.5 text-vx-muted" viewBox="0 0 14 14" fill="none">
-                <path d="M3.5 5.25L7 8.75L10.5 5.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <svg
+                aria-hidden="true"
+                className="w-3.5 h-3.5 text-vx-muted"
+                viewBox="0 0 14 14"
+                fill="none"
+              >
+                <path
+                  d="M3.5 5.25L7 8.75L10.5 5.25"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -295,14 +365,32 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               {t("swap.from.approxValue", {
                 value: srcValueUSD.toLocaleString("en-US", { maximumFractionDigits: 2 }),
               })}
+              {/* #285 – show "estimated" badge when showing a price-derived value (no live quote yet) */}
+              {showPriceEstimateNotice && (
+                <span
+                  title={t("swap.prices.asOf", { date: PRICES_AS_OF })}
+                  className="inline-flex items-center px-1 py-0.5 rounded text-[10px] leading-none bg-vx-surface border border-vx-border text-vx-muted/80 cursor-default"
+                >
+                  {t("swap.prices.estimated")}
+                </span>
+              )}
             </div>
           )}
         </div>
 
         <div className="flex justify-center">
-          <div aria-hidden="true" className="w-8 h-8 rounded-full bg-vx-surface border border-vx-border flex items-center justify-center z-10">
+          <div
+            aria-hidden="true"
+            className="w-8 h-8 rounded-full bg-vx-surface border border-vx-border flex items-center justify-center z-10"
+          >
             <svg className="w-4 h-4 text-vx-sage" viewBox="0 0 16 16" fill="none">
-              <path d="M8 3v10M5 10l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M8 3v10M5 10l3 3 3-3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </div>
         </div>
@@ -311,7 +399,12 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t("swap.to.label")}</span>
             <span className="stellar-badge">
-              <svg aria-hidden="true" className="w-2.5 h-2.5" viewBox="0 0 10 10" fill="currentColor">
+              <svg
+                aria-hidden="true"
+                className="w-2.5 h-2.5"
+                viewBox="0 0 10 10"
+                fill="currentColor"
+              >
                 <circle cx="5" cy="5" r="2" />
               </svg>
               Stellar
@@ -322,7 +415,10 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             <div className="flex-1">
               {quoting ? (
                 <div className="h-9 flex items-center">
-                  <div aria-hidden="true" className="w-24 h-6 bg-vx-surface rounded animate-pulse" />
+                  <div
+                    aria-hidden="true"
+                    className="w-24 h-6 bg-vx-surface rounded animate-pulse"
+                  />
                   <span className="sr-only">{t("swap.to.quoteLoading")}</span>
                 </div>
               ) : (
@@ -375,7 +471,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t("swap.destination.label")}</span>
           </div>
-          <label htmlFor="dst-address" className="sr-only">{t("swap.destination.label")}</label>
+          <label htmlFor="dst-address" className="sr-only">
+            {t("swap.destination.label")}
+          </label>
           <input
             id="dst-address"
             type="text"
@@ -425,7 +523,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         )}
 
         {submission.status === "error" && (
-          <p role="alert" className="text-center text-[11px] text-red-400 px-1">{submission.error}</p>
+          <p role="alert" className="text-center text-[11px] text-red-400 px-1">
+            {submission.error}
+          </p>
         )}
 
         <button
@@ -437,8 +537,21 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
-              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4 animate-spin-slow"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray="28"
+                  strokeDashoffset="8"
+                />
               </svg>
               {t(SUBMISSION_LABEL_KEY[submission.status] ?? "swap.submit.submitting")}
             </span>
@@ -446,8 +559,21 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             t("swap.submit.success")
           ) : quoting ? (
             <span className="flex items-center justify-center gap-2">
-              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4 animate-spin-slow"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray="28"
+                  strokeDashoffset="8"
+                />
               </svg>
               {t("swap.submit.findingRoute")}
             </span>

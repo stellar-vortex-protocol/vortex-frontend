@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
+import { swrRetryConfig } from "@/hooks/useRetry";
 import type { Quote, QuoteRequest, QuoteErrorType } from "@/lib/types";
 
 function quoteKey(params: QuoteRequest | null): string | null {
@@ -17,7 +18,11 @@ function quoteKey(params: QuoteRequest | null): string | null {
 function classifyQuoteError(err: unknown): QuoteErrorType {
   if (err instanceof Error) {
     const body = err.message.toLowerCase();
-    if (body.includes("no solver available") || body.includes("no_solver_available") || body.includes("no solver found")) {
+    if (
+      body.includes("no solver available") ||
+      body.includes("no_solver_available") ||
+      body.includes("no solver found")
+    ) {
       return { kind: "no-solver", message: err.message };
     }
   }
@@ -41,5 +46,11 @@ export function useQuote(params: QuoteRequest | null) {
     },
   });
 
-  return { quote: data, quoteFetchedAt, isLoading, error };
+  useEffect(() => {
+    if (data) setQuoteFetchedAt(Date.now());
+  }, [data]);
+
+  const quoteError = error ? classifyQuoteError(error) : null;
+
+  return { quote: data, quoteFetchedAt, isLoading, error, quoteErrorType: quoteError };
 }

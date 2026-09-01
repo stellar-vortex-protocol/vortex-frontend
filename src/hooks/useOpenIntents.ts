@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
+import { swrRetryConfig } from "@/hooks/useRetry";
 import type { OpenIntent } from "@/lib/types";
 
 // Open intents are NOT covered by a WebSocket subscription (the WS feed is
@@ -21,6 +22,7 @@ export function useOpenIntents() {
     refreshInterval: 5_000,
     dedupingInterval: 5_000,
     revalidateOnFocus: false,
+    ...swrRetryConfig,
   });
 
   return { intents: data ?? [], isLoading, error };

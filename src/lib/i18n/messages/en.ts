@@ -10,6 +10,8 @@ export const en = {
   "wallet.error.connectFailed": "Failed to connect wallet.",
 
   "swap.chainPicker.title": "Select source chain",
+  "swap.chainPicker.recent": "Recent",
+  "swap.chainPicker.selectChain": "Select {name}",
 
   "activityFeed.status.live": "Live",
   "activityFeed.status.polling": "Polling",
@@ -23,6 +25,9 @@ export const en = {
   "swap.from.selectChain": "Source chain, currently {name}",
   "swap.from.selectToken": "Select source token, currently {symbol}",
   "swap.from.approxValue": "≈ ${value}",
+
+  "swap.prices.estimated": "est.",
+  "swap.prices.asOf": "Estimated price as of {date}. Live quote will update this once available.",
 
   "swap.to.label": "To",
   "swap.to.tokenGroup": "Destination token",
@@ -41,6 +46,11 @@ export const en = {
   "swap.quote.protocolFee": "Protocol fee",
   "swap.quote.protocolFeeValue": "{percent}%",
   "swap.quote.rate": "Rate",
+
+  "swap.quote.fillTime.tooltip": "Estimated time for a solver to fill your swap after you submit. Actual time may vary.",
+  "swap.quote.priceImpact.tooltip": "How much your trade moves the effective price relative to the mid-market rate. A high impact means you receive less than the quoted mid-market rate.",
+  "swap.quote.protocolFee.tooltip": "A small percentage fee charged by the Vortex protocol on each settled swap. It is deducted from the destination amount.",
+  "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
   "swap.quote.unavailable": "Live quote unavailable — showing an estimated rate.",
   "swap.quote.noSolver": "No solver is available for this route right now.",
   "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
