@@ -1,0 +1,15 @@
+[package]
+name = "lumenqraph-mcp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lumenqraph-core = { path = "../lumenqraph-core" }
+tokio = { version = "1.0", features = ["full"] }
+log = "0.4"
+env_logger = "0.10"
+thiserror = "1.0"
+serde_json = "1.0"
+
+[dev-dependencies]
+tokio-test = "0.4"

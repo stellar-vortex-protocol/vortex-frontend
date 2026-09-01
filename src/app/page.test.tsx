@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 const { useIntentFeedMock } = vi.hoisted(() => ({ useIntentFeedMock: vi.fn() }));
 vi.mock("@/hooks/useIntentFeed", () => ({ useIntentFeed: useIntentFeedMock }));
 // The swap card has its own suite; stub it so this one stays about the page shell.
 vi.mock("@/components/SwapCard", () => ({ SwapCard: () => <div data-testid="swap-card" /> }));
+// Nav/Footer/ActivityFeed carry their own (currently broken on main) suites and
+// wallet/i18n context this one doesn't set up.
+vi.mock("@/components/Nav", () => ({ Nav: () => null }));
+vi.mock("@/components/Footer", () => ({ Footer: () => null }));
+vi.mock("@/components/ActivityFeed", () => ({ ActivityFeed: () => <div data-testid="activity-feed" /> }));
 
 import HomePage from "./page";
 
@@ -14,6 +20,11 @@ function renderHome() {
 }
 
 describe("HomePage", () => {
+  beforeEach(() => {
+    // Suppress the first-visit onboarding sequence for the shell tests.
+    localStorage.setItem("vortex-onboarding-seen", "1");
+  });
+
   it("renders content within a main landmark", () => {
     renderHome();
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
@@ -70,5 +81,17 @@ describe("HomePage", () => {
 
     expect(screen.getByText("Supported chains")).toBeInTheDocument();
     expect(screen.getByText("Stellar (dest.)")).toBeInTheDocument();
+  });
+
+  it("shows the first-visit onboarding without blocking access to the swap card", async () => {
+    localStorage.removeItem("vortex-onboarding-seen");
+    renderHome();
+
+    expect(screen.getByRole("dialog", { name: "Start a swap here" })).toBeInTheDocument();
+    // The swap card is still rendered and reachable behind the hint.
+    expect(screen.getByTestId("swap-card")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Skip" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

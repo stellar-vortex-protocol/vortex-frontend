@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { IntentDetail } from "@/lib/types";
 
 const { useIntentMock } = vi.hoisted(() => ({ useIntentMock: vi.fn() }));
 vi.mock("@/hooks/useIntent", () => ({ useIntent: useIntentMock }));
+// Nav/Footer are app chrome that needs wallet + i18n context this suite does
+// not set up - stub them so the record itself is what's under test.
+vi.mock("@/components/Nav", () => ({ Nav: () => null }));
+vi.mock("@/components/Footer", () => ({ Footer: () => null }));
 
 import IntentDetailPage from "./page";
 
@@ -82,5 +87,33 @@ describe("IntentDetailPage", () => {
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
     expect(screen.getByText("← Back to explorer")).toHaveAttribute("href", "/explore");
+  });
+
+  it("triggers the browser print dialog from the Print / Save as PDF action", async () => {
+    const printSpy = vi.spyOn(window, "print").mockImplementation(() => {});
+    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /print \/ save as pdf/i }));
+    expect(printSpy).toHaveBeenCalledTimes(1);
+    printSpy.mockRestore();
+  });
+
+  it("marks a non-settled intent as not a completed-swap record", () => {
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "pending", txHash: undefined },
+      isLoading: false,
+      error: undefined,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.getByRole("note")).toHaveTextContent(/not yet settled/i);
+  });
+
+  it("shows a completed record with no warning for a filled intent", () => {
+    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
 });

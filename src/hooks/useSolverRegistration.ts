@@ -1,21 +1,27 @@
 import { useCallback, useState } from "react";
 import { mutate } from "swr";
-import freighterApi from "@stellar/freighter-api";
+import { walletAdapter } from "@/lib/wallet";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { decodeXdr, validateRegistrationXdr, XdrMismatchError } from "@/lib/xdrReview";
 
 export type SolverRegistrationStatus =
   | "idle"
   | "connecting"
   | "building"
+  | "reviewing"
   | "awaiting-signature"
   | "submitting"
   | "success"
   | "error";
 
 function RegistrationErrorMessage(err: unknown): string {
+  if (err instanceof XdrMismatchError) {
+    return err.message;
+  }
   if (err instanceof ApiError) {
     if (err.status === 409) {
       return "This address is already registered as a solver.";
@@ -61,10 +67,24 @@ export function useSolverRegistration() {
       setStatus("building");
       const { registrationId, unsignedXdr } = await registerSolver({ address, bondUsd });
 
+      // ── #244: XDR review step ──────────────────────────────────────────────
+      // Decode and validate the bond-deposit XDR before presenting it to
+      // Freighter.  A decode failure or address mismatch is a hard stop.
+      setStatus("reviewing");
+      const decoded = decodeXdr(unsignedXdr, wallet.network);
+      validateRegistrationXdr(decoded, { bondUsd, solverAddress: address });
+      // ──────────────────────────────────────────────────────────────────────
+
       setStatus("awaiting-signature");
-      const signedXdr = await freighterApi.signTransaction(unsignedXdr, {
+      const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });
+
+      // Defense-in-depth: verify signed XDR matches unsigned (Issue #308)
+      const xdrVerification = verifySignedXdrMatches(unsignedXdr, signedXdr);
+      if (!xdrVerification.valid) {
+        throw new Error(xdrVerification.error ?? "Transaction verification failed. The signed transaction does not match what was reviewed.");
+      }
 
       setStatus("submitting");
       await submitSolverRegistration(registrationId, signedXdr);
