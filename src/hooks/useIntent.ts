@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
+import { swrRetryConfig } from "@/hooks/useRetry";
 import type { IntentDetail } from "@/lib/types";
 
 // Single-intent detail fetch. No WebSocket or polling needed — the user
@@ -18,6 +19,7 @@ export function useIntent(id: string | null) {
       refreshInterval: 0,
       dedupingInterval: 5_000,
       revalidateOnFocus: true,
+      ...swrRetryConfig,
     },
   );
 

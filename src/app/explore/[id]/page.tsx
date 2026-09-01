@@ -1,22 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
-import { Nav } from "@/components/Nav";
+import { CopyButton } from "@/components/CopyButton";
 import { Footer } from "@/components/Footer";
 import { CopyButton } from "@/components/CopyButton";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
+import { Nav } from "@/components/Nav";
 import { SkeletonDetailCard } from "@/components/Skeleton";
+import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useIntent } from "@/hooks/useIntent";
 import { timeAgo } from "@/lib/time";
+import { truncateAddress } from "@/lib/stellarAddress";
 
 const NETWORK = process.env.NEXT_PUBLIC_NETWORK ?? "testnet";
 
-function truncateAddress(address: string) {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-6)}`;
-}
+// This screen shows 6-and-6 truncation for full-width identifiers.
+const truncate = (value: string) => truncateAddress(value, { prefix: 6, suffix: 6 });
 
 function deadlineLabel(deadline: string) {
   const msRemaining = new Date(deadline).getTime() - Date.now();
@@ -29,6 +29,8 @@ function deadlineLabel(deadline: string) {
 export default function IntentDetailPage({ params }: { params: { id: string } }) {
   const { intent, isLoading, error } = useIntent(params.id);
   const { copy } = useCopyToClipboard();
+  const [txHashCopied, setTxHashCopied] = useState(false);
+
   const isExpired = useMemo(() => {
     if (!intent || intent.status !== "pending" || !intent.deadline) return false;
     return new Date(intent.deadline).getTime() <= Date.now();
@@ -57,7 +59,10 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
         </div>
 
         {isLoading ? (
-          <SkeletonDetailCard />
+          <div className="card p-8 space-y-3">
+            <div className="h-6 w-2/3 bg-vx-surface rounded animate-pulse" />
+            <div className="h-4 w-1/3 bg-vx-surface rounded animate-pulse" />
+          </div>
         ) : error ? (
           <div className="card p-8 text-center text-sm text-vx-muted">
             Couldn&apos;t find that intent. It may not exist, or the relay is unreachable.
@@ -83,14 +88,7 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
                   {intent.srcAmount} {intent.srcToken} → {intent.dstAmount} {intent.dstToken}
                 </h1>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <IntentStatusBadge status={intent.status} />
-                {isExpired && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-400 border border-amber-400/30 rounded-full px-2 py-0.5">
-                    Likely expired
-                  </span>
-                )}
-              </div>
+              <IntentStatusBadge status={intent.status} />
             </div>
 
             {!isSettled && (
@@ -107,36 +105,37 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
             <div className="grid sm:grid-cols-2 gap-4">
               {[
                 ["Source chain", intent.srcChain],
-                ["Solver", intent.solver],
+                ["Solver", sanitizeDisplayText(intent.solver)],
                 ["Minimum out", `${intent.minOut} ${intent.dstToken}`],
                 ["Submitted", `${new Date(intent.createdAt).toLocaleString()} (${timeAgo(intent.createdAt)})`],
                 ["Deadline", deadlineLabel(intent.deadline)],
+                ["Destination address", truncateAddress(intent.dstAddress)],
               ].map(([k, v]) => (
                 <div key={k} className="bg-vx-surface/40 rounded-lg p-3">
                   <div className="eyebrow mb-1">{k}</div>
                   <div className="text-sm text-vx-text num capitalize">{v}</div>
                 </div>
               ))}
-              <div className="bg-vx-surface/40 rounded-lg p-3">
-                <div className="eyebrow mb-1">Destination address</div>
-                <div className="flex items-center gap-2 text-sm text-vx-text num">
-                  <span className="truncate">{truncateAddress(intent.dstAddress)}</span>
-                  <CopyButton value={intent.dstAddress} label="Copy destination address" />
-                </div>
-              </div>
             </div>
 
             {intent.txHash && (
               <div className="pt-2 border-t border-vx-line">
                 <div className="eyebrow mb-1">Settlement transaction</div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-xs text-vx-muted num">{truncateAddress(intent.txHash)}</span>
+                  <span className="text-xs text-vx-muted num">{truncate(intent.txHash)}</span>
                   <button
-                    type="button"
-                    onClick={() => copy(intent.txHash!, "Transaction hash copied")}
-                    className="text-xs text-vx-sage hover:underline print:hidden"
+                    onClick={async () => {
+                      const txHash = intent.txHash;
+                      if (!txHash) return;
+                      const didCopy = await copy(txHash);
+                      setTxHashCopied(didCopy);
+                      if (didCopy) {
+                        window.setTimeout(() => setTxHashCopied(false), 1200);
+                      }
+                    }}
+                    className="text-xs text-vx-sage hover:underline"
                   >
-                    Copy
+                    {txHashCopied ? "Copied" : "Copy"}
                   </button>
                   <a
                     href={`https://stellar.expert/explorer/${NETWORK}/tx/${intent.txHash}`}

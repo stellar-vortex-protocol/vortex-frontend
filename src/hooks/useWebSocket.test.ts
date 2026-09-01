@@ -67,7 +67,7 @@ describe("useWebSocket", () => {
   const expectReconnectAfter = (expectedDelayMs: number) => {
     const before = MockWebSocket.instances.length;
     act(() => {
-      MockWebSocket.instances[before - 1].onclose?.();
+      MockWebSocket.instances[before - 1]!.onclose?.();
     });
     act(() => {
       vi.advanceTimersByTime(expectedDelayMs - 1);
@@ -101,7 +101,7 @@ describe("useWebSocket", () => {
       expectReconnectAfter(6000);
 
       act(() => {
-        MockWebSocket.instances[MockWebSocket.instances.length - 1].onopen?.();
+        MockWebSocket.instances[MockWebSocket.instances.length - 1]!.onopen?.();
       });
 
       expectReconnectAfter(3000);

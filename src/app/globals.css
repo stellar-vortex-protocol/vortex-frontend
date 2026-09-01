@@ -5,6 +5,7 @@
 @layer base {
   * { box-sizing: border-box; }
 
+  /* ── Font stacks ─────────────────────────────────────────────────────────── */
   :root {
     --font-geist-sans: "Inter", system-ui, sans-serif;
     --font-geist-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -12,27 +13,140 @@
 
   html { -webkit-font-smoothing: antialiased; }
 
-  body {
-    background: #080C14;
-    background-image:
-      radial-gradient(ellipse 80% 60% at 50% -20%, rgba(76,235,168,0.06) 0%, transparent 70%),
-      radial-gradient(ellipse 60% 40% at 80% 80%, rgba(167,139,250,0.04) 0%, transparent 60%);
-    background-attachment: fixed;
-    min-height: 100vh;
+  /* ── Dark theme (default) ───────────────────────────────────────────────── */
+  /*
+   * The :root block defines the dark-mode palette.  The light-mode overrides
+   * below flip every variable to its light counterpart.  Because Tailwind
+   * resolves all vx-* color tokens to var(--vx-*), every component in the
+   * tree automatically adapts without any className changes.
+   */
+  :root {
+    /* Surfaces */
+    --vx-ink:     #080C14;
+    --vx-base:    #0C1120;
+    --vx-surface: #111827;
+    --vx-card:    #161E2E;
+    --vx-border:  rgba(255, 255, 255, 0.07);
+    --vx-line:    rgba(255, 255, 255, 0.04);
+
+    /* Primary: sage green */
+    --vx-sage:     #4CEBA8;
+    --vx-sage-dim: #2A8A62;
+    --vx-sage-bg:  rgba(76, 235, 168, 0.08);
+
+    /* Accent: lavender */
+    --vx-lav:     #A78BFA;
+    --vx-lav-dim: #5B3F8C;
+    --vx-lav-bg:  rgba(167, 139, 250, 0.08);
+
+    /* State */
+    --vx-amber: #F5A623;
+    --vx-rose:  #F87171;
+
+    /* Text */
+    --vx-text:  #E8EDF5;
+    --vx-muted: #6B7A8E;
+    --vx-dim:   #374151;
+
+    /* Body background (used in the body rule below) */
+    --vx-body-bg:      #080C14;
+    --vx-body-radial1: rgba(76, 235, 168, 0.06);
+    --vx-body-radial2: rgba(167, 139, 250, 0.04);
+
+    /* Scrollbar */
+    --vx-scrollbar-thumb: rgba(255, 255, 255, 0.08);
+
+    /* Selection */
+    --vx-selection-bg: rgba(76, 235, 168, 0.25);
+
+    /* Focus ring */
+    --vx-focus-ring: rgba(76, 235, 168, 0.5);
   }
 
+  /* ── Light theme ─────────────────────────────────────────────────────────── */
+  /*
+   * All surfaces invert: ink → near-white, card → white, surface → light grey.
+   * Text colour inverts similarly.  The sage/lavender hues stay saturated but
+   * their backgrounds and dims shift so they read well on white.
+   */
+  @media (prefers-color-scheme: light) {
+    :root {
+      /* Surfaces */
+      --vx-ink:     #FFFFFF;
+      --vx-base:    #F5F7FA;
+      --vx-surface: #EFF1F5;
+      --vx-card:    #FFFFFF;
+      --vx-border:  rgba(0, 0, 0, 0.08);
+      --vx-line:    rgba(0, 0, 0, 0.05);
+
+      /* Primary: sage green (slightly deeper for contrast on white) */
+      --vx-sage:     #0FA871;
+      --vx-sage-dim: #0A6849;
+      --vx-sage-bg:  rgba(15, 168, 113, 0.08);
+
+      /* Accent: lavender */
+      --vx-lav:     #7C3AED;
+      --vx-lav-dim: #4C1D95;
+      --vx-lav-bg:  rgba(124, 58, 237, 0.08);
+
+      /* State */
+      --vx-amber: #D97706;
+      --vx-rose:  #DC2626;
+
+      /* Text */
+      --vx-text:  #0F172A;
+      --vx-muted: #64748B;
+      --vx-dim:   #CBD5E1;
+
+      /* Body background */
+      --vx-body-bg:      #F5F7FA;
+      --vx-body-radial1: rgba(15, 168, 113, 0.04);
+      --vx-body-radial2: rgba(124, 58, 237, 0.03);
+
+      /* Scrollbar */
+      --vx-scrollbar-thumb: rgba(0, 0, 0, 0.12);
+
+      /* Selection */
+      --vx-selection-bg: rgba(15, 168, 113, 0.2);
+
+      /* Focus ring */
+      --vx-focus-ring: rgba(15, 168, 113, 0.5);
+    }
+  }
+
+  /* ── Body ────────────────────────────────────────────────────────────────── */
+  body {
+    background-color: var(--vx-body-bg);
+    background-image:
+      radial-gradient(ellipse 80% 60% at 50% -20%, var(--vx-body-radial1) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 80% 80%, var(--vx-body-radial2) 0%, transparent 60%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: var(--vx-text);
+  }
+
+  /* ── Scrollbar ───────────────────────────────────────────────────────────── */
   ::-webkit-scrollbar { width: 3px; height: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--vx-scrollbar-thumb);
+    border-radius: 2px;
+  }
 
-  ::selection { background: rgba(76,235,168,0.25); color: inherit; }
-  :focus-visible { outline: 1.5px solid rgba(76,235,168,0.5); outline-offset: 2px; }
+  /* ── Selection ───────────────────────────────────────────────────────────── */
+  ::selection { background: var(--vx-selection-bg); color: inherit; }
+
+  /* ── Focus ring ──────────────────────────────────────────────────────────── */
+  :focus-visible {
+    outline: 1.5px solid var(--vx-focus-ring);
+    outline-offset: 2px;
+  }
 }
 
 @layer components {
   .card {
     @apply bg-vx-card border border-vx-border rounded-xl overflow-hidden;
-    background-image: linear-gradient(160deg, rgba(76,235,168,0.025) 0%, transparent 50%);
+    background-image: linear-gradient(160deg, color-mix(in srgb, var(--vx-sage) 2.5%, transparent) 0%, transparent 50%);
   }
 
   .card-sm {
@@ -78,8 +192,8 @@
 
 /* Swap button gradient */
 .btn-swap {
-  background: linear-gradient(135deg, #4CEBA8 0%, #38BDF8 100%);
-  color: #080C14;
+  background: linear-gradient(135deg, var(--vx-sage) 0%, #38BDF8 100%);
+  color: var(--vx-ink);
   font-weight: 700;
   font-size: 0.9375rem;
   padding: 0.875rem;
@@ -93,10 +207,14 @@
 .btn-swap:hover { filter: brightness(1.08); }
 .btn-swap:active { transform: scale(0.99); }
 .btn-swap:disabled {
-  background: linear-gradient(135deg, rgba(76,235,168,0.25) 0%, rgba(56,189,248,0.25) 100%);
-  color: rgba(8,12,20,0.5);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--vx-sage) 25%, transparent) 0%, rgba(56,189,248,0.25) 100%);
+  color: color-mix(in srgb, var(--vx-ink) 50%, transparent);
   cursor: not-allowed;
 }
+
+/* ── Light-mode .btn-swap text fix ───────────────────────────────────────── */
+/* On dark: ink is #080C14 (nearly black) — fine on the sage gradient.
+   On light: ink is #FFFFFF — also fine, gives white text on the green button. */
 
 /* Flow animation for intent pipeline */
 .intent-flow-line {
@@ -129,38 +247,9 @@ html[data-motion="allow"] *, html[data-motion="allow"] *::before, html[data-moti
   scroll-behavior: smooth;
 }
 
-/* ── Print ──────────────────────────────────────────────────────────────────
-   The intent detail page (src/app/explore/[id]/page.tsx) doubles as a
-   printable / save-as-PDF record. Strip the app chrome and interactive-only
-   controls, and render the summary as plain black-on-white. Elements that
-   should not appear on paper carry Tailwind's `print:hidden`; this block
-   covers the structural chrome those utilities can't reach. */
-@media print {
-  nav,
-  footer {
-    display: none !important;
-  }
-
-  html,
-  body {
-    background: #fff !important;
-    color: #000 !important;
-  }
-
-  main {
-    padding: 0 !important;
-    max-width: none !important;
-  }
-
-  #intent-record {
-    background: #fff !important;
-    color: #000 !important;
-  }
-
-  /* Keep colour-coded badges legible when printed in greyscale - they already
-     carry a text label and a distinct icon shape alongside the colour. */
-  #intent-record * {
-    color: #000 !important;
-    border-color: rgba(0, 0, 0, 0.25) !important;
+/* Safe-area padding for notched/dynamic-island iOS devices */
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

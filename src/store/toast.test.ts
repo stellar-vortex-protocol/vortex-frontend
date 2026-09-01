@@ -51,4 +51,33 @@ describe("useToastStore", () => {
     useToastStore.getState().addToast("Second");
     expect(useToastStore.getState().toasts).toHaveLength(2);
   });
+
+  it("pausing prevents auto-dismissal until resumed", () => {
+    vi.useFakeTimers();
+    const id = useToastStore.getState().addToast("Pause me");
+
+    vi.advanceTimersByTime(TOAST_DURATION_MS - 500);
+    useToastStore.getState().pauseToast(id);
+    vi.advanceTimersByTime(10_000);
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+
+    useToastStore.getState().resumeToast(id);
+    vi.advanceTimersByTime(499);
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("pausing/resuming one toast does not affect another's timer", () => {
+    vi.useFakeTimers();
+    const pausedId = useToastStore.getState().addToast("Paused");
+    useToastStore.getState().addToast("Running");
+
+    useToastStore.getState().pauseToast(pausedId);
+    vi.advanceTimersByTime(TOAST_DURATION_MS);
+
+    const remaining = useToastStore.getState().toasts;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.id).toBe(pausedId);
+  });
 });

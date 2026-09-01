@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { WalletHydrator } from "@/components/WalletHydrator";
 import { ToastViewport } from "@/components/ToastViewport";
-import { CommandPalette } from "@/components/CommandPalette";
+import { IntentStatusWatcher } from "@/components/IntentStatusWatcher";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { DEFAULT_LOCALE } from "@/lib/i18n";
 
@@ -83,7 +83,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-vx-ink text-vx-text antialiased">
+      <body className="antialiased">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200]
@@ -93,10 +93,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to main content
         </a>
         <I18nProvider locale={DEFAULT_LOCALE}>
+          <GlobalErrorCapture />
           <WalletHydrator />
+          <IntentStatusWatcher />
           {children}
           <CommandPalette />
           <ToastViewport />
+          <ConnectivityBanner />
         </I18nProvider>
       </body>
     </html>

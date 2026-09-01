@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+
+const { useGlobalErrorCaptureMock } = vi.hoisted(() => ({
+  useGlobalErrorCaptureMock: vi.fn(),
+}));
+
+// Stub out the global error capture hook — we test it in isolation
+vi.mock("@/hooks/useGlobalErrorCapture", () => ({
+  useGlobalErrorCapture: useGlobalErrorCaptureMock,
+}));
+
 import RootLayout from "./layout";
 
 describe("RootLayout", () => {
@@ -21,5 +31,14 @@ describe("RootLayout", () => {
     );
 
     expect(screen.getByText("Skip to main content")).toHaveAttribute("href", "#main-content");
+  });
+
+  it("mounts the global error capture hook", () => {
+    render(
+      <RootLayout>
+        <div />
+      </RootLayout>
+    );
+    expect(useGlobalErrorCaptureMock).toHaveBeenCalled();
   });
 });

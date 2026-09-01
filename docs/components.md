@@ -78,35 +78,38 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
   [`useToastStore`](../src/store/toast.ts) — you don't need to handle connection
   errors yourself when using this component.
 
-## `CommandPalette`
+## `Tooltip`
 
-[`src/components/CommandPalette.tsx`](../src/components/CommandPalette.tsx)
+[`src/components/Tooltip.tsx`](../src/components/Tooltip.tsx)
 
-Global `Cmd/Ctrl+K` command palette for keyboard-driven navigation. Mounted once
-in [`src/app/layout.tsx`](../src/app/layout.tsx) so the shortcut works on every
-route — you do not render it yourself.
+Accessible WAI-ARIA tooltip component. Shown on hover and keyboard focus
+(never mouse-only), dismissed via Escape, and associated to its trigger via
+`aria-describedby`. Includes basic viewport-edge collision handling and a
+tap-to-toggle affordance for touch devices.
 
 ```tsx
-import { CommandPalette } from "@/components/CommandPalette";
+import { Tooltip } from "@/components/Tooltip";
 
-<CommandPalette />
+<Tooltip content="Protocol fee is deducted from the destination amount.">
+  <span className="underline decoration-dotted cursor-help">Protocol fee</span>
+</Tooltip>
 ```
 
 **Props**
 
-None. State (open/closed, query, active option) is entirely internal.
+| prop        | type        | required | default  | notes                                                                                |
+| ----------- | ----------- | -------- | -------- | ------------------------------------------------------------------------------------ |
+| `content`   | `ReactNode` | yes      | —        | The tooltip text or element shown in the popover.                                    |
+| `children`  | `ReactElement` | yes   | —        | Single trigger element. Must accept `ref`, `aria-describedby`, focus/blur/mouse handlers. |
+| `placement` | `"top" \| "bottom"` | no | `"top"` | Preferred placement; auto-flips when close to viewport edge.                        |
 
-**Behavior**
+**Behaviour**
 
-- `Cmd/Ctrl+K` toggles the palette open/closed from anywhere. `Escape` or a
-  click on the backdrop closes it.
-- Lists the four top-level routes (`/`, `/explore`, `/solve`, `/my-intents`),
-  filtered by the typed query against each route's label/path.
-- If the query is a valid Stellar public key it offers a direct jump to
-  `/solve/[address]`; otherwise a whitespace-free token that matches no route is
-  offered as an `/explore/[id]` lookup.
-- Fully keyboard-operable: `ArrowUp`/`ArrowDown` move the active option (wrapping),
-  `Enter` activates it, following the WAI-ARIA combobox/listbox pattern
-  (`role="combobox"` input + `role="listbox"` with `aria-activedescendant`).
-- On activate it calls `router.push(href)` and restores focus to the element that
-  was focused before the palette opened.
+- Hover or keyboard focus opens the tooltip; losing either closes it.
+- Pressing Escape dismisses the tooltip from anywhere on the page.
+- Touch: tap the trigger to toggle the tooltip open/closed.
+- The trigger receives `aria-describedby` pointing to the tooltip while it is visible.
+- Does not trap focus or interfere with Tab order.
+- Currently applied to `Price impact`, `Protocol fee`, and `Est. fill time` in
+  SwapCard's quote details panel. See `Tooltip.stories.tsx` for interactive examples.
+
