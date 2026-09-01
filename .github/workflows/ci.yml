@@ -11,10 +11,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   frontend:
     name: Frontend (Next.js)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,9 +41,29 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run test:coverage
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-report
           path: coverage/
       - run: npm run build
       - run: node scripts/check-bundle-size.mjs
+      - name: Build with bundle analysis
+        run: npm run build
+        env:
+          ANALYZE: true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: bundle-analysis-report
+          path: .next-analyze/
+          retention-days: 30
+      - name: Build Storybook
+        run: npm run build:storybook
+      - name: Run visual regression tests
+        run: npm run test:visual
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: visual-regression-report
+          path: blob-report/
+          retention-days: 30

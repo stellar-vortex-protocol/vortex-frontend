@@ -132,6 +132,51 @@ If preview-specific variables are not set, the workflow uses sensible defaults p
 | `npm run lint` | `next lint` |
 | `npm test` | Run the Vitest suite |
 
+### Bundle Analysis
+
+To generate a visual breakdown of the production bundle, build with the `ANALYZE=true` flag:
+
+```bash
+ANALYZE=true npm run build
+```
+
+This generates an interactive treemap visualization in `.next-analyze/` showing what modules contribute to bundle size. Open `client.html` in your browser to explore the breakdown.
+
+The CI pipeline automatically generates and uploads bundle analysis reports on every build as a downloadable artifact, making it easy to spot size regressions in pull requests.
+
+### Visual Regression Testing
+
+Storybook components are tested for visual regressions using Playwright. This catches unintended CSS changes that might break component appearance.
+
+**Run locally:**
+
+```bash
+npm run storybook      # Start Storybook dev server on http://localhost:6006
+npm run build:storybook # Build Storybook static site
+npm run test:visual    # Run visual regression tests
+```
+
+**Workflow:**
+
+1. Tests run against the built Storybook (`storybook-static/`)
+2. Playwright captures screenshots of all story variants
+3. Screenshots are compared against baseline images
+4. Differences are reported as test failures
+5. CI artifacts include a visual regression report with diffs
+
+**First time setup / Updating baselines:**
+
+When adding new stories or intentionally changing component styles, update the baseline snapshots:
+
+```bash
+npm run build:storybook
+npm run test:visual -- --update
+```
+
+Commit the updated baseline images in `.storybook/playwright/` so future runs have a reference point.
+
+The CI pipeline runs visual regression tests on every build, preventing CSS regressions from reaching production.
+
 ## Troubleshooting
 
 ### Freighter not detected
@@ -168,6 +213,18 @@ If preview-specific variables are not set, the workflow uses sensible defaults p
 ---
 
 ## Contributing
+
+### Code Ownership & Review Requirements
+
+This repository uses a [CODEOWNERS](./.github/CODEOWNERS) file to automatically assign reviewers based on the paths changed in a pull request. Critical areas like wallet storage (`src/store/wallet.ts`), API logic (`src/lib/api.ts`), solver registration, and CI/CD workflows require approval from designated maintainers before merging.
+
+For more details, see the [CODEOWNERS](./.github/CODEOWNERS) file.
+
+### Security Practices
+
+- **Pinned Actions**: All GitHub Actions used in CI/CD workflows are pinned to specific commit SHAs (not mutable version tags) to prevent supply-chain attacks. Version comments are included for readability.
+- **Dependabot**: Automatically maintains SHA pins via weekly GitHub Actions updates. Review and merge Dependabot PRs to stay current with security patches.
+- **Minimal Permissions**: Workflows declare only the minimum required permissions (`contents: read`, `checks: write`) following the principle of least privilege.
 
 ### Issue Complexity Labels
 
