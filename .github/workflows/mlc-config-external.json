@@ -1,0 +1,10 @@
+{
+  "ignorePatterns": [],
+  "replacementPatterns": [],
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackRetryDelay": "1s",
+  "timeout": "15s",
+  "retryOn": [404, 429, 503],
+  "aliveStatusCodes": [200, 206]
+}

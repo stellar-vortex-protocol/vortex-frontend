@@ -4,15 +4,14 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
+import { CopyButton } from "@/components/CopyButton";
+import { SkeletonCard } from "@/components/Skeleton";
 import { useSolver } from "@/hooks/useSolver";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
-
-function truncateAddress(address: string) {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-6)}`;
-}
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -22,6 +21,7 @@ const usdCompact = new Intl.NumberFormat("en-US", {
 });
 
 export default function SolverDetailPage({ params }: { params: { address: string } }) {
+  const { t } = useTranslation();
   const isValidAddress = isValidStellarPublicKey(params.address);
   const { solver, isLoading, error } = useSolver(isValidAddress ? params.address : null);
   const { items: fillHistory, isLoading: historyLoading, error: historyError } = useIntentFeed();
@@ -63,10 +63,10 @@ export default function SolverDetailPage({ params }: { params: { address: string
                 <div>
                   <div className="eyebrow mb-1 sm:mb-2 text-xs">Solver</div>
                   <h1 className="text-lg sm:text-2xl font-bold text-vx-text break-words">
-                    {solver.name}
+                    {sanitizeDisplayText(solver.name)}
                   </h1>
                 </div>
-                <div 
+                <div
                   className={`flex-shrink-0 px-2 sm:px-3 py-1 rounded-lg text-xs font-semibold border whitespace-nowrap ${
                     solver.status === "active"
                       ? "bg-vx-sage-bg text-vx-sage border-vx-sage/30"
@@ -78,9 +78,8 @@ export default function SolverDetailPage({ params }: { params: { address: string
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-vx-muted font-mono break-all">
-                <span>Address: {params.address}</span>
-                <CopyButton value={params.address} label="Copy solver address" />
+              <div className="text-xs sm:text-sm text-vx-muted font-mono break-all">
+                Address: {params.address}
               </div>
 
               {/* Metrics grid */}
@@ -105,23 +104,14 @@ export default function SolverDetailPage({ params }: { params: { address: string
                 <h2 className="eyebrow text-xs mb-2">Supported Chains</h2>
                 <div className="flex flex-wrap gap-2">
                   {solver.chains.length > 0 ? (
-                    solver.chains.map(chainId => {
-                      const chainMeta = CHAINS.find(c => c.id === chainId);
-                      const chainName = chainMeta?.name ?? chainId;
-                      const chainColor = chainMeta?.color ?? "#6B7280";
-                      return (
-                        <span 
-                          key={chainId} 
-                          className="text-xs px-2 py-1 rounded text-white border font-medium"
-                          style={{ 
-                            backgroundColor: chainColor,
-                            borderColor: chainColor,
-                          }}
-                        >
-                          {chainName}
-                        </span>
-                      );
-                    })
+                    solver.chains.map(chain => (
+                      <span 
+                        key={chain} 
+                        className="text-xs px-2 py-1 bg-vx-surface rounded text-vx-text border border-vx-border"
+                      >
+                        {chain}
+                      </span>
+                    ))
                   ) : (
                     <span className="text-xs text-vx-muted">No chains supported yet</span>
                   )}
@@ -129,23 +119,39 @@ export default function SolverDetailPage({ params }: { params: { address: string
               </div>
             </div>
 
-            {/* Fill history section */}
+            {/* ── Solver Timeline ─────────────────────────────────────────── */}
+            <div className="mb-6">
+              <SolverTimeline
+                solverAddress={solver.address}
+                fills={fillHistory}
+                isLoading={historyLoading && fillHistory.length === 0}
+              />
+            </div>
+
+            {/* ── Fill history table ──────────────────────────────────────── */}
             <div className="card overflow-hidden">
               <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30">
                 <h2 className="text-sm font-semibold text-vx-text">Recent Fills by Solver</h2>
               </div>
 
               {historyLoading && fillHistory.length === 0 ? (
-                <div className="p-4 sm:p-5">
-                  <SkeletonCard rows={3} rowHeight="h-16" />
+                <div className="p-4 sm:p-5 space-y-3">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-16 bg-vx-surface/40 rounded-lg animate-pulse" />
+                  ))}
                 </div>
               ) : historyError ? (
                 <div role="alert" className="p-6 sm:p-8 text-center text-sm text-vx-muted">
                   Couldn&apos;t load fill history right now.
                 </div>
               ) : fillHistory.filter(item => item.solver === solver.address).length === 0 ? (
-                <div className="p-6 sm:p-8 text-center text-sm text-vx-muted">
-                  No fills from this solver in the history.
+                <div className="p-6 sm:p-8 text-center">
+                  <p className="text-sm font-medium text-vx-text mb-1">
+                    {t("solverDetail.fillHistory.empty.title")}
+                  </p>
+                  <p className="text-xs text-vx-muted max-w-xs mx-auto">
+                    {t("solverDetail.fillHistory.empty.message")}
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-vx-line">
@@ -153,8 +159,8 @@ export default function SolverDetailPage({ params }: { params: { address: string
                     .filter(item => item.solver === solver.address)
                     .slice(0, 10)
                     .map(fill => (
-                      <div 
-                        key={fill.id} 
+                      <div
+                        key={fill.id}
                         className="px-4 sm:px-5 py-4 hover:bg-vx-surface/30 transition-colors"
                       >
                         <div className="flex flex-col gap-2">

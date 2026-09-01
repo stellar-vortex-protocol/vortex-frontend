@@ -18,6 +18,12 @@ Closes #
 - [ ] `npx tsc --noEmit` passes
 - [ ] `npm test` passes (or note any skipped/unrelated failures)
 
+## Preview
+
+🚀 **Live Preview**: A staging preview will automatically deploy once CI completes. The preview URL will appear as a comment below. Visit it to visually review your changes against the staging backend.
+
+> **Note**: Fork PRs cannot use preview deployments for security reasons. Please run `npm run dev` locally to test.
+
 ## Checklist
 
 - [ ] Self-reviewed the diff
