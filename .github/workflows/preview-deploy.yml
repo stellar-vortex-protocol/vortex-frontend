@@ -1,0 +1,140 @@
+name: Deploy PR Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  deploy-preview:
+    name: Deploy to Preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check if fork PR
+        id: fork-check
+        run: |
+          if [ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
+            echo "is-fork=true" >> $GITHUB_OUTPUT
+            echo "fork-owner=${{ github.event.pull_request.head.repo.owner.login }}" >> $GITHUB_OUTPUT
+          else
+            echo "is-fork=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for preview
+        id: build
+        env:
+          # Use staging/non-production backends for PR previews
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_PREVIEW_API_URL || 'https://api.testnet.example.com' }}
+          NEXT_PUBLIC_WS_URL: ${{ secrets.NEXT_PUBLIC_PREVIEW_WS_URL || 'wss://api.testnet.example.com/ws' }}
+          NEXT_PUBLIC_NETWORK: ${{ secrets.NEXT_PUBLIC_PREVIEW_NETWORK || 'testnet' }}
+          NEXT_PUBLIC_SETTLEMENT_CONTRACT: ${{ secrets.NEXT_PUBLIC_PREVIEW_SETTLEMENT_CONTRACT }}
+          NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_PREVIEW_SOLVER_REGISTRY_CONTRACT }}
+        run: |
+          npm run build
+          echo "build-timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Vercel Preview
+        id: vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_PREVIEW_API_URL || 'https://api.testnet.example.com' }}
+          NEXT_PUBLIC_WS_URL: ${{ secrets.NEXT_PUBLIC_PREVIEW_WS_URL || 'wss://api.testnet.example.com/ws' }}
+          NEXT_PUBLIC_NETWORK: ${{ secrets.NEXT_PUBLIC_PREVIEW_NETWORK || 'testnet' }}
+          NEXT_PUBLIC_SETTLEMENT_CONTRACT: ${{ secrets.NEXT_PUBLIC_PREVIEW_SETTLEMENT_CONTRACT }}
+          NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_PREVIEW_SOLVER_REGISTRY_CONTRACT }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "deployment-url=CREDENTIALS_MISSING" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          npm install -g vercel
+
+          # Deploy with PR context for preview environment
+          PREVIEW_URL=$(vercel deploy \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_ORG_ID \
+            --project-id=$VERCEL_PROJECT_ID \
+            --meta pr=${{ github.event.pull_request.number }} \
+            2>&1 | tail -1 || echo "DEPLOYMENT_FAILED")
+
+          if [ "$PREVIEW_URL" != "DEPLOYMENT_FAILED" ] && [ "$PREVIEW_URL" != "CREDENTIALS_MISSING" ]; then
+            echo "deployment-url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+            echo "deployment-success=true" >> $GITHUB_OUTPUT
+          else
+            echo "deployment-success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR - Fork PR
+        if: steps.fork-check.outputs.is-fork == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### 🔗 Preview Deployment\n\n⚠️ **Fork PR detected**: Preview deployments are not available for pull requests from forks. This is a security measure to prevent exposing sensitive deployment credentials.\n\n**To review changes:**\n1. Clone the repository\n2. Checkout this PR's branch\n3. Run \`npm run dev\` locally\n4. Test with your local backend\n\nThank you for contributing! 🙏`
+            });
+
+      - name: Comment on PR - Preview Ready
+        if: steps.fork-check.outputs.is-fork == 'false' && steps.vercel.outputs.deployment-success == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### 🚀 Preview Deployment Ready\n\n✅ **Live Preview**: [${{ steps.vercel.outputs.deployment-url }}](${{ steps.vercel.outputs.deployment-url }})\n\n**Backend**: Staging/Testnet\n**Built**: ${{ steps.build.outputs.build-timestamp }}\n\nYou can now view this PR's changes in a live environment. The preview will update automatically as you push new commits.`
+            });
+
+      - name: Comment on PR - Deployment Failed
+        if: steps.fork-check.outputs.is-fork == 'false' && steps.vercel.outputs.deployment-success == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### ⚠️ Preview Deployment Failed\n\n❌ **Status**: Deployment encountered an error\n\n**Troubleshooting:**\n- Check that all required secrets are configured in repository settings\n- Verify the build completed successfully in the CI logs\n- Contact maintainers if the issue persists\n\nYou can review the changes by cloning and running locally with \`npm run dev\`.`
+            });
+
+      - name: Comment on PR - Credentials Missing
+        if: steps.fork-check.outputs.is-fork == 'false' && steps.vercel.outputs.deployment-url == 'CREDENTIALS_MISSING'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### ℹ️ Preview Deployment Unavailable\n\n**Reason**: Deployment credentials not configured\n\nThe maintainers need to set up Vercel integration by configuring:\n- \`VERCEL_TOKEN\`\n- \`VERCEL_ORG_ID\`\n- \`VERCEL_PROJECT_ID\`\n\nTo review these changes, clone the repository and run \`npm run dev\` locally.`
+            });

@@ -60,6 +60,68 @@ npm run dev    # http://localhost:3000
 | `NEXT_PUBLIC_SETTLEMENT_CONTRACT` | Settlement contract ID from `vortex-contract` deployment |
 | `NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT` | Solver registry contract ID from `vortex-contract` deployment |
 
+---
+
+## Deployment
+
+### Automated Production Deployment
+
+This repository includes a GitHub Actions workflow (`.github/workflows/deploy.yml`) that automatically deploys the application to Vercel on every merge to `main`.
+
+### Setup Production Deployment
+
+To enable automated deployments, configure the following secrets in your GitHub repository settings:
+
+**Vercel Secrets:**
+- `VERCEL_TOKEN` — Vercel API token ([create here](https://vercel.com/account/tokens))
+- `VERCEL_ORG_ID` — Your Vercel organization ID
+- `VERCEL_PROJECT_ID` — Your Vercel project ID
+
+**Environment Variables (production):**
+- `NEXT_PUBLIC_API_URL` — Production `vortex-backend` relay URL
+- `NEXT_PUBLIC_WS_URL` — Production WebSocket URL
+- `NEXT_PUBLIC_NETWORK` — Production Stellar network
+- `NEXT_PUBLIC_SETTLEMENT_CONTRACT` — Production contract ID
+- `NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT` — Production contract ID
+
+### Deployment Process
+
+1. **Build**: Code is compiled and Next.js build artifacts are generated
+2. **Deploy**: Artifacts are deployed to Vercel using production environment variables
+3. **Verification**: Deployment status is recorded and summarized in the GitHub Actions log
+
+The workflow runs only on merges to `main`, not on every PR.
+
+### PR Preview Deployments
+
+Pull requests automatically receive live preview deployments to facilitate visual review. Each PR preview:
+
+- **Updates automatically** as new commits are pushed
+- **Uses staging backend** (testnet) to isolate testing from production
+- **Includes a comment** with the preview URL when deployment succeeds
+- **Gracefully handles** fork PRs by explaining local setup instead
+
+#### Fork PR Limitations
+
+For security, pull requests from forks do not receive preview deployments. This prevents exposing deployment credentials. Contributors from forks can:
+
+1. Clone the repository
+2. Checkout the PR branch
+3. Run `npm run dev` locally with their own `.env.local` configuration
+4. Test changes with a local backend instance
+
+#### Setup PR Preview
+
+PR previews require the same Vercel configuration as production deployments (see section above). Additionally, you can configure staging-specific environment variables:
+
+- `NEXT_PUBLIC_PREVIEW_API_URL` — Staging backend URL
+- `NEXT_PUBLIC_PREVIEW_WS_URL` — Staging WebSocket URL
+- `NEXT_PUBLIC_PREVIEW_NETWORK` — Staging network (e.g., `testnet`)
+- `NEXT_PUBLIC_PREVIEW_SETTLEMENT_CONTRACT` — Staging contract ID
+- `NEXT_PUBLIC_PREVIEW_SOLVER_REGISTRY_CONTRACT` — Staging contract ID
+
+If preview-specific variables are not set, the workflow uses sensible defaults pointing to testnet.
+
 ### Scripts
 
 | Script | Description |
