@@ -1,6 +1,7 @@
 "use client";
 
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
+import { sanitizeDisplayText } from "@/lib/textSafety";
 
 export function CopyButton({ value, label = "Copy to clipboard" }: { value: string; label?: string }) {
   const { copy } = useCopyToClipboard();
@@ -8,7 +9,9 @@ export function CopyButton({ value, label = "Copy to clipboard" }: { value: stri
   return (
     <button
       type="button"
-      onClick={() => copy(value)}
+      // Sanitize before copying: strip bidi-override and zero-width characters
+      // so what goes into the clipboard is the visually honest string.
+      onClick={() => copy(sanitizeDisplayText(value))}
       aria-label={label}
       className="inline-flex items-center justify-center text-vx-muted hover:text-vx-text transition-colors
                  focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-sage rounded"

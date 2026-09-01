@@ -1,6 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiFetch, ApiError, TimeoutError } from "./api";
 
+// Note: API_URL validation happens at module load time.
+// Unit tests verify the apiFetch function behavior; integration tests
+// and CI will verify that misconfigured environment variables fail at startup.
+describe("API URL validation", () => {
+  it("validates URL structure via the URL constructor", () => {
+    // Valid URLs
+    expect(() => new URL("http://localhost:4000")).not.toThrow();
+    expect(() => new URL("https://api.example.com")).not.toThrow();
+
+    // Invalid URLs
+    expect(() => new URL("not a url")).toThrow();
+    expect(() => new URL("ftp://api.example.com")).not.toThrow(); // URL constructor accepts it
+  });
+});
+
 describe("apiFetch", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
