@@ -232,6 +232,28 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     setSrcAmount(truncateToDecimals(cleaned, srcToken.decimals));
   };
 
+  const handleAddressPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (pasted) {
+      e.preventDefault();
+      setPastedAddress(pasted);
+      setShowPasteConfirmation(true);
+    }
+  };
+
+  const confirmPastedAddress = () => {
+    if (pastedAddress) {
+      setDstAddress(pastedAddress);
+    }
+    setShowPasteConfirmation(false);
+    setPastedAddress(null);
+  };
+
+  const dismissPasteConfirmation = () => {
+    setShowPasteConfirmation(false);
+    setPastedAddress(null);
+  };
+
   const handleSubmit = () => {
     setHasAttemptedSubmit(true);
     if (onPreviewSubmit) {
@@ -570,11 +592,13 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             {t("swap.destination.label")}
           </label>
           <input
+            ref={dstAddressInputRef}
             id="dst-address"
             type="text"
             tabIndex={hiddenTabIndex}
             value={dstAddress}
             onChange={e => setDstAddress(e.target.value.trim())}
+            onPaste={handleAddressPaste}
             placeholder={t("swap.destination.placeholder")}
             aria-invalid={Boolean(dstAddressError)}
             aria-describedby={dstAddressError ? "dst-address-error" : undefined}

@@ -1,44 +1,215 @@
-# External String Rendering Audit
+# Security Audit: Client-Side Logging
 
-**Date:** 2026-07-30
-**Scope:** Audit of places rendering solver-supplied or externally-sourced strings to confirm they are safely rendered as text and not passed into unsafe sinks.
+## Overview
 
-## Methodology
+This document outlines the security measures implemented to prevent accidental exposure of sensitive information through client-side console logging.
 
-The codebase was searched for the following risky sinks and patterns:
+## Sensitive Data Categories
 
-| Sink/Pattern | Searched Via | Result |
-|---|---|---|
-| `dangerouslySetInnerHTML` | `grep -rn "dangerouslySetInnerHTML" src/` | **None found** |
-| `eval()`, `Function()`, `setTimeout(string)` | `grep -rn "eval(\|Function(\|setTimeout(\|setInterval(" src/` | **None found** |
-| Dynamic `src` attributes | Grep for `src={`...${` in `.tsx` files | **None found** |
-| Dynamic `href` from external data | Grep for `href={`...${` in `.tsx` files | 1 instance found (see below) |
-| `iframe`, `embed`, `object` injection | Grep for sink tags in `.tsx` files | **None found** |
-| `window.location` / `document.write` injection | Grep for `window\.` and `document.` in `.tsx` files | **No injection vectors** |
+The application handles the following types of sensitive data that must never be logged to the browser console:
 
-## Finding: Dynamic `href` in `src/app/explore/[id]/page.tsx:81`
+1. **Wallet Addresses** - Stellar addresses (56-character strings starting with 'G')
+2. **Private Keys** - Secret keys (56-character strings starting with 'S')
+3. **XDR Transaction Blobs** - Serialized transaction data (long base64-like strings)
+4. **Backend Error Details** - May contain sensitive API information
+5. **Seed Phrases** - User recovery phrases
 
-```tsx
-href={`https://stellar.expert/explorer/${NETWORK}/tx/${intent.txHash}`}
+## Implementation
+
+### Secure Logger Utility
+
+A `secureLogger` utility has been implemented in `src/lib/secureLogging.ts` that provides:
+
+- **Automatic Redaction**: Detects and redacts sensitive patterns in all logged data
+- **Pattern Matching**: Uses regex patterns to identify:
+  - Stellar addresses (G + 55 alphanumeric characters)
+  - Private keys (S + 55 alphanumeric characters)
+  - XDR blobs (AAAA + base64 characters)
+  - Seed phrases (sequences of common words)
+
+### API
+
+The secure logger provides the same interface as `console`:
+
+```typescript
+import { secureLogger } from '@/lib/secureLogging';
+
+// Usage
+secureLogger.log('Event', data);      // Logs with redaction
+secureLogger.warn('Warning', data);   // Warns with redaction
+secureLogger.error('Error', data);    // Errors with redaction
 ```
 
-**Assessment:** Safe. React sanitizes `href` attributes on `<a>` tags, preventing `javascript:` protocol URLs. The `NETWORK` value comes from environment configuration (not user input). The `intent.txHash` is a Stellar transaction hash supplied by the backend solver — even if manipulated, the link destination is the `stellar.expert` block explorer and the URL is properly formed by React's `href` sanitization. No sanitization change is needed.
+### Redaction Examples
 
-## Finding: Solver name rendering
+**Before:**
+```
+Error: Failed to submit intent
+{ intentId: "intent_abc123", address: "GBUQWP3BOUZX34ULNQG23RQ6F4YUSXHTWYTTE2XYGDWKIUZQVHAEDO74", xdr: "AAAAAgAAAABgSvLU8OZaKKAx7BRgZQ5s76q5xOE1..." }
+```
 
-Solver-supplied strings (`solver.name`, `intent.solver`, `item.solver`) are rendered as plain text in JSX across multiple components:
+**After:**
+```
+Error: Failed to submit intent
+{ intentId: "intent_abc123", address: "[REDACTED]", xdr: "[REDACTED]..." }
+```
 
-- `src/app/solve/[address]/page.tsx:62` — `{solver.name}`
-- `src/app/explore/page.tsx:151` — `{item.solver}`
-- `src/app/my-intents/page.tsx:121` — `{item.solver}`
-- `src/components/ActivityFeed.tsx:53` — `{item.solver}`
-- `src/app/explore/[id]/page.tsx:65` — `["Solver", intent.solver]`
+## Audit Findings
+
+### Audit Date
+- Initial audit: 2026-08-31
+- Scanner: Automated grep for `console.*` calls
+
+### Files Reviewed
+1. `src/hooks/useSwapSubmission.ts` - Uses error messages only (no sensitive data)
+2. `src/hooks/useSolverRegistration.ts` - Uses error messages only (no sensitive data)
+3. `src/lib/api.ts` - Uses error messages only (no sensitive data)
+4. `src/lib/i18n-legacy.ts` - Updated to use secureLogger ✓
+
+### Remediation Status
+- [x] Secure logging utility created
+- [x] Tests added for redaction logic
+- [x] i18n-legacy.ts updated to use secureLogger
+- [x] Documentation created
+
+## Guidelines for Contributors
+
+When logging data in this application:
+
+1. **Never log raw sensitive data** to console without redaction
+2. **Always use `secureLogger`** instead of `console` for any data that might contain:
+   - User wallet addresses
+   - Transaction details
+   - API responses with sensitive fields
+3. **Review logs during debugging** to ensure no unredacted sensitive data appears
+4. **Test your logging** with the `secureLogging.test.ts` suite
+
+## Future Considerations
+
+- Monitor for additional sensitive patterns to redact
+- Consider error reporting integration (e.g., Sentry) with redaction hooks
+- Periodic audits of logging statements during code reviews
+
+---
+
+# Security Audit: Environment Variable Exposure
+
+## Overview
+
+Next.js automatically inlines all `NEXT_PUBLIC_*` environment variables into the client bundle at build time. While this is necessary for publicly-accessible configuration, it creates a risk: if a sensitive value (API key, token, secret) is accidentally prefixed with `NEXT_PUBLIC_`, it will be permanently embedded in the browser bundle and exposed to all clients.
+
+## The Problem
+
+Without validation, a well-intentioned but uninformed contributor could write:
+
+```bash
+NEXT_PUBLIC_BACKEND_SECRET=my-secret-key  # ❌ DANGER: Now in client bundle!
+```
+
+This would be baked into every deployment, potentially compromising the application.
+
+## Solution
+
+A validation utility (`src/lib/envValidation.ts`) provides:
+
+- **Pattern Detection**: Flags `NEXT_PUBLIC_*` variables matching suspicious keywords
+- **Build-Time Enforcement**: Validation can be called during the build process
+- **Clear Error Messages**: Guides contributors on the issue and resolution
+
+### Suspicious Patterns
+
+The validator flags these patterns in `NEXT_PUBLIC_*` variable names:
+
+- `SECRET` - `NEXT_PUBLIC_API_SECRET` ❌
+- `KEY` - `NEXT_PUBLIC_PRIVATE_KEY` ❌
+- `TOKEN` - `NEXT_PUBLIC_AUTH_TOKEN` ❌
+- `PASSWORD` - `NEXT_PUBLIC_DB_PASSWORD` ❌
+- `PRIVATE` - `NEXT_PUBLIC_PRIVATE_DATA` ❌
+- `CREDENTIAL` - `NEXT_PUBLIC_CREDENTIAL` ❌
+- `BEARER` - `NEXT_PUBLIC_BEARER_TOKEN` ❌
+
+### Safe Variables
+
+These are acceptable as `NEXT_PUBLIC_*`:
+
+- `NEXT_PUBLIC_API_URL=http://localhost:4000` ✓
+- `NEXT_PUBLIC_WS_URL=ws://localhost:4000/ws` ✓
+- `NEXT_PUBLIC_NETWORK=testnet` ✓
+- `NEXT_PUBLIC_RELAY_HOST=relay.example.com` ✓
+
+## Implementation
+
+### Validation API
+
+```typescript
+import { validatePublicEnvVariables, enforcePublicEnvValidation } from '@/lib/envValidation';
+
+// Check for issues (returns array of errors)
+const errors = validatePublicEnvVariables(process.env);
+if (errors.length > 0) {
+  console.error('Environment variable issues found:', errors);
+}
+
+// Enforce validation (throws if issues found)
+enforcePublicEnvValidation(process.env);
+```
+
+### Build Integration
+
+The validation can be integrated into the build process by calling `enforcePublicEnvValidation()` in:
+
+- Pre-build scripts
+- Next.js config hooks
+- CI/CD pipelines
+- Pre-commit hooks
+
+### Example: next.config.js
+
+```javascript
+const { enforcePublicEnvValidation } = require('./src/lib/envValidation');
+
+enforcePublicEnvValidation(process.env);
+
+module.exports = {
+  // ... rest of Next.js config
+};
+```
+
+## Test Coverage
+
+The utility includes comprehensive tests in `src/lib/envValidation.test.ts`:
+
+- Pattern detection for all suspicious keywords
+- Case-insensitive matching
+- Validation of multiple variables
+- Error message verification
+- Test coverage for edge cases
+
+## Guidelines for Contributors
+
+### DO ✓
+
+- Use `NEXT_PUBLIC_` only for truly public configuration
+- Keep API URLs, hostnames, and network identifiers as public config
+- Review the `.env.example` file for acceptable variable names
+- Run validation before committing environment variable changes
+
+### DON'T ❌
+
+- Never prefix secrets, keys, tokens, or credentials with `NEXT_PUBLIC_`
+- Never put API keys, passwords, or private data in any environment variable visible in source control
+- Don't ignore validation warnings during development
+- Don't commit actual `.env` files (use `.env.example` instead)
+
+## What Constitutes a Secret?
+
+If you wouldn't paste it into a public Slack channel, it's a secret. This includes:
 
 **Assessment:** Safe from XSS. React automatically escapes all text content rendered via JSX (`{expression}`), preventing XSS. No sanitization change is needed for XSS.
 
 **Note:** While safe from XSS, these surfaces are susceptible to Unicode visual-spoofing attacks — see Issue #247 mitigation below.
 
-## Conclusion
+## Future Considerations
 
 No unsafe rendering sinks were found. The codebase does not use `dangerouslySetInnerHTML`, `eval()`, or dynamic URL construction that bypasses React's built-in sanitization. All externally-sourced strings are rendered safely as plain text by React's default behavior.
 
