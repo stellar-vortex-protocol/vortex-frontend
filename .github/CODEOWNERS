@@ -1,0 +1,32 @@
+# CODEOWNERS file for vortex-frontend
+# This file assigns review responsibilities based on code paths
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repository
+* @Barbieple-Devstem
+
+# Critical paths requiring explicit review
+
+# Wallet storage and state management
+/src/store/wallet.ts @Barbieple-Devstem
+/src/store/wallet.test.ts @Barbieple-Devstem
+
+# API logic and external communication
+/src/lib/api.ts @Barbieple-Devstem
+/src/lib/api.test.ts @Barbieple-Devstem
+
+# Swap functionality and hooks
+/src/hooks/useSwap* @Barbieple-Devstem
+/src/hooks/swap* @Barbieple-Devstem
+
+# Solver registration and related logic
+/src/lib/solver* @Barbieple-Devstem
+/src/hooks/useSolver* @Barbieple-Devstem
+
+# Workflows and CI/CD configuration
+/.github/workflows/ @Barbieple-Devstem
+/.github/dependabot.yml @Barbieple-Devstem
+
+# Security and documentation
+/docs/SECURITY.md @Barbieple-Devstem
+/.github/CODEOWNERS @Barbieple-Devstem

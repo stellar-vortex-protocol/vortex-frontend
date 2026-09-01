@@ -39,7 +39,7 @@ describe("useMyLiveIntents", () => {
   });
 
   it("prepends a live message ahead of the REST list, deduped by id", () => {
-    const liveItem: FeedItem = { ...restItems[0], id: "live-1", solver: "Beta" };
+    const liveItem: FeedItem = { ...restItems[0]!, id: "live-1", solver: "Beta" };
     useMyIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: liveItem });
 
@@ -68,7 +68,7 @@ describe("useMyLiveIntents", () => {
   });
 
   it("updates status when a live message arrives", () => {
-    const initialItem: FeedItem = { ...restItems[0], status: "pending" };
+    const initialItem: FeedItem = { ...restItems[0]!, status: "pending" };
     const updatedItem: FeedItem = { ...initialItem, status: "filled" };
 
     useMyIntentsMock.mockReturnValue({ intents: [initialItem], isLoading: false, error: undefined });
@@ -76,6 +76,6 @@ describe("useMyLiveIntents", () => {
 
     const { result } = renderHook(() => useMyLiveIntents(address));
 
-    expect(result.current.intents[0].status).toBe("filled");
+    expect(result.current.intents[0]!.status).toBe("filled");
   });
 });

@@ -10,9 +10,7 @@ const initialWalletState = useWalletStore.getState();
 
 /** Wrap Nav in I18nProvider so locale context is available. */
 function renderNav(props: Parameters<typeof Nav>[0]) {
-  return render(
-    createElement(I18nProvider, { locale: "en" }, createElement(Nav, props))
-  );
+  return render(<I18nProvider locale="en"><Nav {...props} /></I18nProvider>);
 }
 
 describe("Nav", () => {
@@ -24,6 +22,7 @@ describe("Nav", () => {
     renderNav({ variant: "home" });
     expect(screen.getByText("Explore")).toBeInTheDocument();
     expect(screen.getByText("Become a Solver")).toBeInTheDocument();
+    expect(screen.getByText("Contributors")).toBeInTheDocument();
     expect(screen.getByText("Connect Freighter")).toBeInTheDocument();
   });
 
@@ -157,7 +156,7 @@ describe("Nav", () => {
       renderNav({ variant: "home" });
 
       await user.click(screen.getByLabelText("Open menu"));
-      const mobileMyIntentsLink = screen.getAllByRole("link", { name: "My Intents" })[1];
+      const mobileMyIntentsLink = screen.getAllByRole("link", { name: "My Intents" })[1]!;
       await user.click(mobileMyIntentsLink);
 
       expect(screen.getByLabelText("Open menu")).toBeInTheDocument();
