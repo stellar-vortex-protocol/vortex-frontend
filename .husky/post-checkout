@@ -1,0 +1,15 @@
+#!/bin/sh
+# Validate Node version matches .nvmrc
+
+REQUIRED_NODE_VERSION=$(cat .nvmrc)
+CURRENT_NODE_VERSION=$(node --version | sed 's/^v//')
+
+if [ "$CURRENT_NODE_VERSION" != "$REQUIRED_NODE_VERSION" ]; then
+  echo "⚠️  Node version mismatch!"
+  echo "   Required: v$REQUIRED_NODE_VERSION (from .nvmrc)"
+  echo "   Current:  v$CURRENT_NODE_VERSION"
+  echo ""
+  echo "   Please switch to Node v$REQUIRED_NODE_VERSION using your version manager"
+  echo "   (nvm use, fnm use, volta, asdf, etc.)"
+  exit 1
+fi

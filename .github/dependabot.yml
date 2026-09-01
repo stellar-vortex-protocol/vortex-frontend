@@ -9,6 +9,15 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      major-updates:
+        update-types:
+          - "major"
+        patterns:
+          - "@stellar/freighter-api"
+          - "@stellar/stellar-sdk"
+          - "next"
+          - "react"
+          - "react-dom"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -19,3 +28,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      major-updates:
+        update-types:
+          - "major"

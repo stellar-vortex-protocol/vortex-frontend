@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: '.nvmrc'
           cache: 'npm'
       - name: Check dependencies for supply-chain security (Issue #311)
         run: node scripts/check-dependencies.mjs
@@ -45,6 +45,14 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+      - run: npx playwright install --with-deps
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
       - run: npm run build
       - run: node scripts/check-bundle-size.mjs
       - name: Build with bundle analysis

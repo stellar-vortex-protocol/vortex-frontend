@@ -43,8 +43,26 @@ registrations. Part of the multi-repo Vortex stack — see also
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20 (specified in `.nvmrc`)
 - A running [`vortex-backend`](https://github.com/stellar-vortex-protocol/vortex-backend) relay (set its URL in `.env.local`)
+
+#### Node Version Setup
+
+This project enforces Node.js version 20. The `.nvmrc` file specifies the required version, and husky hooks will validate it on checkout.
+
+If you use a Node version manager (nvm, fnm, volta, asdf, etc.), install the correct version:
+
+```bash
+# For nvm
+nvm install && nvm use
+
+# For fnm
+fnm use
+
+# For other managers, see their documentation
+```
+
+Then proceed with setup:
 
 ```bash
 npm install
