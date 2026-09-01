@@ -72,7 +72,7 @@ describe("SwapCard", () => {
     expect(screen.getByRole("button", { name: "XLM" })).toHaveAttribute("aria-pressed");
   });
 
-  it("opening the chain picker with the keyboard moves focus into it, not into the hidden card behind it", async () => {
+  it("opening the chain picker with the keyboard moves focus into its search field", async () => {
     const user = userEvent.setup();
     renderSwapCard();
 
@@ -80,11 +80,8 @@ describe("SwapCard", () => {
     chainToggle.focus();
     await user.keyboard("{Enter}");
 
-    const dialog = screen.getByRole("dialog", { name: "Select source chain" });
-    expect(dialog).toContainElement(document.activeElement as HTMLElement);
-
-    const mainCard = screen.getByLabelText("Amount to swap").closest(".card");
-    expect(mainCard).toHaveAttribute("aria-hidden", "true");
+    const listbox = screen.getByRole("listbox", { name: "Select source chain" });
+    expect(listbox.parentElement).toContainElement(document.activeElement as HTMLElement);
   });
 
   it("closes the chain picker with Escape and returns focus to the toggle button", async () => {
@@ -93,11 +90,11 @@ describe("SwapCard", () => {
 
     const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
     await user.click(chainToggle);
-    expect(screen.getByRole("dialog", { name: "Select source chain" })).toBeInTheDocument();
+    expect(screen.getByRole("listbox", { name: "Select source chain" })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(chainToggle).toHaveFocus();
   });
 
@@ -108,11 +105,10 @@ describe("SwapCard", () => {
     const chainToggle = screen.getByRole("button", { name: "Source chain, currently Ethereum" });
     await user.click(chainToggle);
 
-    const baseOption = screen.getByRole("button", { name: "Base" });
-    baseOption.focus();
-    await user.keyboard("{Enter}");
+    // Chains are listed as Ethereum, Base, … — one ArrowDown moves the roving index onto Base.
+    await user.keyboard("{ArrowDown}{Enter}");
 
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Source chain, currently Base" })).toHaveFocus();
   });
 

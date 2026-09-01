@@ -169,7 +169,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       return;
     }
 
-    if (quote && quoteFetchedAt && Date.now() - quoteFetchedAt > STALE_QUOTE_THRESHOLD_MS) {
+    if (quoteIsStale) {
       useToastStore.getState().addToast(t("swap.quote.staleWarning"), "error");
       return;
     }
@@ -513,6 +513,23 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                 {t("swap.quote.highPriceImpactWarning", { threshold: HIGH_PRICE_IMPACT_THRESHOLD_PCT })}
               </p>
             )}
+            {quoteFetchedAt && !quoteIsStale && quoteExpiresInSeconds !== null && quoteExpiresInSeconds <= 5 && (
+              <p role="status" className="text-xs text-amber-300">
+                {t("swap.quote.expiresIn", { seconds: quoteExpiresInSeconds })}
+              </p>
+            )}
+            {quoteIsStale && (
+              <div className="flex items-center justify-between gap-2">
+                <p role="alert" className="text-xs text-amber-300">{t("swap.quote.expired")}</p>
+                <button
+                  type="button"
+                  onClick={() => refreshQuote()}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-vx-sage/30 bg-vx-sage-bg text-vx-sage hover:bg-vx-sage/15 transition-colors"
+                >
+                  {t("swap.quote.refreshCta")}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -624,6 +641,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               </svg>
               {t("swap.submit.findingRoute")}
             </span>
+          ) : quoteIsStale ? (
+            t("swap.quote.expired")
           ) : canSwap ? (
             t(submission.status === "error" ? "swap.submit.retryCta" : "swap.submit.cta", {
               amount: srcAmount,

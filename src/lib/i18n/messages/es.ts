@@ -1,6 +1,14 @@
 // Spanish (es) message catalog.
 // Keys must stay in sync with en.ts — the test suite enforces this.
 export const es = {
+  "nav.branding": "Vortex",
+  "nav.explore": "Explorar",
+  "nav.becomeSolver": "Conviértete en Solver",
+  "nav.docs": "Documentación",
+  "nav.myIntents": "Mis Intenciones",
+  "nav.openMenu": "Abrir menú",
+  "nav.closeMenu": "Cerrar menú",
+
   "wallet.connect.cta": "Conectar Freighter",
   "wallet.connect.connecting": "Conectando...",
   "wallet.connect.retry": "Reintentar conexión",
@@ -37,6 +45,7 @@ export const es = {
   "swap.slippage.label": "Tolerancia de deslizamiento",
   "swap.slippage.inputLabel": "Porcentaje de tolerancia de deslizamiento",
   "swap.slippage.minOut": "Mínimo recibido: {amount} {token}",
+  "swap.slippage.zeroWarning": "Un deslizamiento del 0% puede hacer que tu swap falle ante cualquier movimiento de precio.",
 
   "swap.quote.solver": "Mejor solver",
   "swap.quote.fillTime": "Tiempo estimado",

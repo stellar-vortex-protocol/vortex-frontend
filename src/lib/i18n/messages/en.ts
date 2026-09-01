@@ -1,6 +1,14 @@
 // Source-of-truth message catalog. Keys are dot-namespaced by feature; values
 // may contain {placeholder} tokens that are filled in at render time.
 export const en = {
+  "nav.branding": "Vortex",
+  "nav.explore": "Explore",
+  "nav.becomeSolver": "Become a Solver",
+  "nav.docs": "Docs",
+  "nav.myIntents": "My Intents",
+  "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
+
   "wallet.connect.cta": "Connect Freighter",
   "wallet.connect.connecting": "Connecting...",
   "wallet.connect.retry": "Retry Connection",
@@ -36,6 +44,7 @@ export const en = {
   "swap.slippage.label": "Slippage tolerance",
   "swap.slippage.inputLabel": "Slippage tolerance percent",
   "swap.slippage.minOut": "Min out: {amount} {token}",
+  "swap.slippage.zeroWarning": "0% slippage may cause your swap to fail if the price moves at all.",
 
   "swap.quote.solver": "Best solver",
   "swap.quote.fillTime": "Est. fill time",

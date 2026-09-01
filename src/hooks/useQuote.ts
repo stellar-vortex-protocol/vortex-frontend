@@ -31,7 +31,7 @@ function classifyQuoteError(err: unknown): QuoteErrorType {
 
 export function useQuote(params: QuoteRequest | null) {
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<number | null>(null);
-  const { data, error, isLoading } = useSWR<Quote>(quoteKey(params), fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<Quote>(quoteKey(params), fetcher, {
     revalidateOnFocus: false,
     onSuccess(data) {
       setQuoteFetchedAt(Date.now());

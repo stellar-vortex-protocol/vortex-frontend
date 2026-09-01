@@ -56,7 +56,7 @@ export function Nav(props: NavProps) {
           <div className="flex items-center gap-8">
             <div className="flex items-center gap-2">
               <VortexLogo className="w-6 h-6 text-vx-sage" />
-              <span className="font-semibold text-sm tracking-tight text-vx-text">{getMessage("nav.branding")}</span>
+              <span className="font-semibold text-sm tracking-tight text-vx-text">{t("nav.branding")}</span>
             </div>
             <div className="hidden md:flex items-center gap-5 text-sm text-vx-muted">
               {NAV_LINKS.map((link) => (
@@ -82,7 +82,7 @@ export function Nav(props: NavProps) {
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2">
               <VortexLogo className="w-5 h-5 text-vx-sage" />
-              <span className="font-semibold text-sm text-vx-text">{getMessage("nav.branding")}</span>
+              <span className="font-semibold text-sm text-vx-text">{t("nav.branding")}</span>
             </Link>
             <span className="text-vx-dim">/</span>
             <span className="text-sm text-vx-muted">{props.label}</span>
@@ -121,7 +121,7 @@ export function Nav(props: NavProps) {
               onClick={closeMobileMenu}
               className={`py-2 text-sm transition-colors ${pathname === link.href ? "text-vx-text" : "text-vx-muted hover:text-vx-text active:text-vx-sage"}`}
             >
-              {getMessage(`nav.${link.label}`)}
+              {t(`nav.${link.label}`)}
             </Link>
           ))}
           {isConnected && (
@@ -130,7 +130,7 @@ export function Nav(props: NavProps) {
               onClick={() => setMobileOpen(false)}
               className={`py-2 text-sm transition-colors ${pathname === "/my-intents" ? "text-vx-text" : "text-vx-muted hover:text-vx-text"}`}
             >
-              My Intents
+              {t("nav.myIntents")}
             </Link>
           )}
           <a
@@ -138,7 +138,7 @@ export function Nav(props: NavProps) {
             onClick={() => setMobileOpen(false)}
             className="py-2 text-sm text-vx-muted hover:text-vx-text transition-colors"
           >
-            {getMessage("nav.docs")}
+            {t("nav.docs")}
           </a>
         </div>
       )}
