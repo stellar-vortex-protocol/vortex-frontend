@@ -78,3 +78,28 @@ the only call that pops the Freighter approval UI. That call only happens in
 strictly a read of already-granted access — if the extension would need to
 prompt the user, hydration clears the session instead of prompting silently on
 page load.
+
+## Multi-tab reconciliation (#302)
+
+`useWalletStore` persists to `localStorage` under `PERSIST_KEY` (`vortex-wallet`).
+The browser's `storage` event fires in **every other same-origin tab** whenever
+one tab writes that key, so [`WalletHydrator`](../src/components/WalletHydrator.tsx)
+also registers a `storage` listener (once, alongside the mount-time `hydrate()`).
+
+When another tab changes the persisted wallet slice, the listener parses the new
+value and calls `useWalletStore.getState().syncFromStorage(persisted)`:
+
+- **Already in sync** (`isConnected` and `address` match this tab) — no-op. This
+  is what prevents a reconciliation loop: a tab's own reconciling write lands in
+  the other tabs as a `storage` event, but by then every tab already agrees, so
+  nothing further is written.
+- **Another tab disconnected** (`persisted.isConnected === false`) — trusted
+  directly; this tab clears its wallet state. A user-initiated disconnect is
+  authoritative and there's nothing to re-verify.
+- **Another tab connected or switched account** — the new address is adopted
+  optimistically and then `hydrate()` re-confirms it against the extension
+  (`isConnected` / `isAllowed` / `getPublicKey`), so a tab never trusts an
+  account it can't verify.
+
+The `storage` event never fires in the tab that made the change, so the
+originating tab keeps the correct state from its own `set()` and is unaffected.

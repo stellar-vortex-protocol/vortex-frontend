@@ -5,6 +5,7 @@ node_modules/
 
 # Next.js / build output
 .next/
+.next-analyze/
 out/
 build/
 storybook-static/
@@ -30,4 +31,5 @@ npm-debug.log*
 # Test / coverage
 coverage/
 playwright-report/
+blob-report/
 test-results/

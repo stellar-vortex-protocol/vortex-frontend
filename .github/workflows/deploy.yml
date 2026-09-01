@@ -1,0 +1,139 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deployment-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build-id: ${{ steps.build.outputs.build-id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        id: build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_WS_URL: ${{ secrets.NEXT_PUBLIC_WS_URL }}
+          NEXT_PUBLIC_NETWORK: ${{ secrets.NEXT_PUBLIC_NETWORK }}
+          NEXT_PUBLIC_SETTLEMENT_CONTRACT: ${{ secrets.NEXT_PUBLIC_SETTLEMENT_CONTRACT }}
+          NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT }}
+        run: |
+          npm run build
+          echo "build-id=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-build-${{ steps.build.outputs.build-id }}
+          path: .next
+          retention-days: 1
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      deployments: write
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-build-${{ needs.build.outputs.build-id }}
+          path: .next
+
+      - name: Deploy to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_WS_URL: ${{ secrets.NEXT_PUBLIC_WS_URL }}
+          NEXT_PUBLIC_NETWORK: ${{ secrets.NEXT_PUBLIC_NETWORK }}
+          NEXT_PUBLIC_SETTLEMENT_CONTRACT: ${{ secrets.NEXT_PUBLIC_SETTLEMENT_CONTRACT }}
+          NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT: ${{ secrets.NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::warning::Vercel credentials not configured. Skipping Vercel deployment."
+            echo "deployed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          npm install -g vercel
+          DEPLOYMENT_URL=$(vercel deploy --prod \
+            --token=$VERCEL_TOKEN \
+            --scope=$VERCEL_ORG_ID \
+            --project-id=$VERCEL_PROJECT_ID \
+            2>&1 | tail -1)
+
+          echo "deployed=true" >> $GITHUB_OUTPUT
+          echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+
+      - name: Create deployment status
+        if: steps.deploy.outputs.deployed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.ref,
+              environment: 'production',
+              required_contexts: [],
+              auto_merge: false,
+            });
+
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'success',
+              environment_url: '${{ steps.deploy.outputs.deployment-url }}',
+              description: 'Deployment completed successfully',
+            });
+
+      - name: Report deployment summary
+        if: always()
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.deploy.outputs.deployed }}" == "true" ]; then
+            echo "✅ **Deployment Status**: Success" >> $GITHUB_STEP_SUMMARY
+            echo "**URL**: ${{ steps.deploy.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Deployment Status**: Skipped (Vercel not configured)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build ID**: ${{ needs.build.outputs.build-id }}" >> $GITHUB_STEP_SUMMARY

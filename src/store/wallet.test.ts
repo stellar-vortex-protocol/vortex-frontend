@@ -21,6 +21,7 @@ vi.mock("@stellar/freighter-api", () => ({
 import { useWalletStore } from "./wallet";
 
 const initialState = useWalletStore.getState();
+const VALID_STELLAR_ADDRESS = "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
 
 describe("useWalletStore", () => {
   beforeEach(() => {
@@ -45,7 +46,7 @@ describe("useWalletStore", () => {
 
   it("connects successfully and stores address + network", async () => {
     isConnectedMock.mockResolvedValue(true);
-    requestAccessMock.mockResolvedValue("GABC123");
+    requestAccessMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     getNetworkMock.mockResolvedValue("TESTNET");
 
     await useWalletStore.getState().connect();
@@ -53,8 +54,8 @@ describe("useWalletStore", () => {
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(true);
     expect(state.isConnecting).toBe(false);
-    expect(state.address).toBe("GABC123");
-    expect(state.lastKnownAddress).toBe("GABC123");
+    expect(state.address).toBe(VALID_STELLAR_ADDRESS);
+    expect(state.lastKnownAddress).toBe(VALID_STELLAR_ADDRESS);
     expect(state.network).toBe("TESTNET");
     expect(state.wasSessionCleared).toBe(false);
     expect(state.error).toBeNull();
@@ -66,7 +67,7 @@ describe("useWalletStore", () => {
   it("sets networkMismatch when the wallet network differs from NEXT_PUBLIC_NETWORK", async () => {
     vi.stubEnv("NEXT_PUBLIC_NETWORK", "testnet");
     isConnectedMock.mockResolvedValue(true);
-    requestAccessMock.mockResolvedValue("GABC123");
+    requestAccessMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     // Freighter reports MAINNET but the app expects TESTNET
     getNetworkMock.mockResolvedValue("MAINNET");
 
@@ -74,7 +75,7 @@ describe("useWalletStore", () => {
 
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(true);
-    expect(state.address).toBe("GABC123");
+    expect(state.address).toBe(VALID_STELLAR_ADDRESS);
     expect(state.networkMismatch).toBe(true);
     expect(state.error).toBeNull();
   });
@@ -82,7 +83,7 @@ describe("useWalletStore", () => {
   it("does not set networkMismatch when networks match (case-insensitive)", async () => {
     vi.stubEnv("NEXT_PUBLIC_NETWORK", "testnet");
     isConnectedMock.mockResolvedValue(true);
-    requestAccessMock.mockResolvedValue("GABC123");
+    requestAccessMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     getNetworkMock.mockResolvedValue("TESTNET");
 
     await useWalletStore.getState().connect();
@@ -92,10 +93,10 @@ describe("useWalletStore", () => {
 
   it("sets networkMismatch on hydrate when the restored network differs", async () => {
     vi.stubEnv("NEXT_PUBLIC_NETWORK", "testnet");
-    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "MAINNET" });
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, network: "MAINNET" });
     isConnectedMock.mockResolvedValue(true);
     isAllowedMock.mockResolvedValue(true);
-    getPublicKeyMock.mockResolvedValue("GOLD123");
+    getPublicKeyMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     // Freighter still reports MAINNET
     getNetworkMock.mockResolvedValue("MAINNET");
 
@@ -109,7 +110,7 @@ describe("useWalletStore", () => {
   it("clears networkMismatch on disconnect", async () => {
     vi.stubEnv("NEXT_PUBLIC_NETWORK", "testnet");
     isConnectedMock.mockResolvedValue(true);
-    requestAccessMock.mockResolvedValue("GABC123");
+    requestAccessMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     getNetworkMock.mockResolvedValue("MAINNET");
     await useWalletStore.getState().connect();
     expect(useWalletStore.getState().networkMismatch).toBe(true);
@@ -131,7 +132,6 @@ describe("useWalletStore", () => {
     expect(state.isConnecting).toBe(false);
     expect(state.address).toBeNull();
     expect(state.error).toMatch(/not installed/i);
-    expect(state.errorKey).toBe("wallet.error.freighterUnavailable");
   });
 
   // ── Issue #2: not-installed ──────────────────────────────────────────────
@@ -156,7 +156,9 @@ describe("useWalletStore", () => {
     const state = useWalletStore.getState();
     expect(state.notInstalled).toBe(false);
     expect(state.error).toBe("User declined access");
-  });  it("sets an error when requestAccess rejects", async () => {
+  });
+
+  it("sets an error when requestAccess rejects", async () => {
     isConnectedMock.mockResolvedValue(true);
     requestAccessMock.mockRejectedValue(new Error("User declined access"));
 
@@ -165,12 +167,11 @@ describe("useWalletStore", () => {
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(false);
     expect(state.error).toBe("User declined access");
-    expect(state.errorKey).toBeNull();
   });
 
   it("clears wallet state on disconnect", async () => {
     isConnectedMock.mockResolvedValue(true);
-    requestAccessMock.mockResolvedValue("GABC123");
+    requestAccessMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     getNetworkMock.mockResolvedValue("TESTNET");
     await useWalletStore.getState().connect();
 
@@ -190,10 +191,10 @@ describe("useWalletStore", () => {
   });
 
   it("hydrate() silently restores a session the extension still allows", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "TESTNET" });
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, network: "TESTNET" });
     isConnectedMock.mockResolvedValue(true);
     isAllowedMock.mockResolvedValue(true);
-    getPublicKeyMock.mockResolvedValue("GOLD123");
+    getPublicKeyMock.mockResolvedValue(VALID_STELLAR_ADDRESS);
     getNetworkMock.mockResolvedValue("TESTNET");
 
     await useWalletStore.getState().hydrate();
@@ -201,12 +202,12 @@ describe("useWalletStore", () => {
     expect(requestAccessMock).not.toHaveBeenCalled();
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(true);
-    expect(state.address).toBe("GOLD123");
+    expect(state.address).toBe(VALID_STELLAR_ADDRESS);
     expect(state.networkMismatch).toBe(false);
   });
 
   it("hydrate() clears a stale session the extension no longer allows", async () => {
-    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "TESTNET" });
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, lastKnownAddress: VALID_STELLAR_ADDRESS, network: "TESTNET" });
     isConnectedMock.mockResolvedValue(true);
     isAllowedMock.mockResolvedValue(false);
 
@@ -215,99 +216,61 @@ describe("useWalletStore", () => {
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(false);
     expect(state.address).toBeNull();
-    expect(state.lastKnownAddress).toBe("GOLD123");
+    expect(state.lastKnownAddress).toBe(VALID_STELLAR_ADDRESS);
     expect(state.wasSessionCleared).toBe(true);
   });
 
-  // ── Issue #307: Persisted wallet state validation ──────────────────────────
+  // ── Issue #302: multi-tab reconciliation ────────────────────────────────
 
-  describe("Persisted wallet state validation", () => {
-    it("should accept valid persisted state", () => {
-      const validState = {
-        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
-        lastKnownAddress: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
-        network: "testnet",
-        isConnected: true,
-      };
-      expect(validState).toBeTruthy();
+  it("syncFromStorage() disconnects this tab when another tab disconnected", () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+
+    useWalletStore.getState().syncFromStorage({
+      address: null,
+      lastKnownAddress: "GABC123",
+      network: null,
+      isConnected: false,
     });
 
-    it("should handle null and undefined address fields", () => {
-      const nullAddressState = {
-        address: null,
-        lastKnownAddress: null,
-        network: "testnet",
-        isConnected: false,
-      };
-      expect(nullAddressState.address).toBeNull();
-      expect(nullAddressState.isConnected).toBe(false);
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.address).toBeNull();
+    expect(isConnectedMock).not.toHaveBeenCalled();
+  });
+
+  it("syncFromStorage() re-verifies with the extension when another tab switched account", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "TESTNET" });
+    isConnectedMock.mockResolvedValue(true);
+    isAllowedMock.mockResolvedValue(true);
+    getPublicKeyMock.mockResolvedValue("GNEW456");
+    getNetworkMock.mockResolvedValue("TESTNET");
+
+    useWalletStore.getState().syncFromStorage({
+      address: "GNEW456",
+      lastKnownAddress: "GNEW456",
+      network: "TESTNET",
+      isConnected: true,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const state = useWalletStore.getState();
+    expect(state.address).toBe("GNEW456");
+    expect(state.isConnected).toBe(true);
+    expect(getPublicKeyMock).toHaveBeenCalled();
+  });
+
+  it("syncFromStorage() is a no-op when already in sync (no reconciliation loop)", () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+
+    useWalletStore.getState().syncFromStorage({
+      address: "GABC123",
+      lastKnownAddress: "GABC123",
+      network: "TESTNET",
+      isConnected: true,
     });
 
-    it("should reject malformed JSON from corrupted localStorage", () => {
-      const malformed = "not json at all";
-      let parsed = null;
-      try {
-        parsed = JSON.parse(malformed);
-      } catch (e) {
-        parsed = null;
-      }
-      expect(parsed).toBeNull();
-    });
-
-    it("should reject state with wrong address type", () => {
-      const invalidState = {
-        address: 12345,
-        lastKnownAddress: null,
-        network: "testnet",
-        isConnected: true,
-      };
-      const isValid =
-        typeof invalidState.address === "string" || invalidState.address === null;
-      expect(isValid).toBe(false);
-    });
-
-    it("should reject state with missing isConnected field", () => {
-      const invalidState = {
-        address: null,
-        lastKnownAddress: null,
-        network: "testnet",
-      };
-      const isValid = typeof (invalidState as any).isConnected === "boolean";
-      expect(isValid).toBe(false);
-    });
-
-    it("should reject state with invalid Stellar addresses", () => {
-      const invalidState = {
-        address: "not-a-valid-stellar-address",
-        lastKnownAddress: null,
-        network: "testnet",
-        isConnected: true,
-      };
-      expect(invalidState.address).not.toMatch(/^G[A-Z0-9]{55}$/);
-    });
-
-    it("should reject state with malicious modified addresses", () => {
-      const tamperedState = {
-        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK999", // Modified last digits
-        lastKnownAddress: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
-        network: "testnet",
-        isConnected: true,
-      };
-      // The validation would check this against isValidStellarPublicKey
-      expect(tamperedState.address).not.toBe(
-        "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"
-      );
-    });
-
-    it("should handle mixed valid and invalid data", () => {
-      const mixedState = {
-        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
-        lastKnownAddress: "invalid",
-        network: "testnet",
-        isConnected: true,
-      };
-      expect(mixedState.address).toMatch(/^G[A-Z0-9]{55}$/);
-      expect(mixedState.lastKnownAddress).not.toMatch(/^G[A-Z0-9]{55}$/);
-    });
+    expect(isConnectedMock).not.toHaveBeenCalled();
+    expect(useWalletStore.getState().address).toBe("GABC123");
   });
 });

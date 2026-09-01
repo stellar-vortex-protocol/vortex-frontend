@@ -14,8 +14,39 @@ import {
   isSubmitRegistrationResponse,
 } from "./schemas";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const TIMEOUT_MS = 10_000;
+
+// Validate API_URL at module load time for supply-chain defense
+function validateApiUrl(urlString: string): string {
+  try {
+    const url = new URL(urlString);
+
+    // In production, require https:// for security
+    if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+      throw new Error(
+        `API_URL must use https:// in production. Got: ${url.protocol}//`
+      );
+    }
+
+    // Allow http:// in development (localhost)
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      throw new Error(
+        `API_URL must use http:// or https://. Got: ${url.protocol}//`
+      );
+    }
+
+    return urlString;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("API_URL must")) {
+      throw err;
+    }
+    throw new Error(
+      `NEXT_PUBLIC_API_URL is not a valid URL: "${urlString}". Error: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+const API_URL = validateApiUrl(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
 
 export class ApiError extends Error {
   status: number;
