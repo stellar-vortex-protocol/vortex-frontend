@@ -76,6 +76,14 @@ export function SkeletonCard({ rows = 3, rowHeight = "h-14", className }: Skelet
   );
 }
 
+export function IntentListSkeleton({ count = 5 }: { count?: number }) {
+  return <SkeletonCard rows={count} rowHeight="h-16" />;
+}
+
+export function FeedSkeleton({ count = 3 }: { count?: number }) {
+  return <SkeletonCard rows={count} rowHeight="h-12" />;
+}
+
 // ─── SkeletonDetailCard ────────────────────────────────────────────────────────
 // Skeleton for a detail card (e.g. intent detail, solver detail header).
 

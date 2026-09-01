@@ -1,23 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useQuote } from "@/hooks/useQuote";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useRecentChains } from "@/hooks/useRecentChains";
 import { useToastStore } from "@/store/toast";
-import { Tooltip } from "@/components/Tooltip";
-import { CHAINS, SRC_TOKENS, DST_TOKENS, PRICES_AS_OF } from "@/lib/marketData";
+import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { formatTokenAmount } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
-import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import type { MessageKey } from "@/lib/i18n";
-import type { Quote, QuoteRequest } from "@/lib/types";
 
 export const DEFAULT_SLIPPAGE_PCT = 0.5;
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
-// A quote older than 30 s is considered stale; warn the user before submission.
-export const STALE_QUOTE_THRESHOLD_MS = 30_000;
+export const STALE_QUOTE_THRESHOLD_MS = 60_000;
 
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
@@ -28,20 +25,22 @@ const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
 
 export type SwapCardProps = {
   initialAmount?: string;
+  /** Pre-select the source chain (must be a valid CHAINS id; falls back to "ethereum"). */
+  initialChain?: string;
+  /** Pre-select the source token symbol on the given chain (falls back to that chain's first token). */
+  initialSrcToken?: string;
+  /** Pre-select the destination token symbol (must be in DST_TOKENS; falls back to the first). */
+  initialDstToken?: string;
   previewQuote?: Quote;
   onPreviewSubmit?: (request: QuoteRequest) => void;
 };
 
-export function SwapCard({
-  initialAmount = "",
-  previewQuote,
-  onPreviewSubmit,
-}: SwapCardProps = {}) {
+export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: SwapCardProps = {}) {
   const { t } = useTranslation();
 
   const [srcChain, setSrcChain] = useState("ethereum");
-  const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"][0]);
-  const [dstToken, setDstToken] = useState(DST_TOKENS[0]);
+  const [srcToken, setSrcToken] = useState(SRC_TOKENS.ethereum![0]!);
+  const [dstToken, setDstToken] = useState(DST_TOKENS[0]!);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
   const [dstAddress, setDstAddress] = useState("");
   const [slippagePct, setSlippagePct] = useState(String(DEFAULT_SLIPPAGE_PCT));
@@ -50,32 +49,16 @@ export function SwapCard({
 
   const chainToggleRef = useRef<HTMLButtonElement>(null);
   const chainPickerRef = useRef<HTMLDivElement>(null);
+  const tokenToggleRef = useRef<HTMLButtonElement>(null);
+  const tokenPickerRef = useRef<HTMLDivElement>(null);
 
-  // #284 – recent chains
-  const { recentChains, addRecentChain } = useRecentChains();
+  const chain = CHAINS.find(c => c.id === srcChain) ?? CHAINS[0]!;
 
-  const chain = CHAINS.find(c => c.id === srcChain)!;
-
+  // ── Chain picker helpers ───────────────────────────────────────────────────
   const closeChainPicker = () => {
     setShowChainPicker(false);
     chainToggleRef.current?.focus();
   };
-
-  // Moves focus into the overlay when it opens.
-  useEffect(() => {
-    if (!showChainPicker) return;
-    chainPickerRef.current?.querySelector<HTMLElement>("button")?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeChainPicker();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showChainPicker]);
 
   const handleChainPickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
@@ -83,37 +66,32 @@ export function SwapCard({
       closeChainPicker();
       return;
     }
+
     if (e.key !== "Tab") return;
+
     const focusable = chainPickerRef.current?.querySelectorAll<HTMLButtonElement>("button");
     if (!focusable || focusable.length === 0) return;
+
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();
-      last.focus();
+      last?.focus();
     } else if (!e.shiftKey && document.activeElement === last) {
       e.preventDefault();
-      first.focus();
+      first?.focus();
     }
   };
 
-  /** Select a chain from either the quick-row or the full grid. */
-  const handleSelectChain = (chainId: string) => {
-    setSrcChain(chainId);
-    setSrcToken(SRC_TOKENS[chainId][0]);
-    addRecentChain(chainId); // #284 – record recency
-    closeChainPicker();
-  };
+  useEffect(() => {
+    if (showChainPicker) {
+      chainPickerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    }
+  }, [showChainPicker]);
 
   const debouncedAmount = useDebouncedValue(srcAmount, 500);
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
-  const {
-    quote: fetchedQuote,
-    quoteFetchedAt,
-    isLoading: quoteIsLoading,
-    error: quoteError,
-    quoteErrorType,
-  } = useQuote(
+  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError, quoteFetchedAt } = useQuote(
     hasAmount && !previewQuote
       ? {
           srcChain,
@@ -127,30 +105,33 @@ export function SwapCard({
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
 
-  const dstAddressError =
-    dstAddress && !isValidStellarPublicKey(dstAddress)
-      ? t("swap.destination.invalidAddress")
-      : null;
+  const dstAddressError = dstAddress && !isValidStellarPublicKey(dstAddress) ? t("swap.destination.invalidAddress") : null;
 
+  // ── Derived display values ─────────────────────────────────────────────────
   const dstAmount = quote
     ? parseFloat(quote.dstAmount)
     : srcAmount
-      ? (parseFloat(srcAmount) * srcToken.priceUSD) / dstToken.priceUSD * 0.998
+      ? (parseFloat(srcAmount) * srcToken.priceUsd) / dstToken.priceUsd * 0.998
       : 0;
 
-  const srcValueUSD = srcAmount ? parseFloat(srcAmount) * srcToken.priceUSD : 0;
+  const srcValueUSD = srcAmount ? parseFloat(srcAmount) * srcToken.priceUsd : 0;
   const parsedSlippagePct = Math.max(0, Math.min(50, parseFloat(slippagePct) || 0));
-  const minOut =
-    dstAmount > 0
-      ? (dstAmount * (1 - parsedSlippagePct / 100)).toFixed(dstToken.symbol === "XLM" ? 2 : 4)
-      : "0";
-  const hasHighPriceImpact = quote
-    ? quote.priceImpactPct > HIGH_PRICE_IMPACT_THRESHOLD_PCT
-    : false;
+  const minOut = dstAmount > 0 ? (dstAmount * (1 - parsedSlippagePct / 100)).toFixed(dstToken.symbol === "XLM" ? 2 : 4) : "0";
+  const hasHighPriceImpact = quote ? quote.priceImpactPct > HIGH_PRICE_IMPACT_THRESHOLD_PCT : false;
 
-  // #285 – show the "as of" notice only when showing the estimate (no live quote).
-  const showPriceEstimateNotice = !quote && srcValueUSD > 0;
+  const quoteErrorType = (() => {
+    if (!quoteError) return null;
+    const message = quoteError instanceof Error ? quoteError.message : String(quoteError);
+    const lowered = message.toLowerCase();
+    if (lowered.includes("no solver") || lowered.includes("no_solver") || lowered.includes("no solver found")) {
+      return { kind: "no-solver" as const };
+    }
+    return { kind: "generic" as const };
+  })();
 
+  const quoteErrorType = quoteError as { kind?: string } | null | undefined;
+
+  // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
   const isSubmitting = submission.status in SUBMISSION_LABEL_KEY;
   const canSwap =
@@ -160,10 +141,9 @@ export function SwapCard({
     !isSubmitting &&
     !dstAddressError;
 
-  /** Truncate a raw amount string to at most `decimals` decimal places. */
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
-    if (dotIndex === -1 || decimals === 0) return value.split(".")[0];
+    if (dotIndex === -1 || decimals === 0) return (value.split(".")[0] ?? "");
     return value.slice(0, dotIndex + 1 + decimals);
   }
 
@@ -172,6 +152,7 @@ export function SwapCard({
   };
 
   const handleSubmit = () => {
+    setHasAttemptedSubmit(true);
     if (onPreviewSubmit) {
       onPreviewSubmit({
         srcChain,
@@ -181,6 +162,7 @@ export function SwapCard({
       });
       return;
     }
+
     if (submission.status === "success") {
       submission.reset();
       setSrcAmount("");
@@ -197,15 +179,14 @@ export function SwapCard({
       srcToken: srcToken.symbol,
       srcAmount,
       dstToken: dstToken.symbol,
+      minOut,
     });
   };
 
-  // While the chain picker overlay is open, keep main card controls out of tab order.
   const hiddenTabIndex = showChainPicker ? -1 : undefined;
 
   return (
     <div className="relative">
-      {/* Chain picker overlay */}
       {showChainPicker && (
         <div
           ref={chainPickerRef}
@@ -255,18 +236,19 @@ export function SwapCard({
               <button
                 key={c.id}
                 type="button"
-                onClick={() => handleSelectChain(c.id)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all
-                  ${srcChain === c.id
+                onClick={() => {
+                  setSrcChain(c.id);
+                  const nextToken = SRC_TOKENS[c.id]?.[0];
+                  if (nextToken) setSrcToken(nextToken);
+                  closeChainPicker();
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all ${
+                  srcChain === c.id
                     ? "border-vx-sage/40 bg-vx-sage-bg text-vx-sage"
                     : "border-vx-border hover:border-vx-border text-vx-muted hover:text-vx-text bg-vx-surface/50"
-                  }`}
+                }`}
               >
-                <span
-                  aria-hidden="true"
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: c.color }}
-                />
+                <span aria-hidden="true" className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
                 <span className="text-sm font-medium">{c.name}</span>
               </button>
             ))}
@@ -274,21 +256,15 @@ export function SwapCard({
         </div>
       )}
 
-      {/* Main card */}
-      <div
-        aria-hidden={showChainPicker}
-        className={`card p-5 space-y-2 ${showChainPicker ? "opacity-0 pointer-events-none" : ""}`}
-      >
-        {/* ── From ── */}
+      <div aria-hidden={showChainPicker} className={`card p-5 space-y-2 ${showChainPicker ? "opacity-0 pointer-events-none" : ""}`}>
         <div className="bg-vx-surface/50 rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t("swap.from.label")}</span>
             <button
               ref={chainToggleRef}
               type="button"
-              tabIndex={hiddenTabIndex}
               onClick={() => setShowChainPicker(true)}
-              aria-haspopup="true"
+              aria-haspopup="dialog"
               aria-expanded={showChainPicker}
               aria-label={t("swap.from.selectChain", { name: chain.name })}
               className="chain-badge cursor-pointer hover:bg-vx-lav/15 transition-colors"
@@ -317,18 +293,18 @@ export function SwapCard({
             <input
               id="src-amount"
               type="number"
-              tabIndex={hiddenTabIndex}
               value={srcAmount}
-              onChange={e => handleAmountChange(e.target.value)}
+              onChange={e => setSrcAmount(e.target.value)}
               placeholder={t("swap.from.amountPlaceholder")}
               className="input-swap flex-1"
             />
+            {/* ── Token picker toggle ── */}
             <button
+              ref={tokenToggleRef}
               type="button"
-              tabIndex={hiddenTabIndex}
               className="token-btn"
-              onClick={() => setShowTokenPicker(!showTokenPicker)}
-              aria-haspopup="true"
+              onClick={() => setShowTokenPicker(prev => !prev)}
+              aria-haspopup="listbox"
               aria-expanded={showTokenPicker}
               aria-label={t("swap.from.selectToken", { symbol: srcToken.symbol })}
             >
@@ -355,8 +331,15 @@ export function SwapCard({
             </button>
           </div>
 
+          {/* ── Token picker inline overlay ── */}
           {showTokenPicker && (
-            <div className="pt-2 border-t border-vx-line space-y-1">
+            <div
+              ref={tokenPickerRef}
+              role="listbox"
+              aria-label={t("swap.from.selectToken", { symbol: srcToken.symbol })}
+              onKeyDown={handleTokenPickerKeyDown}
+              className="pt-2 border-t border-vx-line space-y-1"
+            >
               {(SRC_TOKENS[srcChain] ?? []).map(token => (
                 <button
                   key={token.symbol}
@@ -366,21 +349,19 @@ export function SwapCard({
                     setSrcToken(token);
                     setShowTokenPicker(false);
                   }}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors
-                    ${token.symbol === srcToken.symbol
-                      ? "bg-vx-lav-bg text-vx-lav"
-                      : "hover:bg-vx-surface text-vx-muted hover:text-vx-text"}`}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                    token.symbol === srcToken.symbol ? "bg-vx-lav-bg text-vx-lav" : "hover:bg-vx-surface text-vx-muted hover:text-vx-text"
+                  }`}
                 >
                   <span className="font-medium">{token.symbol}</span>
-                  <span className="num text-xs">${token.priceUSD.toLocaleString()}</span>
+                  <span className="num text-xs">${token.priceUsd.toLocaleString()}</span>
                 </button>
               ))}
             </div>
           )}
 
           {srcValueUSD > 0 && (
-            <div className="num text-xs text-vx-muted flex items-center gap-1">
-              {/* Number formatting stays locale-hardcoded here; issue #63 owns making it locale-aware. */}
+            <div className="num text-xs text-vx-muted">
               {t("swap.from.approxValue", {
                 value: srcValueUSD.toLocaleString("en-US", { maximumFractionDigits: 2 }),
               })}
@@ -397,7 +378,6 @@ export function SwapCard({
           )}
         </div>
 
-        {/* Swap direction arrow */}
         <div className="flex justify-center">
           <div
             aria-hidden="true"
@@ -415,7 +395,6 @@ export function SwapCard({
           </div>
         </div>
 
-        {/* ── To (always Stellar) ── */}
         <div className="bg-vx-surface/50 rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t("swap.to.label")}</span>
@@ -457,14 +436,11 @@ export function SwapCard({
                 <button
                   key={token.symbol}
                   type="button"
-                  tabIndex={hiddenTabIndex}
                   onClick={() => setDstToken(token)}
                   aria-pressed={dstToken.symbol === token.symbol}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all
-                    ${dstToken.symbol === token.symbol
-                      ? "bg-vx-sage-bg text-vx-sage border-vx-sage/30"
-                      : "border-vx-border text-vx-muted hover:text-vx-text"
-                    }`}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    dstToken.symbol === token.symbol ? "bg-vx-sage-bg text-vx-sage border-vx-sage/30" : "border-vx-border text-vx-muted hover:text-vx-text"
+                  }`}
                 >
                   {token.symbol}
                 </button>
@@ -473,7 +449,24 @@ export function SwapCard({
           </div>
         </div>
 
-        {/* Destination address */}
+        <div className="bg-vx-surface/50 rounded-xl p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="eyebrow">{t("swap.slippage.label")}</span>
+            <span className="num text-[10px] text-vx-muted">{t("swap.slippage.minOut", { amount: minOut, token: dstToken.symbol })}</span>
+          </div>
+          <label htmlFor="slippage-pct" className="sr-only">{t("swap.slippage.inputLabel")}</label>
+          <input
+            id="slippage-pct"
+            type="number"
+            min="0"
+            max="50"
+            step="0.1"
+            value={slippagePct}
+            onChange={e => setSlippagePct(e.target.value)}
+            className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
+          />
+        </div>
+
         <div className="bg-vx-surface/50 rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t("swap.destination.label")}</span>
@@ -484,6 +477,7 @@ export function SwapCard({
           <input
             id="dst-address"
             type="text"
+            tabIndex={hiddenTabIndex}
             value={dstAddress}
             onChange={e => setDstAddress(e.target.value.trim())}
             placeholder={t("swap.destination.placeholder")}
@@ -491,122 +485,51 @@ export function SwapCard({
             aria-describedby={dstAddressError ? "dst-address-error" : undefined}
             className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
           />
-          {dstAddressError && (
-            <p id="dst-address-error" role="alert" className="text-[11px] text-red-400">
-              {dstAddressError}
-            </p>
-          )}
+          {dstAddressError && <p id="dst-address-error" role="alert" className="text-[11px] text-red-400">{dstAddressError}</p>}
         </div>
 
-        {/* Slippage */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-vx-muted">{t("swap.slippage.label")}</span>
-          <label className="sr-only" htmlFor="slippage-input">
-            {t("swap.slippage.inputLabel")}
-          </label>
-          <input
-            id="slippage-input"
-            type="number"
-            value={slippagePct}
-            onChange={e => setSlippagePct(e.target.value)}
-            tabIndex={hiddenTabIndex}
-            className="w-16 bg-vx-surface border border-vx-border rounded-lg px-2 py-1 text-xs text-right text-vx-text focus:outline-none focus:border-vx-sage/50"
-          />
-        </div>
-        {dstAmount > 0 && (
-          <div className="text-xs text-vx-muted px-1">
-            {t("swap.slippage.minOut", { amount: minOut, token: dstToken.symbol })}
-          </div>
-        )}
-
-        {/* Quote details */}
         {quote && srcAmount && (
           <div
             className={`rounded-xl p-3.5 space-y-2.5 animate-fade-up border ${
-              hasHighPriceImpact
-                ? "bg-amber-500/10 border-amber-400/30"
-                : "bg-vx-surface/40 border-transparent"
+              hasHighPriceImpact ? "bg-amber-500/10 border-amber-400/30" : "bg-vx-surface/40 border-transparent"
             }`}
           >
-            {(
-              [
-                ["swap.quote.solver", quote.solver, null],
-                [
-                  "swap.quote.fillTime",
-                  t("swap.quote.fillTimeValue", { seconds: quote.fillTimeSeconds }),
-                  "swap.quote.fillTime.tooltip",
-                ],
-                [
-                  "swap.quote.priceImpact",
-                  t("swap.quote.priceImpactValue", {
-                    percent:
-                      quote.priceImpactPct < 0.01
-                        ? t("swap.quote.priceImpactBelowMin")
-                        : quote.priceImpactPct.toFixed(2),
-                  }),
-                  "swap.quote.priceImpact.tooltip",
-                ],
-                [
-                  "swap.quote.protocolFee",
-                  t("swap.quote.protocolFeeValue", {
-                    percent: quote.protocolFeePct.toFixed(2),
-                  }),
-                  "swap.quote.protocolFee.tooltip",
-                ],
-                ["swap.quote.rate", quote.rate, null],
-              ] as const
-            ).map(([labelKey, value, tooltipKey]) => (
+            {([
+              ["swap.quote.solver", quote.solver],
+              ["swap.quote.fillTime", t("swap.quote.fillTimeValue", { seconds: quote.fillTimeSeconds })],
+              ["swap.quote.priceImpact", t("swap.quote.priceImpactValue", { percent: quote.priceImpactPct < 0.01 ? t("swap.quote.priceImpactBelowMin") : quote.priceImpactPct.toFixed(2) })],
+              ["swap.quote.protocolFee", t("swap.quote.protocolFeeValue", { percent: quote.protocolFeePct.toFixed(2) })],
+              ["swap.quote.rate", quote.rate],
+            ] as const).map(([labelKey, value]) => (
               <div key={labelKey} className="flex items-center justify-between">
-                {tooltipKey ? (
-                  <Tooltip content={t(tooltipKey)}>
-                    <span className="text-xs text-vx-muted underline decoration-dotted underline-offset-2 cursor-help">
-                      {t(labelKey)}
-                    </span>
-                  </Tooltip>
-                ) : (
-                  <span className="text-xs text-vx-muted">{t(labelKey)}</span>
-                )}
-                <span
-                  className={`num text-xs font-medium ${
-                    labelKey === "swap.quote.priceImpact" && hasHighPriceImpact
-                      ? "text-amber-300"
-                      : "text-vx-text"
-                  }`}
-                >
+                <span className="text-xs text-vx-muted">{t(labelKey)}</span>
+                <span className={`num text-xs font-medium ${labelKey === "swap.quote.priceImpact" && hasHighPriceImpact ? "text-amber-300" : "text-vx-text"}`}>
                   {value}
                 </span>
               </div>
             ))}
             {hasHighPriceImpact && (
               <p role="alert" className="text-xs text-amber-300">
-                {t("swap.quote.highPriceImpactWarning", {
-                  threshold: HIGH_PRICE_IMPACT_THRESHOLD_PCT,
-                })}
+                {t("swap.quote.highPriceImpactWarning", { threshold: HIGH_PRICE_IMPACT_THRESHOLD_PCT })}
               </p>
             )}
           </div>
         )}
 
-        {/* Quote error — falls back to an estimated rate above */}
         {quoteError && hasAmount && !quoting && (
           <p role="status" className="text-center text-[11px] text-amber-400/90 px-1">
-            {quoteErrorType?.kind === "no-solver"
-              ? t("swap.quote.noSolver")
-              : t("swap.quote.unavailable")}
+            {quoteErrorType?.kind === "no-solver" ? t("swap.quote.noSolver") : t("swap.quote.unavailable")}
           </p>
         )}
 
-        {/* Submission error */}
         {submission.status === "error" && (
           <p role="alert" className="text-center text-[11px] text-red-400 px-1">
             {submission.error}
           </p>
         )}
 
-        {/* Submit */}
         <button
           type="button"
-          tabIndex={hiddenTabIndex}
           className="btn-swap"
           disabled={!canSwap && submission.status !== "success"}
           aria-busy={isSubmitting}
@@ -630,7 +553,7 @@ export function SwapCard({
                   strokeDashoffset="8"
                 />
               </svg>
-              {t(SUBMISSION_LABEL_KEY[submission.status]!)}
+              {t(SUBMISSION_LABEL_KEY[submission.status] ?? "swap.submit.submitting")}
             </span>
           ) : submission.status === "success" ? (
             t("swap.submit.success")
@@ -666,6 +589,51 @@ export function SwapCard({
         </button>
 
         <p className="text-center text-[11px] text-vx-muted/70">{t("swap.disclaimer")}</p>
+      </div>
+
+      {/* Mobile sticky action bar — only visible below md breakpoint */}
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 z-30
+                   bg-vx-card/95 backdrop-blur-sm
+                   border-t border-vx-border
+                   px-4 pt-3 pb-safe"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        aria-hidden={showChainPicker}
+      >
+        <button
+          type="button"
+          tabIndex={showChainPicker ? -1 : undefined}
+          className="btn-swap"
+          disabled={!canSwap && submission.status !== "success"}
+          aria-busy={isSubmitting}
+          onClick={handleSubmit}
+        >
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              </svg>
+              {t(SUBMISSION_LABEL_KEY[submission.status]!)}
+            </span>
+          ) : submission.status === "success" ? (
+            t("swap.submit.success")
+          ) : quoting ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              </svg>
+              {t("swap.submit.findingRoute")}
+            </span>
+          ) : canSwap ? (
+            t(submission.status === "error" ? "swap.submit.retryCta" : "swap.submit.cta", {
+              amount: srcAmount,
+              srcToken: srcToken.symbol,
+              dstToken: dstToken.symbol,
+            })
+          ) : (
+            t("swap.submit.enterAmount")
+          )}
+        </button>
       </div>
     </div>
   );

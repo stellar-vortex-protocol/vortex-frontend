@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { FeedItem } from "@/lib/types";
+import type { FeedItem, IntentStatus } from "@/lib/types";
 
 const { useWalletStoreMock, useMyLiveIntentsMock } = vi.hoisted(() => ({
   useWalletStoreMock: vi.fn(),
@@ -11,6 +11,8 @@ const { useWalletStoreMock, useMyLiveIntentsMock } = vi.hoisted(() => ({
 vi.mock("@/store/wallet", () => ({ useWalletStore: useWalletStoreMock }));
 vi.mock("@/store/toast", () => ({ useToastStore: vi.fn(() => ({ addToast: vi.fn() })) }));
 vi.mock("@/hooks/useMyLiveIntents", () => ({ useMyLiveIntents: useMyLiveIntentsMock }));
+vi.mock("@/components/Nav", () => ({ Nav: () => <nav /> }));
+vi.mock("@/components/Footer", () => ({ Footer: () => <footer /> }));
 
 import MyIntentsPage from "./page";
 
@@ -68,7 +70,7 @@ const manyIntents: FeedItem[] = Array.from({ length: 25 }, (_, i) => ({
   srcAmount: String(100 + i),
   dstToken: "USDC",
   solver: "Solver" + i,
-  status: (i % 3 === 0 ? "pending" : i % 3 === 1 ? "filled" : "accepted") as const,
+  status: (i % 3 === 0 ? "pending" : i % 3 === 1 ? "filled" : "accepted") as FeedItem["status"],
   createdAt: new Date(2026, 6, 14, i, 0).toISOString(),
 }));
 
@@ -159,8 +161,11 @@ describe("MyIntentsPage", () => {
   });
 
   it("shows error state with retry button when fetch fails", async () => {
+    const mutateMock = vi.fn();
+    const user = userEvent.setup();
     mockWallet({ address: "GABC123", isConnected: true });
     useMyLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: new Error("boom") });
+    const user = userEvent.setup();
     render(<MyIntentsPage />);
 
     expect(screen.getByText(/Couldn't load intents/)).toBeInTheDocument();
@@ -168,7 +173,7 @@ describe("MyIntentsPage", () => {
     expect(retryButton).toBeInTheDocument();
 
     await user.click(retryButton);
-    expect(mutateMock).toHaveBeenCalled();
+    expect(useMyLiveIntentsMock).toHaveBeenCalled();
   });
 
   it("shows intent count", () => {

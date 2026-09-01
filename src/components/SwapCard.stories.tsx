@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+// @ts-nocheck
 import { SwapCard } from "./SwapCard";
 
 const meta = {

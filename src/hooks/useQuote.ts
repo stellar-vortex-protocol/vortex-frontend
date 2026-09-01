@@ -33,7 +33,17 @@ export function useQuote(params: QuoteRequest | null) {
   const [quoteFetchedAt, setQuoteFetchedAt] = useState<number | null>(null);
   const { data, error, isLoading } = useSWR<Quote>(quoteKey(params), fetcher, {
     revalidateOnFocus: false,
-    ...swrRetryConfig,
+    onSuccess(data) {
+      setQuoteFetchedAt(Date.now());
+      return data;
+    },
+    onErrorRetry(error, _key, _config, revalidate, { retryCount }) {
+      // Do not retry on 4xx client errors — they won't self-heal.
+      if (error?.status >= 400 && error?.status < 500) return;
+      // Cap at 3 retries with exponential back-off: 1s, 2s, 4s.
+      if (retryCount >= 3) return;
+      setTimeout(() => revalidate({ retryCount }), 1000 * 2 ** retryCount);
+    },
   });
 
   useEffect(() => {

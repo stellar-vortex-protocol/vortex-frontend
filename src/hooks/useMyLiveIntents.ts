@@ -18,7 +18,7 @@ function mergeById(items: FeedItem[]): FeedItem[] {
 }
 
 export function useMyLiveIntents(address: string | null) {
-  const { intents: restIntents, isLoading, error } = useMyIntents(address);
+  const { intents: restIntents, isLoading, error, mutate } = useMyIntents(address);
   const { status, lastMessage } = useWebSocket<FeedItem>(address ? WS_URL : null);
   const [liveItems, setLiveItems] = useState<FeedItem[]>([]);
 
@@ -31,6 +31,7 @@ export function useMyLiveIntents(address: string | null) {
     intents: mergeById([...liveItems, ...restIntents]),
     isLoading,
     error,
+    mutate,
     isLive: status === "open",
   };
 }

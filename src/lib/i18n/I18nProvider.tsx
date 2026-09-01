@@ -18,7 +18,7 @@ export function I18nProvider({
   children,
 }: {
   locale?: Locale;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 
@@ -23,12 +23,52 @@ export function SettingsPanel() {
   const locale = useLocale();
   const setLocale = useSetLocale();
 
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     const preference = stored === "reduce" || stored === "allow" ? stored : "system";
     setMotionPreference(preference);
     applyMotionPreference(preference);
   }, []);
+
+  // Move focus into the panel when it opens.
+  useEffect(() => {
+    if (!open) return;
+    const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+      "select, button, input, [tabindex]:not([tabindex='-1'])"
+    );
+    firstFocusable?.focus();
+  }, [open]);
+
+  const closePanel = () => {
+    setOpen(false);
+    toggleRef.current?.focus();
+  };
+
+  // Trap Tab focus inside panel; Escape closes it.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closePanel();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
+      "select, button, input, [tabindex]:not([tabindex='-1'])"
+    );
+    if (!focusable || focusable.length === 0) return;
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleMotionChange = (preference: MotionPreference) => {
     setMotionPreference(preference);
@@ -43,10 +83,12 @@ export function SettingsPanel() {
   return (
     <div className="relative">
       <button
+        ref={toggleRef}
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => (open ? closePanel() : setOpen(true))}
         aria-expanded={open}
         aria-controls="settings-panel"
+        aria-haspopup="dialog"
         className="px-3 py-1.5 text-xs rounded-lg border border-vx-border text-vx-muted hover:text-vx-text hover:border-vx-sage/50 transition-colors"
       >
         Settings
@@ -54,16 +96,21 @@ export function SettingsPanel() {
 
       {open && (
         <div
+          ref={panelRef}
           id="settings-panel"
-          className="absolute right-0 mt-2 w-64 rounded-xl border border-vx-border bg-vx-card p-4 shadow-xl"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Settings"
+          onKeyDown={handleKeyDown}
+          className="absolute right-0 mt-2 w-64 rounded-xl border border-vx-border bg-vx-card p-4 shadow-xl z-50"
         >
           <div className="space-y-4">
             <div>
-              <label htmlFor="locale-switcher" className="block text-xs font-medium text-vx-muted">
+              <label htmlFor="settings-locale-switcher" className="block text-xs font-medium text-vx-muted">
                 Language
               </label>
               <select
-                id="locale-switcher"
+                id="settings-locale-switcher"
                 value={locale}
                 onChange={(e) => setLocale(e.target.value as Locale)}
                 aria-label="Switch language"

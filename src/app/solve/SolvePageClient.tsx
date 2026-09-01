@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Nav } from "@/components/Nav";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useSolvers } from "@/hooks/useSolvers";
 import { useOpenIntents } from "@/hooks/useOpenIntents";
 import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
+import { useLocalStorageDraft } from "@/hooks/useLocalStorageDraft";
+import { useWalletStore } from "@/store/wallet";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { getMessage } from "@/i18n/messages";
 import { formatCurrency } from "@/lib/format";
+import { sanitizeDisplayText } from "@/lib/textSafety";
 import Link from "next/link";
 
 const usdCompact = (value: number) =>
@@ -20,6 +23,12 @@ const usdCompact = (value: number) =>
   });
 
 const MIN_BOND_USD = 50;
+
+/** Shape of the persisted registration draft. */
+type RegistrationDraft = {
+  address: string;
+  bond: string;
+};
 
 const REGISTRATION_LABEL: Record<string, string> = {
   connecting: getMessage("solve.register.states.connecting"),
@@ -34,10 +43,36 @@ export default function SolvePageClient() {
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
   const { accept, acceptingId, error: acceptError } = useAcceptIntent();
 
-  const [address, setAddress] = useState("");
-  const [bond, setBond] = useState("");
+  // Draft persistence — scoped to the currently connected wallet so that
+  // switching wallets never silently restores the wrong address.
+  const connectedAddress = useWalletStore((s) => s.address);
+  const [draft, setDraft, clearDraft] = useLocalStorageDraft<RegistrationDraft>(
+    "vortex:solver-registration-draft",
+    connectedAddress ?? null,
+  );
+
+  const [address, setAddress] = useState(draft?.address ?? "");
+  const [bond, setBond] = useState(draft?.bond ?? "");
+
+  // Sync form fields into the draft whenever they change.
+  const handleAddressChange = (value: string) => {
+    setAddress(value);
+    setDraft({ address: value, bond });
+  };
+  const handleBondChange = (value: string) => {
+    setBond(value);
+    setDraft({ address, bond: value });
+  };
+
   const registration = useSolverRegistration();
   const isRegistering = registration.status in REGISTRATION_LABEL;
+
+  // Clear draft after successful submission.
+  useEffect(() => {
+    if (registration.status === "success") {
+      clearDraft();
+    }
+  }, [registration.status, clearDraft]);
 
   const addressError =
     address && !isValidStellarPublicKey(address)
@@ -50,11 +85,37 @@ export default function SolvePageClient() {
   const canRegister =
     Boolean(address) && Boolean(bond) && !addressError && !bondError && !isRegistering;
 
+  const sortedSolvers = [...solvers].sort((a, b) => {
+    if (!sortKey || sortDir === "none") return 0;
+    const aVal = a[sortKey];
+    const bVal = b[sortKey];
+    // Stable numeric comparison
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+    }
+    return 0;
+  });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else if (sortDir === "desc") {
+      setSortDir("none");
+      setSortKey(null);
+    } else {
+      setSortDir("asc");
+    }
+  };
+
   const handleRegister = () => {
     if (registration.status === "success") {
       registration.reset();
       setAddress("");
       setBond("");
+      clearDraft();
       return;
     }
     if (!canRegister) return;
@@ -138,10 +199,80 @@ export default function SolvePageClient() {
             aria-labelledby="tab-leaderboard"
             className="card overflow-hidden"
           >
-            <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30">
-              <span className="text-sm font-semibold text-vx-text">
-                {getMessage("solve.leaderboard.title")}
-              </span>
+            <div className="px-3 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-vx-text">
+                  {getMessage("solve.leaderboard.title")}
+                </span>
+                <div className="hidden sm:flex items-center gap-1" role="group" aria-label="Sort leaderboard">
+                  {([
+                    ["fills",                "Fills"],
+                    ["volumeUsd",            "Volume"],
+                    ["avgFillTimeSeconds",   "Avg Time"],
+                    ["successRatePct",       "Success %"],
+                  ] as [SortKey, string][]).map(([key, label]) => {
+                    const isActive = sortKey === key && sortDir !== "none";
+                    const ariaSortValue: "ascending" | "descending" | "none" =
+                      sortKey === key && sortDir !== "none"
+                        ? sortDir === "asc" ? "ascending" : "descending"
+                        : "none";
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleSort(key)}
+                        aria-sort={ariaSortValue}
+                        aria-label={`Sort by ${label}${
+                          sortKey === key && sortDir !== "none"
+                            ? sortDir === "asc" ? ", ascending" : ", descending"
+                            : ""
+                        }`}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors
+                          ${
+                            isActive
+                              ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
+                              : "text-vx-muted hover:text-vx-text border border-transparent hover:border-vx-border"
+                          }`}
+                      >
+                        {label}
+                        <SortIcon direction={sortKey === key ? sortDir : "none"} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* Mobile sort: compact dropdown alternative */}
+              <div className="flex sm:hidden items-center gap-1 mt-2 flex-wrap" role="group" aria-label="Sort leaderboard">
+                {([
+                  ["fills",                "Fills"],
+                  ["volumeUsd",            "Volume"],
+                  ["avgFillTimeSeconds",   "Avg Time"],
+                  ["successRatePct",       "Success %"],
+                ] as [SortKey, string][]).map(([key, label]) => {
+                  const isActive = sortKey === key && sortDir !== "none";
+                  const ariaSortValue: "ascending" | "descending" | "none" =
+                    sortKey === key && sortDir !== "none"
+                      ? sortDir === "asc" ? "ascending" : "descending"
+                      : "none";
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleSort(key)}
+                      aria-sort={ariaSortValue}
+                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors
+                        ${
+                          isActive
+                            ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
+                            : "text-vx-muted hover:text-vx-text border border-transparent hover:border-vx-border"
+                        }`}
+                    >
+                      {label}
+                      <SortIcon direction={sortKey === key ? sortDir : "none"} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {solversLoading && solvers.length === 0 ? (
@@ -158,7 +289,7 @@ export default function SolvePageClient() {
               </div>
             ) : (
               <div className="divide-y divide-vx-line">
-                {solvers.map((s, i) => (
+                {sortedSolvers.map((s, i) => (
                   <Link
                     key={s.address}
                     href={`/solve/${s.address}`}
@@ -170,7 +301,7 @@ export default function SolvePageClient() {
                           {String(i + 1).padStart(2, "0")}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-vx-text truncate">{s.name}</div>
+                          <div className="text-sm font-semibold text-vx-text truncate">{sanitizeDisplayText(s.name)}</div>
                           <div className="num text-xs text-vx-muted truncate">{s.address}</div>
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {s.chains.map((c) => (
@@ -330,7 +461,7 @@ export default function SolvePageClient() {
                   id="solver-address"
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value.trim())}
+                  onChange={(e) => handleAddressChange(e.target.value.trim())}
                   placeholder={getMessage("solve.register.addressPlaceholder")}
                   aria-invalid={Boolean(addressError)}
                   aria-describedby={addressError ? "solver-address-error" : undefined}
@@ -353,7 +484,7 @@ export default function SolvePageClient() {
                   id="solver-bond"
                   type="number"
                   value={bond}
-                  onChange={(e) => setBond(e.target.value)}
+                  onChange={(e) => handleBondChange(e.target.value)}
                   placeholder={getMessage("solve.register.bondPlaceholder")}
                   aria-invalid={Boolean(bondError)}
                   aria-describedby={bondError ? "solver-bond-error" : undefined}
