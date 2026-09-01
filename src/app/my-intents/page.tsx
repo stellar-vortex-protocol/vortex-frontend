@@ -40,6 +40,19 @@ function swapAgainHref(item: FeedItem): string {
   return `/?${params.toString()}`;
 }
 
+// On-screen row columns. `pair` and `status` and `submitted` are essential for
+// scanning the list, so they can't be hidden; `chain` and `solver` are optional.
+const MY_INTENTS_COLUMNS = ["pair", "chain", "solver", "status", "submitted"] as const;
+type MyIntentsColumn = (typeof MY_INTENTS_COLUMNS)[number];
+const ALWAYS_VISIBLE_COLUMNS: MyIntentsColumn[] = ["pair", "status", "submitted"];
+const COLUMN_LABELS: Record<MyIntentsColumn, string> = {
+  pair: "Swap",
+  chain: "Source chain",
+  solver: "Solver",
+  status: "Status",
+  submitted: "Submitted",
+};
+
 export default function MyIntentsPage() {
   const { t } = useTranslation();
   const address = useWalletStore((s) => s.address);

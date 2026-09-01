@@ -6,6 +6,16 @@ export type WalletErrorKey =
   | "wallet.error.freighterUnavailable"
   | "wallet.error.connectFailed";
 
+/** Shape of the slice persisted to localStorage under `PERSIST_KEY`. */
+export type PersistedWalletState = {
+  address: string | null;
+  lastKnownAddress: string | null;
+  network: string | null;
+  isConnected: boolean;
+};
+
+export const PERSIST_KEY = "vortex-wallet";
+
 /** The network name the app expects, normalised to upper-case for comparison. */
 const EXPECTED_NETWORK = (process.env.NEXT_PUBLIC_NETWORK ?? "testnet").toUpperCase();
 
@@ -34,6 +44,17 @@ export type WalletState = {
    */
   errorKey: WalletErrorKey | null;
   /**
+   * Stable i18n key for the error when it maps to a known category, else null
+   * (a raw error message from Freighter is surfaced via `error` only).
+   */
+  errorKey: WalletErrorKey | null;
+  /**
+   * `true` when a persisted session was dropped on hydrate because the
+   * extension no longer allows this site - the UI can offer a one-click
+   * reconnect keyed off `lastKnownAddress`.
+   */
+  wasSessionCleared: boolean;
+  /**
    * `true` when the wallet is connected but on a different network than the
    * one configured via NEXT_PUBLIC_NETWORK. The wallet is still treated as
    * connected so the address remains accessible, but the UI should surface a
@@ -49,6 +70,12 @@ export type WalletState = {
   connect: () => Promise<void>;
   disconnect: () => void;
   hydrate: () => Promise<void>;
+  /**
+   * Reconcile this tab's state with a persisted snapshot written by another
+   * tab (delivered via the `storage` event). Trusts an explicit cross-tab
+   * disconnect; re-verifies a changed account against the extension.
+   */
+  syncFromStorage: (persisted: PersistedWalletState) => void;
 };
 
 export const useWalletStore = create<WalletState>()(
@@ -203,11 +230,46 @@ export const useWalletStore = create<WalletState>()(
           });
         }
       },
+
+      // === Cross-tab reconciliation (#302)
+      // The `storage` event fires only in *other* tabs, so this never sees this
+      // tab's own writes. A cross-tab disconnect (persisted isConnected=false)
+      // is trusted; a changed account is re-verified against the extension.
+      syncFromStorage: (persisted) => {
+        const state = get();
+        const inSync =
+          persisted.isConnected === state.isConnected &&
+          persisted.address === state.address;
+        if (inSync) return;
+
+        if (!persisted.isConnected) {
+          set({
+            address: null,
+            network: null,
+            isConnected: false,
+            error: null,
+            errorKey: null,
+            networkMismatch: false,
+            notInstalled: false,
+          });
+          return;
+        }
+
+        // Another tab connected, or switched account: adopt the address
+        // optimistically, then let hydrate() confirm it with Freighter.
+        set({
+          address: persisted.address,
+          lastKnownAddress: persisted.address ?? state.lastKnownAddress,
+          network: persisted.network,
+          isConnected: true,
+        });
+        void get().hydrate();
+      },
     }),
     {
-      name: "vortex-wallet",
+      name: PERSIST_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
+      partialize: (state): PersistedWalletState => ({
         address: state.address,
         lastKnownAddress: state.lastKnownAddress,
         network: state.network,

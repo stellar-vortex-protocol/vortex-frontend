@@ -22,6 +22,9 @@ export const STALE_QUOTE_THRESHOLD_MS = 30_000;
 // How long the "quote changed" delta indicator stays on screen after a refresh.
 const QUOTE_DELTA_TTL_MS = 4000;
 
+// A quote older than this must refresh before a submit is allowed.
+export const STALE_QUOTE_THRESHOLD_MS = 30_000;
+
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
   building: "swap.submit.building",

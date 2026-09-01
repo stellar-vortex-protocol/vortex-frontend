@@ -218,4 +218,58 @@ describe("useWalletStore", () => {
     expect(state.lastKnownAddress).toBe("GOLD123");
     expect(state.wasSessionCleared).toBe(true);
   });
+
+  // ── Issue #302: multi-tab reconciliation ────────────────────────────────
+
+  it("syncFromStorage() disconnects this tab when another tab disconnected", () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+
+    useWalletStore.getState().syncFromStorage({
+      address: null,
+      lastKnownAddress: "GABC123",
+      network: null,
+      isConnected: false,
+    });
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.address).toBeNull();
+    expect(isConnectedMock).not.toHaveBeenCalled();
+  });
+
+  it("syncFromStorage() re-verifies with the extension when another tab switched account", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GOLD123", network: "TESTNET" });
+    isConnectedMock.mockResolvedValue(true);
+    isAllowedMock.mockResolvedValue(true);
+    getPublicKeyMock.mockResolvedValue("GNEW456");
+    getNetworkMock.mockResolvedValue("TESTNET");
+
+    useWalletStore.getState().syncFromStorage({
+      address: "GNEW456",
+      lastKnownAddress: "GNEW456",
+      network: "TESTNET",
+      isConnected: true,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const state = useWalletStore.getState();
+    expect(state.address).toBe("GNEW456");
+    expect(state.isConnected).toBe(true);
+    expect(getPublicKeyMock).toHaveBeenCalled();
+  });
+
+  it("syncFromStorage() is a no-op when already in sync (no reconciliation loop)", () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "TESTNET" });
+
+    useWalletStore.getState().syncFromStorage({
+      address: "GABC123",
+      lastKnownAddress: "GABC123",
+      network: "TESTNET",
+      isConnected: true,
+    });
+
+    expect(isConnectedMock).not.toHaveBeenCalled();
+    expect(useWalletStore.getState().address).toBe("GABC123");
+  });
 });

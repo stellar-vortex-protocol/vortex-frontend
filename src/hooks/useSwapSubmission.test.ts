@@ -21,10 +21,14 @@ vi.mock("@stellar/freighter-api", () => ({
   default: { signTransaction: signTransactionMock },
 }));
 
-vi.mock("@/lib/api", () => ({
-  createIntent: createIntentMock,
-  submitIntent: submitIntentMock,
-}));
+vi.mock("@/lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api")>();
+  return {
+    ...actual,
+    createIntent: createIntentMock,
+    submitIntent: submitIntentMock,
+  };
+});
 
 vi.mock("@/store/toast", () => ({
   useToastStore: { getState: () => ({ addToast: addToastMock }) },
@@ -46,7 +50,7 @@ vi.mock("@/lib/xdrReview", () => {
 });
 
 import { useWalletStore } from "@/store/wallet";
-import { useSwapSubmission } from "./useSwapSubmission";
+import { classifySwapError, useSwapSubmission } from "./useSwapSubmission";
 
 const params = { srcChain: "ethereum", srcToken: "USDC", srcAmount: "500", dstToken: "XLM" };
 const initialWalletState = useWalletStore.getState();
@@ -156,6 +160,7 @@ describe("useSwapSubmission", () => {
 
     expect(result.current.status).toBe("error");
     expect(result.current.error).toBe("User declined access");
+    expect(result.current.errorKind).toBe("user-rejected");
     expect(submitIntentMock).not.toHaveBeenCalled();
     expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
   });

@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FeedItem, IntentStatus } from "@/lib/types";
 
@@ -75,6 +75,14 @@ const manyIntents: FeedItem[] = Array.from({ length: 25 }, (_, i) => ({
 }));
 
 describe("MyIntentsPage", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
   it("renders the main landmark with the correct id", () => {
     mockWallet();
     useMyLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: undefined, isLive: false });
