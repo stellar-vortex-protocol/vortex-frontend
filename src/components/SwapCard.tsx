@@ -16,12 +16,50 @@ export const DEFAULT_SLIPPAGE_PCT = 0.5;
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
 export const STALE_QUOTE_THRESHOLD_MS = 60_000;
 
+// A quote older than this is considered stale and must refresh before submit.
+export const STALE_QUOTE_THRESHOLD_MS = 30_000;
+
+// How long the "quote changed" delta indicator stays on screen after a refresh.
+const QUOTE_DELTA_TTL_MS = 4000;
+
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
   building: "swap.submit.building",
   "awaiting-signature": "swap.submit.awaitingSignature",
   submitting: "swap.submit.submitting",
 };
+
+// Small ▲/▼ indicator shown briefly next to a quote field when a fresh quote
+// moved it relative to the previous same-route quote (#297). Green when the
+// change favours the user, amber when it works against them.
+function QuoteDelta({
+  value,
+  betterWhenHigher,
+  format,
+  label,
+}: {
+  value: number;
+  betterWhenHigher: boolean;
+  format: (n: number) => string;
+  label: string;
+}) {
+  if (value === 0) return null;
+  const isUp = value > 0;
+  const isGood = betterWhenHigher ? isUp : !isUp;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[10px] font-semibold animate-fade-up ${
+        isGood ? "text-vx-sage" : "text-amber-400"
+      }`}
+    >
+      <span aria-hidden="true">{isUp ? "▲" : "▼"}</span>
+      <span aria-hidden="true">{format(Math.abs(value))}</span>
+      <span className="sr-only">
+        {label} {isGood ? "improved" : "worsened"} by {format(Math.abs(value))} on the latest quote
+      </span>
+    </span>
+  );
+}
 
 export type SwapCardProps = {
   initialAmount?: string;
@@ -104,6 +142,43 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
+  const quoteErrorType: { kind: "no-solver" | "generic" } | null = quoteError
+    ? { kind: /no[_ ]solver/i.test(quoteError.message ?? "") ? "no-solver" : "generic" }
+    : null;
+
+  // === "Quote changed" delta indicator (#297)
+  // Compare each fresh quote to the immediately-previous one for the *same
+  // route* (chain + token pair). A different route is a new quote entirely, not
+  // a delta; the very first quote for a route has nothing to compare against.
+  const routeKey = `${srcChain}|${srcToken.symbol}|${dstToken.symbol}`;
+  const prevQuoteRef = useRef<{ routeKey: string; quote: Quote } | null>(null);
+  const [quoteDelta, setQuoteDelta] = useState<{ dstAmount: number; priceImpactPct: number } | null>(null);
+
+  useEffect(() => {
+    const prev = prevQuoteRef.current;
+
+    // No quote (initial, or cleared while a new route's quote loads), or the
+    // route changed: drop any comparison history so the next quote for this
+    // route counts as a first quote, not a delta.
+    if (!quote || (prev && prev.routeKey !== routeKey)) {
+      prevQuoteRef.current = quote ? { routeKey, quote } : null;
+      setQuoteDelta(null);
+      return;
+    }
+
+    prevQuoteRef.current = { routeKey, quote };
+    if (!prev || prev.quote === quote) return;
+
+    const delta = {
+      dstAmount: parseFloat(quote.dstAmount) - parseFloat(prev.quote.dstAmount),
+      priceImpactPct: quote.priceImpactPct - prev.quote.priceImpactPct,
+    };
+    if (delta.dstAmount === 0 && delta.priceImpactPct === 0) return;
+
+    setQuoteDelta(delta);
+    const timer = setTimeout(() => setQuoteDelta(null), QUOTE_DELTA_TTL_MS);
+    return () => clearTimeout(timer);
+  }, [quote, routeKey]);
 
   const dstAddressError = dstAddress && !isValidStellarPublicKey(dstAddress) ? t("swap.destination.invalidAddress") : null;
 
@@ -148,7 +223,10 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   }
 
   const handleAmountChange = (raw: string) => {
-    setSrcAmount(truncateToDecimals(raw, srcToken.decimals));
+    // The field is `type="text"` (a `type="number"` input silently reformats
+    // high-precision decimals) so keep only digits and a single dot here.
+    const cleaned = raw.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+    setSrcAmount(truncateToDecimals(cleaned, srcToken.decimals));
   };
 
   const handleSubmit = () => {
@@ -422,12 +500,26 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                   <span className="sr-only">{t("swap.to.quoteLoading")}</span>
                 </div>
               ) : (
-                <div className="text-3xl font-light text-vx-text num">
-                  {dstAmount > 0
-                    ? formatTokenAmount(dstAmount, undefined, {
-                        maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
-                      })
-                    : "0"}
+                <div className="flex items-baseline gap-2">
+                  <div className="text-3xl font-light text-vx-text num">
+                    {dstAmount > 0
+                      ? formatTokenAmount(dstAmount, undefined, {
+                          maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
+                        })
+                      : "0"}
+                  </div>
+                  {quoteDelta && (
+                    <QuoteDelta
+                      value={quoteDelta.dstAmount}
+                      betterWhenHigher
+                      label={t("swap.to.label")}
+                      format={(n) =>
+                        formatTokenAmount(n, undefined, {
+                          maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
+                        })
+                      }
+                    />
+                  )}
                 </div>
               )}
             </div>

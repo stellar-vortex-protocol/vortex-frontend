@@ -136,7 +136,6 @@ export default function MyIntentsPage() {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value as IntentStatus | "all")}
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
-                  aria-label="Filter intents by status"
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s} value={s}>
@@ -153,7 +152,6 @@ export default function MyIntentsPage() {
                   value={chainFilter}
                   onChange={(e) => setChainFilter(e.target.value)}
                   className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
-                  aria-label="Filter intents by chain"
                 >
                   <option value="all">All chains</option>
                   {CHAINS.map((c) => (

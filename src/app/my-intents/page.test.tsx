@@ -191,6 +191,16 @@ describe("MyIntentsPage", () => {
     expect(screen.getByRole("link", { name: /make your first swap/i })).toHaveAttribute("href", "/");
   });
 
+  it("shows a relative 'submitted ... ago' timestamp on each row", () => {
+    mockWallet({ address: "GABC123", isConnected: true });
+    const recent: FeedItem[] = [
+      { ...intents[0]!, id: "9", createdAt: new Date(Date.now() - 90_000).toISOString() },
+    ];
+    useMyLiveIntentsMock.mockReturnValue({ intents: recent, isLoading: false, error: undefined });
+    render(<MyIntentsPage />);
+    expect(screen.getByText(/submitted 1m ago/)).toBeInTheDocument();
+  });
+
   it("links each intent row to the intent detail page", () => {
     mockWallet({ address: "GABC123", isConnected: true });
     useMyLiveIntentsMock.mockReturnValue({ intents, isLoading: false, error: undefined });

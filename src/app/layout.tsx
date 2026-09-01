@@ -97,6 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WalletHydrator />
           <IntentStatusWatcher />
           {children}
+          <CommandPalette />
           <ToastViewport />
           <ConnectivityBanner />
         </I18nProvider>

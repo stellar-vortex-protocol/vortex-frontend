@@ -144,7 +144,7 @@ export function ActivityFeedView({ items, isLoading, error, isLive }: ActivityFe
                 className="text-[10px] text-vx-muted"
                 title={new Date(item.createdAt).toLocaleString()}
               >
-                {timeAgo(item.createdAt)}
+                {timeAgo(item.createdAt, now)}
               </span>
             </div>
           </div>
