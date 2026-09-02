@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { CATALOGS, createTranslator, interpolate, isLocale, translate, LOCALES } from "./index";
+import {
+  CATALOGS,
+  createTranslator,
+  interpolate,
+  isLocale,
+  translate,
+  LOCALES,
+} from "./index";
 import { en } from "./messages/en";
 
 describe("interpolate", () => {
   it("substitutes named placeholders", () => {
-    expect(interpolate("Swap {amount} {srcToken}", { amount: "500", srcToken: "USDC" })).toBe(
-      "Swap 500 USDC"
-    );
+    expect(
+      interpolate("Swap {amount} {srcToken}", {
+        amount: "500",
+        srcToken: "USDC",
+      }),
+    ).toBe("Swap 500 USDC");
   });
 
   it("coerces numeric values", () => {
@@ -29,12 +39,18 @@ describe("translate", () => {
 
   it("fills placeholders", () => {
     expect(
-      translate("en", "swap.submit.cta", { amount: "500", srcToken: "USDC", dstToken: "XLM" })
+      translate("en", "swap.submit.cta", {
+        amount: "500",
+        srcToken: "USDC",
+        dstToken: "XLM",
+      }),
     ).toBe("Swap 500 USDC → XLM");
   });
 
   it("falls back to the key when a message is missing", () => {
-    expect(translate("en", "swap.does.not.exist" as never)).toBe("swap.does.not.exist");
+    expect(translate("en", "swap.does.not.exist" as never)).toBe(
+      "swap.does.not.exist",
+    );
   });
 });
 

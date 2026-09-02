@@ -20,10 +20,7 @@ export function SkeletonBlock({ className }: SkeletonBlockProps) {
   return (
     <div
       aria-hidden="true"
-      className={clsx(
-        "bg-vx-surface/40 rounded-lg animate-pulse",
-        className,
-      )}
+      className={clsx("bg-vx-surface/40 rounded-lg animate-pulse", className)}
     />
   );
 }
@@ -44,7 +41,10 @@ export function SkeletonText({ lines = 2, className }: SkeletonTextProps) {
         <div
           // eslint-disable-next-line react/no-array-index-key
           key={i}
-          className={clsx("h-4 bg-vx-surface/40 rounded animate-pulse", widths[i % widths.length])}
+          className={clsx(
+            "h-4 bg-vx-surface/40 rounded animate-pulse",
+            widths[i % widths.length],
+          )}
         />
       ))}
     </div>
@@ -62,7 +62,11 @@ interface SkeletonCardProps {
   className?: string;
 }
 
-export function SkeletonCard({ rows = 3, rowHeight = "h-14", className }: SkeletonCardProps) {
+export function SkeletonCard({
+  rows = 3,
+  rowHeight = "h-14",
+  className,
+}: SkeletonCardProps) {
   return (
     <div aria-hidden="true" className={clsx("space-y-2", className)}>
       {Array.from({ length: rows }).map((_, i) => (
@@ -108,4 +112,12 @@ export function SkeletonDetailCard() {
       </div>
     </div>
   );
+}
+
+export function IntentListSkeleton({ count = 4 }: { count?: number }) {
+  return <SkeletonCard rows={count} rowHeight="h-14" />;
+}
+
+export function FeedSkeleton({ count = 3 }: { count?: number }) {
+  return <SkeletonCard rows={count} rowHeight="h-12" />;
 }

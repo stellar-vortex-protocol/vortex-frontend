@@ -14,13 +14,13 @@ status (not just color) so it doesn't rely on color alone to differentiate.
 ```tsx
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 
-<IntentStatusBadge status="filled" />
+<IntentStatusBadge status="filled" />;
 ```
 
 **Props**
 
-| prop     | type           | required | notes                                            |
-| -------- | -------------- | -------- | ------------------------------------------------- |
+| prop     | type           | required | notes                                                                          |
+| -------- | -------------- | -------- | ------------------------------------------------------------------------------ |
 | `status` | `IntentStatus` | yes      | one of `"pending" \| "accepted" \| "filled" \| "failed"` (see `src/lib/types`) |
 
 No other configuration — styling and icon are derived entirely from `status` via
@@ -39,7 +39,7 @@ toasts.
 ```tsx
 import { ToastViewport } from "@/components/ToastViewport";
 
-<ToastViewport />
+<ToastViewport />;
 ```
 
 **Props**: none. Mount it once, near the root of the tree — it's already mounted
@@ -64,7 +64,7 @@ import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 
 **Props**
 
-| prop      | type      | required | default | notes                                                                 |
+| prop      | type      | required | default | notes                                                                  |
 | --------- | --------- | -------- | ------- | ---------------------------------------------------------------------- |
 | `compact` | `boolean` | no       | `false` | tighter padding/layout for constrained spaces (e.g. mobile nav/header) |
 

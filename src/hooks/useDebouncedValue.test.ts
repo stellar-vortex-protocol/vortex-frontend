@@ -17,9 +17,12 @@ describe("useDebouncedValue", () => {
   });
 
   it("does not update until the delay elapses", () => {
-    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 500), {
-      initialProps: { value: "a" },
-    });
+    const { result, rerender } = renderHook(
+      ({ value }) => useDebouncedValue(value, 500),
+      {
+        initialProps: { value: "a" },
+      },
+    );
 
     rerender({ value: "b" });
     expect(result.current).toBe("a");
@@ -36,9 +39,12 @@ describe("useDebouncedValue", () => {
   });
 
   it("resets the timer on rapid successive changes", () => {
-    const { result, rerender } = renderHook(({ value }) => useDebouncedValue(value, 500), {
-      initialProps: { value: "a" },
-    });
+    const { result, rerender } = renderHook(
+      ({ value }) => useDebouncedValue(value, 500),
+      {
+        initialProps: { value: "a" },
+      },
+    );
 
     rerender({ value: "b" });
     act(() => {

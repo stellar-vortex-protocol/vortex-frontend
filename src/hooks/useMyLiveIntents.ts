@@ -4,7 +4,7 @@ import { useWebSocket } from "./useWebSocket";
 import type { FeedItem } from "@/lib/types";
 
 const MAX_ITEMS = 200;
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? null;
+const WS_URL = process.env["NEXT_PUBLIC_WS_URL"] ?? null;
 
 function mergeById(items: FeedItem[]): FeedItem[] {
   const seen = new Set<string>();

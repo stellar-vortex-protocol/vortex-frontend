@@ -1,7 +1,12 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState } from "react";
-import { createTranslator, DEFAULT_LOCALE, type Locale, type Translator } from ".";
+import {
+  createTranslator,
+  DEFAULT_LOCALE,
+  type Locale,
+  type Translator,
+} from ".";
 
 type LocaleContextValue = {
   locale: Locale;
@@ -24,7 +29,9 @@ export function I18nProvider({
 
   const value = useMemo(() => ({ locale, setLocale }), [locale]);
 
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
+  return (
+    <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+  );
 }
 
 export function useLocale(): Locale {

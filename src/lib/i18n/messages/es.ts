@@ -14,7 +14,8 @@ export const es = {
   "wallet.connect.retry": "Reintentar conexión",
   "wallet.disconnect.cta": "Desconectar",
   "wallet.disconnect.aria": "Desconectar billetera {address}",
-  "wallet.error.freighterUnavailable": "La extensión Freighter no está instalada o habilitada.",
+  "wallet.error.freighterUnavailable":
+    "La extensión Freighter no está instalada o habilitada.",
   "wallet.error.connectFailed": "No se pudo conectar la billetera.",
 
   "swap.chainPicker.title": "Seleccionar cadena origen",
@@ -73,7 +74,8 @@ export const es = {
   "swap.submit.success": "Swap enviado ✓ — iniciar un nuevo swap",
   "swap.submit.enterAmount": "Ingresa un monto",
   "swap.submit.cta": "Intercambiar {amount} {srcToken} → {dstToken}",
-  "swap.submit.retryCta": "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
+  "swap.submit.retryCta":
+    "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
 
   "swap.destination.label": "Dirección de destino",
   "swap.destination.placeholder": "G...",

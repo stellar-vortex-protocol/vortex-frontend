@@ -3,7 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
 
   /* ── Font stacks ─────────────────────────────────────────────────────────── */
   :root {
@@ -11,7 +13,9 @@
     --font-geist-mono: "JetBrains Mono", ui-monospace, monospace;
   }
 
-  html { -webkit-font-smoothing: antialiased; }
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
 
   /* ── Dark theme (default) ───────────────────────────────────────────────── */
   /*
@@ -161,28 +165,25 @@
     @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
   }
 
-  .num { font-family: var(--font-geist-mono); font-variant-numeric: tabular-nums; }
+  .num {
+    font-family: var(--font-geist-mono);
+    font-variant-numeric: tabular-nums;
+  }
 
   .input-swap {
-    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg
-           placeholder-vx-dim/60 caret-vx-sage
-           focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
+    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg placeholder-vx-dim/60 caret-vx-sage focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
   }
 
   .token-btn {
-    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg
-           border border-vx-border hover:border-vx-border hover:bg-vx-card/80
-           transition-all duration-150 cursor-pointer select-none;
+    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg border border-vx-border hover:border-vx-border hover:bg-vx-card/80 transition-all duration-150 cursor-pointer select-none;
   }
 
   .chain-badge {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono
-           bg-vx-lav-bg text-vx-lav border border-vx-lav/20;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-lav-bg text-vx-lav border border-vx-lav/20;
   }
 
   .stellar-badge {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono
-           bg-vx-sage-bg text-vx-sage border border-vx-sage/20;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-sage-bg text-vx-sage border border-vx-sage/20;
   }
 
   .state-dot {
@@ -199,13 +200,19 @@
   padding: 0.875rem;
   border-radius: 0.75rem;
   width: 100%;
-  transition: filter 0.15s, transform 0.1s;
+  transition:
+    filter 0.15s,
+    transform 0.1s;
   border: none;
   cursor: pointer;
 }
 
-.btn-swap:hover { filter: brightness(1.08); }
-.btn-swap:active { transform: scale(0.99); }
+.btn-swap:hover {
+  filter: brightness(1.08);
+}
+.btn-swap:active {
+  transform: scale(0.99);
+}
 .btn-swap:disabled {
   background: linear-gradient(135deg, color-mix(in srgb, var(--vx-sage) 25%, transparent) 0%, rgba(56,189,248,0.25) 100%);
   color: color-mix(in srgb, var(--vx-ink) 50%, transparent);
@@ -224,11 +231,15 @@
 }
 
 @keyframes flow {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -236,14 +247,18 @@
   }
 }
 
-html[data-motion="reduce"] *, html[data-motion="reduce"] *::before, html[data-motion="reduce"] *::after {
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
 
-html[data-motion="allow"] *, html[data-motion="allow"] *::before, html[data-motion="allow"] *::after {
+html[data-motion="allow"] *,
+html[data-motion="allow"] *::before,
+html[data-motion="allow"] *::after {
   scroll-behavior: smooth;
 }
 

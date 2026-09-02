@@ -1,5 +1,8 @@
 export function timeAgo(iso: string, now: number = Date.now()): string {
-  const diffSeconds = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+  const diffSeconds = Math.max(
+    0,
+    Math.floor((now - new Date(iso).getTime()) / 1000),
+  );
 
   if (diffSeconds < 5) return "just now";
   if (diffSeconds < 60) return `${diffSeconds}s ago`;

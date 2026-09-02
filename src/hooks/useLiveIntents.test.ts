@@ -27,7 +27,11 @@ import { useLiveIntents } from "./useLiveIntents";
 
 describe("useLiveIntents", () => {
   it("falls back to the REST list when there is no live message yet", () => {
-    useIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
+    useIntentsMock.mockReturnValue({
+      intents: restItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: null });
 
     const { result } = renderHook(() => useLiveIntents());
@@ -37,8 +41,16 @@ describe("useLiveIntents", () => {
   });
 
   it("prepends a live message ahead of the REST list, deduped by id", () => {
-    const liveItem: FeedItem = { ...restItems[0]!, id: "live-1", solver: "Beta" };
-    useIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
+    const liveItem: FeedItem = {
+      ...restItems[0]!,
+      id: "live-1",
+      solver: "Beta",
+    };
+    useIntentsMock.mockReturnValue({
+      intents: restItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: liveItem });
 
     const { result } = renderHook(() => useLiveIntents());
@@ -48,8 +60,15 @@ describe("useLiveIntents", () => {
   });
 
   it("reports isLive as false when the socket is not open", () => {
-    useIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
-    useWebSocketMock.mockReturnValue({ status: "connecting", lastMessage: null });
+    useIntentsMock.mockReturnValue({
+      intents: restItems,
+      isLoading: false,
+      error: undefined,
+    });
+    useWebSocketMock.mockReturnValue({
+      status: "connecting",
+      lastMessage: null,
+    });
 
     const { result } = renderHook(() => useLiveIntents());
 

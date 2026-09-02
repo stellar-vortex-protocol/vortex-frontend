@@ -5,7 +5,7 @@ import type { Solver } from "@/lib/types";
 export function useSolver(address: string | null) {
   const { data, error, isLoading } = useSWR<Solver>(
     address ? `/solvers/${address}` : null,
-    fetcher
+    fetcher,
   );
 
   return { solver: data, isLoading, error };

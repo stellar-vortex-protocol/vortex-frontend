@@ -10,7 +10,11 @@ function resolveLocale(locale?: string): string {
   return DEFAULT_LOCALE;
 }
 
-export function formatCurrency(value: number, locale?: string, options: Intl.NumberFormatOptions = {}) {
+export function formatCurrency(
+  value: number,
+  locale?: string,
+  options: Intl.NumberFormatOptions = {},
+) {
   return new Intl.NumberFormat(resolveLocale(locale), {
     style: "currency",
     currency: "USD",
@@ -18,6 +22,10 @@ export function formatCurrency(value: number, locale?: string, options: Intl.Num
   }).format(value);
 }
 
-export function formatTokenAmount(value: number, locale?: string, options: Intl.NumberFormatOptions = {}) {
+export function formatTokenAmount(
+  value: number,
+  locale?: string,
+  options: Intl.NumberFormatOptions = {},
+) {
   return new Intl.NumberFormat(resolveLocale(locale), options).format(value);
 }

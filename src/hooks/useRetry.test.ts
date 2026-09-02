@@ -3,7 +3,7 @@
  * resolves successfully once the backend recovers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { createElement, type ReactNode } from "react";
 
@@ -29,7 +29,19 @@ vi.useFakeTimers();
 const wrapper = ({ children }: { children: ReactNode }) =>
   createElement(
     SWRConfig,
-    { value: { provider: () => new Map(), dedupingInterval: 0, errorRetryInterval: 0 } },
+    {
+      value: {
+        provider: () => new Map(),
+        dedupingInterval: 0,
+        errorRetryInterval: 1000,
+        shouldRetryOnError: true,
+        onErrorRetry(error, _key, _config, revalidate, { retryCount }) {
+          if (error?.status >= 400 && error?.status < 500) return;
+          if (retryCount >= 3) return;
+          setTimeout(() => revalidate({ retryCount }), 1000 * 2 ** retryCount);
+        },
+      },
+    },
     children,
   );
 
@@ -74,14 +86,14 @@ describe.skip("useIntents – retry on transient failure", () => {
     const { result } = renderHook(() => useIntents(), { wrapper });
 
     // First call fails — error is surfaced.
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
     expect(result.current.intents).toEqual([]);
 
     // Advance time past the first back-off window (1 s) to trigger retry.
     vi.advanceTimersByTime(1500);
 
     // Second call succeeds.
-    await waitFor(() => expect(result.current.intents).toEqual(intents));
+    await vi.waitFor(() => expect(result.current.intents).toEqual(intents));
     expect(result.current.error).toBeUndefined();
   });
 
@@ -94,7 +106,7 @@ describe.skip("useIntents – retry on transient failure", () => {
     });
 
     const { result } = renderHook(() => useIntents(), { wrapper });
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(5000);
     // fetch called exactly once — no retry.
@@ -131,11 +143,11 @@ describe.skip("useIntent – retry on transient failure", () => {
 
     const { result } = renderHook(() => useIntent("intent-1"), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(1500);
 
-    await waitFor(() => expect(result.current.intent).toEqual(detail));
+    await vi.waitFor(() => expect(result.current.intent).toEqual(detail));
     expect(result.current.error).toBeUndefined();
   });
 });
@@ -167,11 +179,11 @@ describe.skip("useMyIntents – retry on transient failure", () => {
 
     const { result } = renderHook(() => useMyIntents("GABC123"), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(1500);
 
-    await waitFor(() => expect(result.current.intents).toEqual(intents));
+    await vi.waitFor(() => expect(result.current.intents).toEqual(intents));
     expect(result.current.error).toBeUndefined();
   });
 });
@@ -205,11 +217,11 @@ describe.skip("useSolvers – retry on transient failure", () => {
 
     const { result } = renderHook(() => useSolvers(), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(1500);
 
-    await waitFor(() => expect(result.current.solvers).toEqual(solvers));
+    await vi.waitFor(() => expect(result.current.solvers).toEqual(solvers));
     expect(result.current.error).toBeUndefined();
   });
 });
@@ -240,11 +252,11 @@ describe.skip("useOpenIntents – retry on transient failure", () => {
 
     const { result } = renderHook(() => useOpenIntents(), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(1500);
 
-    await waitFor(() => expect(result.current.intents).toEqual(openIntents));
+    await vi.waitFor(() => expect(result.current.intents).toEqual(openIntents));
     expect(result.current.error).toBeUndefined();
   });
 });
@@ -276,11 +288,11 @@ describe.skip("useActivityFeed – retry on transient failure", () => {
 
     const { result } = renderHook(() => useActivityFeed(), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(1500);
 
-    await waitFor(() => expect(result.current.items).toEqual(feed));
+    await vi.waitFor(() => expect(result.current.items).toEqual(feed));
     expect(result.current.error).toBeUndefined();
   });
 });
@@ -306,14 +318,19 @@ describe.skip("useQuote – retry on transient failure", () => {
       .mockImplementationOnce(() => error500())
       .mockImplementationOnce(() => ok(quote));
 
-    const params = { srcChain: "ethereum", srcToken: "USDC", srcAmount: "500", dstToken: "XLM" };
+    const params = {
+      srcChain: "ethereum",
+      srcToken: "USDC",
+      srcAmount: "500",
+      dstToken: "XLM",
+    };
     const { result } = renderHook(() => useQuote(params), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(1500);
 
-    await waitFor(() => expect(result.current.quote).toEqual(quote));
+    await vi.waitFor(() => expect(result.current.quote).toEqual(quote));
     expect(result.current.error).toBeUndefined();
   });
 
@@ -325,10 +342,15 @@ describe.skip("useQuote – retry on transient failure", () => {
       text: async () => "",
     });
 
-    const params = { srcChain: "ethereum", srcToken: "USDC", srcAmount: "500", dstToken: "XLM" };
+    const params = {
+      srcChain: "ethereum",
+      srcToken: "USDC",
+      srcAmount: "500",
+      dstToken: "XLM",
+    };
     const { result } = renderHook(() => useQuote(params), { wrapper });
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    await vi.waitFor(() => expect(result.current.error).toBeDefined());
 
     vi.advanceTimersByTime(5000);
     expect(fetch).toHaveBeenCalledTimes(1);

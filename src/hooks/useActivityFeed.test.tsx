@@ -6,7 +6,9 @@ import { useActivityFeed } from "./useActivityFeed";
 import type { FeedItem } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>{children}</SWRConfig>
+  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    {children}
+  </SWRConfig>
 );
 
 describe("useActivityFeed", () => {

@@ -3,8 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import freighterApi from "@stellar/freighter-api";
 
 export type WalletErrorKey =
-  | "wallet.error.freighterUnavailable"
-  | "wallet.error.connectFailed";
+  "wallet.error.freighterUnavailable" | "wallet.error.connectFailed";
 
 /** Shape of the slice persisted to localStorage under `PERSIST_KEY`. */
 export type PersistedWalletState = {
@@ -17,7 +16,9 @@ export type PersistedWalletState = {
 export const PERSIST_KEY = "vortex-wallet";
 
 /** The network name the app expects, normalised to upper-case for comparison. */
-const EXPECTED_NETWORK = (process.env.NEXT_PUBLIC_NETWORK ?? "testnet").toUpperCase();
+const EXPECTED_NETWORK = (
+  process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"
+).toUpperCase();
 
 function isValidPersistedState(state: unknown): state is {
   address: string | null;
@@ -239,7 +240,7 @@ export const useWalletStore = create<WalletState>()(
           network: null,
           isConnected: false,
           isConnecting: false,
-          wasSessionCleared: false,
+          wasSessionCleared: true,
           error: null,
           errorKey: null,
           networkMismatch: false,
@@ -273,6 +274,7 @@ export const useWalletStore = create<WalletState>()(
           if (!allowed) {
             set({
               address: null,
+              lastKnownAddress: get().address ?? get().lastKnownAddress,
               network: null,
               isConnected: false,
               wasSessionCleared: true,
@@ -290,6 +292,7 @@ export const useWalletStore = create<WalletState>()(
 
           set({
             address,
+            lastKnownAddress: address,
             network,
             isConnected: true,
             wasSessionCleared: false,
@@ -356,6 +359,6 @@ export const useWalletStore = create<WalletState>()(
         network: state.network,
         isConnected: state.isConnected,
       }),
-    }
-  )
+    },
+  ),
 );

@@ -6,7 +6,9 @@ import { useQuote } from "./useQuote";
 import type { Quote } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>{children}</SWRConfig>
+  <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+    {children}
+  </SWRConfig>
 );
 
 describe("useQuote", () => {
@@ -25,8 +27,14 @@ describe("useQuote", () => {
 
   it("does not fetch when the amount is zero or missing", () => {
     renderHook(
-      () => useQuote({ srcChain: "ethereum", srcToken: "USDC", srcAmount: "0", dstToken: "XLM" }),
-      { wrapper }
+      () =>
+        useQuote({
+          srcChain: "ethereum",
+          srcToken: "USDC",
+          srcAmount: "0",
+          dstToken: "XLM",
+        }),
+      { wrapper },
     );
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -47,16 +55,24 @@ describe("useQuote", () => {
     });
 
     const { result } = renderHook(
-      () => useQuote({ srcChain: "ethereum", srcToken: "USDC", srcAmount: "500", dstToken: "XLM" }),
-      { wrapper }
+      () =>
+        useQuote({
+          srcChain: "ethereum",
+          srcToken: "USDC",
+          srcAmount: "500",
+          dstToken: "XLM",
+        }),
+      { wrapper },
     );
 
     await waitFor(() => {
       expect(result.current.quote).toEqual(quote);
     });
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/quote?srcChain=ethereum&srcToken=USDC&srcAmount=500&dstToken=XLM"),
-      expect.anything()
+      expect.stringContaining(
+        "/quote?srcChain=ethereum&srcToken=USDC&srcAmount=500&dstToken=XLM",
+      ),
+      expect.anything(),
     );
   });
 });

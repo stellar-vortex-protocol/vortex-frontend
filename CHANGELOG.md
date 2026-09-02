@@ -7,11 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+
 - Initial changelog entry
 
 ## [0.1.0] — 2025-07-30
 
 ### Added
+
 - Wallet integration — connect/disconnect Freighter, sign swaps and solver registrations, persist sessions across reloads
 - Swap interface with live quotes over SWR and end-to-end Freighter signing
 - Intent explorer page (`/explore`) — browse all intents with status/chain filters, sorting, and pagination

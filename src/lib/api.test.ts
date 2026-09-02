@@ -38,7 +38,11 @@ describe("apiFetch", () => {
     expect(result).toEqual({ hello: "world" });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringMatching(/\/ping$/),
-      expect.objectContaining({ headers: expect.objectContaining({ "Content-Type": "application/json" }) })
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      }),
     );
   });
 
@@ -90,10 +94,12 @@ describe("apiFetch", () => {
           const signal = init?.signal;
           if (signal) {
             signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError"),
+              );
             });
           }
-        })
+        }),
     );
 
     const promise = apiFetch("/slow");
@@ -111,10 +117,12 @@ describe("apiFetch", () => {
           const signal = init?.signal;
           if (signal) {
             signal.addEventListener("abort", () => {
-              reject(new DOMException("The operation was aborted.", "AbortError"));
+              reject(
+                new DOMException("The operation was aborted.", "AbortError"),
+              );
             });
           }
-        })
+        }),
     );
 
     const promise = apiFetch("/slow");

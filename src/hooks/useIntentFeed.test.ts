@@ -27,7 +27,11 @@ import { useIntentFeed } from "./useIntentFeed";
 
 describe("useIntentFeed", () => {
   it("falls back to the REST snapshot when there is no live message yet", () => {
-    useActivityFeedMock.mockReturnValue({ items: seedItems, isLoading: false, error: undefined });
+    useActivityFeedMock.mockReturnValue({
+      items: seedItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: null });
 
     const { result } = renderHook(() => useIntentFeed());
@@ -37,8 +41,16 @@ describe("useIntentFeed", () => {
   });
 
   it("prepends a live message ahead of the REST snapshot", () => {
-    const liveItem: FeedItem = { ...seedItems[0]!, id: "live-1", solver: "Beta" };
-    useActivityFeedMock.mockReturnValue({ items: seedItems, isLoading: false, error: undefined });
+    const liveItem: FeedItem = {
+      ...seedItems[0]!,
+      id: "live-1",
+      solver: "Beta",
+    };
+    useActivityFeedMock.mockReturnValue({
+      items: seedItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: liveItem });
 
     const { result } = renderHook(() => useIntentFeed());
@@ -48,8 +60,15 @@ describe("useIntentFeed", () => {
   });
 
   it("reports isLive as false when the socket is not open", () => {
-    useActivityFeedMock.mockReturnValue({ items: seedItems, isLoading: false, error: undefined });
-    useWebSocketMock.mockReturnValue({ status: "connecting", lastMessage: null });
+    useActivityFeedMock.mockReturnValue({
+      items: seedItems,
+      isLoading: false,
+      error: undefined,
+    });
+    useWebSocketMock.mockReturnValue({
+      status: "connecting",
+      lastMessage: null,
+    });
 
     const { result } = renderHook(() => useIntentFeed());
 
@@ -57,7 +76,11 @@ describe("useIntentFeed", () => {
   });
 
   it("returns a partial page as-is when fewer than the max items are available", () => {
-    useActivityFeedMock.mockReturnValue({ items: seedItems, isLoading: false, error: undefined });
+    useActivityFeedMock.mockReturnValue({
+      items: seedItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: null });
 
     const { result } = renderHook(() => useIntentFeed());
@@ -66,11 +89,16 @@ describe("useIntentFeed", () => {
   });
 
   it("caps out-of-range overflow at the max item count, keeping the newest items", () => {
+    const base = seedItems[0]!;
     const overflowSeed: FeedItem[] = Array.from({ length: 10 }, (_, i) => ({
       ...seedItems[0]!,
       id: `seed-${i}`,
     }));
-    useActivityFeedMock.mockReturnValue({ items: overflowSeed, isLoading: false, error: undefined });
+    useActivityFeedMock.mockReturnValue({
+      items: overflowSeed,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: null });
 
     const { result } = renderHook(() => useIntentFeed());

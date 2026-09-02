@@ -6,7 +6,11 @@ import { useOpenIntents } from "./useOpenIntents";
 import type { OpenIntent } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(SWRConfig, { value: { provider: () => new Map(), dedupingInterval: 0 } }, children);
+  createElement(
+    SWRConfig,
+    { value: { provider: () => new Map(), dedupingInterval: 0 } },
+    children,
+  );
 
 describe("useOpenIntents", () => {
   beforeEach(() => {
@@ -51,7 +55,10 @@ describe("useOpenIntents", () => {
     await waitFor(() => expect(result.current.intents).toEqual(intents));
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeUndefined();
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/intents/open"), expect.anything());
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/intents/open"),
+      expect.anything(),
+    );
   });
 
   it("resolves to an empty array when there are no open intents", async () => {

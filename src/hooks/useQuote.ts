@@ -5,7 +5,8 @@ import { swrRetryConfig } from "@/hooks/useRetry";
 import type { Quote, QuoteRequest, QuoteErrorType } from "@/lib/types";
 
 function quoteKey(params: QuoteRequest | null): string | null {
-  if (!params || !params.srcAmount || parseFloat(params.srcAmount) <= 0) return null;
+  if (!params || !params.srcAmount || parseFloat(params.srcAmount) <= 0)
+    return null;
   const search = new URLSearchParams({
     srcChain: params.srcChain,
     srcToken: params.srcToken,
@@ -26,7 +27,10 @@ export function classifyQuoteError(err: unknown): QuoteErrorType {
       return { kind: "no-solver", message: err.message };
     }
   }
-  return { kind: "generic", message: err instanceof Error ? err.message : "Failed to fetch quote." };
+  return {
+    kind: "generic",
+    message: err instanceof Error ? err.message : "Failed to fetch quote.",
+  };
 }
 
 export function useQuote(params: QuoteRequest | null) {

@@ -8,12 +8,13 @@ import { CopyButton } from "@/components/CopyButton";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { Nav } from "@/components/Nav";
 import { SkeletonDetailCard } from "@/components/Skeleton";
+import { CopyButton } from "@/components/CopyButton";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useIntent } from "@/hooks/useIntent";
 import { timeAgo } from "@/lib/time";
 import { truncateAddress } from "@/lib/stellarAddress";
 
-const NETWORK = process.env.NEXT_PUBLIC_NETWORK ?? "testnet";
+const NETWORK = process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet";
 
 // This screen shows 6-and-6 truncation for full-width identifiers.
 const truncate = (value: string) => truncateAddress(value, { prefix: 6, suffix: 6 });
@@ -23,16 +24,23 @@ function deadlineLabel(deadline: string) {
   if (msRemaining <= 0) return "Expired";
   const minutes = Math.floor(msRemaining / 60_000);
   const seconds = Math.floor((msRemaining % 60_000) / 1000);
-  return minutes > 0 ? `${minutes}m ${seconds}s remaining` : `${seconds}s remaining`;
+  return minutes > 0
+    ? `${minutes}m ${seconds}s remaining`
+    : `${seconds}s remaining`;
 }
 
-export default function IntentDetailPage({ params }: { params: { id: string } }) {
+export default function IntentDetailPage({
+  params,
+}: {
+  params: { id: string };
+}) {
   const { intent, isLoading, error } = useIntent(params.id);
   const { copy } = useCopyToClipboard();
   const [txHashCopied, setTxHashCopied] = useState(false);
 
   const isExpired = useMemo(() => {
-    if (!intent || intent.status !== "pending" || !intent.deadline) return false;
+    if (!intent || intent.status !== "pending" || !intent.deadline)
+      return false;
     return new Date(intent.deadline).getTime() <= Date.now();
   }, [intent]);
   const isSettled = intent?.status === "filled";
@@ -65,7 +73,8 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
           </div>
         ) : error ? (
           <div className="card p-8 text-center text-sm text-vx-muted">
-            Couldn&apos;t find that intent. It may not exist, or the relay is unreachable.
+            Couldn&apos;t find that intent. It may not exist, or the relay is
+            unreachable.
           </div>
         ) : !intent ? (
           <div className="card p-8 text-center text-sm text-vx-muted">
@@ -85,7 +94,8 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
               <div>
                 <div className="eyebrow mb-2">Intent</div>
                 <h1 className="text-2xl font-bold text-vx-text num">
-                  {intent.srcAmount} {intent.srcToken} → {intent.dstAmount} {intent.dstToken}
+                  {intent.srcAmount} {intent.srcToken} → {intent.dstAmount}{" "}
+                  {intent.dstToken}
                 </h1>
               </div>
               <IntentStatusBadge status={intent.status} />
@@ -116,6 +126,18 @@ export default function IntentDetailPage({ params }: { params: { id: string } })
                   <div className="text-sm text-vx-text num capitalize">{v}</div>
                 </div>
               ))}
+              <div className="bg-vx-surface/40 rounded-lg p-3">
+                <div className="eyebrow mb-1">Destination address</div>
+                <div className="flex items-center gap-2 text-sm text-vx-text num">
+                  <span className="truncate">
+                    {truncateAddress(intent.dstAddress)}
+                  </span>
+                  <CopyButton
+                    value={intent.dstAddress}
+                    label="Copy destination address"
+                  />
+                </div>
+              </div>
             </div>
 
             {intent.txHash && (

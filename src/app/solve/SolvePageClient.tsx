@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/Nav";
+import { Footer } from "@/components/Footer";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useSolvers } from "@/hooks/useSolvers";
 import { useOpenIntents } from "@/hooks/useOpenIntents";
@@ -17,11 +18,8 @@ import { formatCurrency } from "@/lib/format";
 import { sanitizeDisplayText } from "@/lib/textSafety";
 import Link from "next/link";
 
-const usdCompact = (value: number) =>
-  formatCurrency(value, undefined, {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  });
+const TABS = ["leaderboard", "intents", "register"] as const;
+type Tab = (typeof TABS)[number];
 
 const MIN_BOND_USD = 50;
 const ONBOARDING_DISMISSED_KEY = "vortex_solver_onboarding_dismissed";
@@ -32,12 +30,18 @@ type RegistrationDraft = {
   bond: string;
 };
 
-const REGISTRATION_LABEL: Record<string, string> = {
-  connecting: getMessage("solve.register.states.connecting"),
-  building: getMessage("solve.register.states.building"),
-  "awaiting-signature": getMessage("solve.register.states.awaitingSignature"),
-  submitting: getMessage("solve.register.states.submitting"),
-};
+function usdCompact(amount: number) {
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(1)}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(0)}k`;
+  return `$${amount}`;
+}
+
+function formatTimeRemaining(deadlineStr: string): string {
+  const ms = new Date(deadlineStr).getTime() - Date.now();
+  if (ms <= 0) return "0m";
+  const mins = Math.ceil(ms / 60_000);
+  return `${mins}m`;
+}
 
 export default function SolvePageClient() {
   const { t } = useTranslation();
@@ -45,6 +49,8 @@ export default function SolvePageClient() {
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
   const { accept, acceptingId, error: acceptError } = useAcceptIntent();
+  const { register, status: regStatus, error: regError, reset } =
+    useSolverRegistration();
 
   // Draft persistence — scoped to the currently connected wallet so that
   // switching wallets never silently restores the wrong address.
@@ -134,36 +140,109 @@ export default function SolvePageClient() {
     }
   };
 
-  const handleRegister = () => {
-    if (registration.status === "success") {
-      registration.reset();
+  const sortedSolvers = useMemo(() => {
+    return [...solvers].sort((a, b) => {
+      if (sortField === "name") {
+        return sortDirection === "asc"
+          ? a.name.localeCompare(b.name)
+          : b.name.localeCompare(a.name);
+      }
+      if (sortField === "volume") {
+        return sortDirection === "asc"
+          ? a.volumeUsd - b.volumeUsd
+          : b.volumeUsd - a.volumeUsd;
+      }
+      if (sortField === "fills") {
+        return sortDirection === "asc" ? a.fills - b.fills : b.fills - a.fills;
+      }
+      if (sortField === "success") {
+        return sortDirection === "asc"
+          ? a.successRatePct - b.successRatePct
+          : b.successRatePct - a.successRatePct;
+      }
+      return 0;
+    });
+  }, [solvers, sortField, sortDirection]);
+
+  const handleSort = (field: "name" | "volume" | "fills" | "success") => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection(field === "name" ? "asc" : "desc");
+    }
+  };
+
+  const addressError = useMemo(() => {
+    if (!address) return submitted ? getMessage("solve.register.validation.invalidAddress") : null;
+    if (!isValidStellarPublicKey(address)) {
+      return getMessage("solve.register.validation.invalidAddress");
+    }
+    return null;
+  }, [address, submitted]);
+
+  const bondError = useMemo(() => {
+    if (!bond) return submitted ? getMessage("solve.register.validation.minimumBond", { minBond: MIN_BOND_USDC }) : null;
+    const num = parseFloat(bond);
+    if (isNaN(num) || num < MIN_BOND_USDC) {
+      return getMessage("solve.register.validation.minimumBond", { minBond: MIN_BOND_USDC });
+    }
+    return null;
+  }, [bond, submitted]);
+
+  const canSubmit = Boolean(address && bond && !addressError && !bondError);
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (regStatus === "success") {
+      reset();
       setAddress("");
       setBond("");
       clearDraft();
       return;
     }
-    if (!canRegister) return;
-    registration.register(address, parseFloat(bond));
+    setSubmitted(true);
+    setAddressTouched(true);
+    setBondTouched(true);
+
+    if (!canSubmit) return;
+
+    await register(address, parseFloat(bond));
   };
+
+  let submitButtonText = getMessage("solve.register.button.connect");
+  if (regStatus === "success") {
+    submitButtonText = getMessage("solve.register.button.registered");
+  } else if (regStatus === "connecting") {
+    submitButtonText = getMessage("solve.register.states.connecting");
+  } else if (regStatus === "building") {
+    submitButtonText = getMessage("solve.register.states.building");
+  } else if (regStatus === "awaiting-signature") {
+    submitButtonText = getMessage("solve.register.states.awaitingSignature");
+  } else if (regStatus === "submitting") {
+    submitButtonText = getMessage("solve.register.states.submitting");
+  }
+
+  const isBusy = ["connecting", "building", "awaiting-signature", "submitting"].includes(regStatus);
 
   return (
     <div className="min-h-screen">
       <Nav variant="breadcrumb" label={t("solve.nav.label")} />
 
-      <main id="main-content" className="max-w-5xl mx-auto px-3 sm:px-5 py-8 sm:py-12">
-        <div className="mb-8 sm:mb-10">
-          <div className="eyebrow mb-2 sm:mb-3 text-xs">Solver Network</div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-vx-text mb-2 sm:mb-3">
-            Become a Vortex Solver
+      <main id="main-content" className="max-w-5xl mx-auto px-5 py-12">
+        {/* Header */}
+        <div className="mb-10">
+          <div className="eyebrow mb-3">{getMessage("solve.hero.eyebrow")}</div>
+          <h1 className="text-3xl font-bold text-vx-text mb-3">
+            {getMessage("solve.hero.title")}
           </h1>
-          <p className="text-vx-muted text-xs sm:text-sm max-w-lg leading-relaxed">
-            Solvers are competitive market makers who fill user swap intents. Deposit a USDC bond,
-            watch the open intent feed, and earn fees on every fill you complete.
+          <p className="text-vx-muted text-sm max-w-lg leading-relaxed">
+            {getMessage("solve.hero.description")}
           </p>
         </div>
 
-        {/* How solver earns */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-8 sm:mb-10">
+        {/* Steps strip */}
+        <div className="grid sm:grid-cols-3 gap-4 mb-10">
           {[
             {
               n: t("solve.steps.registerBond.number"),
@@ -192,8 +271,8 @@ export default function SolvePageClient() {
         {/* Tabs */}
         <div
           role="tablist"
-          aria-label="Solver portal sections"
-          className="flex gap-1 mb-6 bg-vx-surface/50 p-1 rounded-lg w-fit overflow-x-auto"
+          aria-label={getMessage("solve.tabs.ariaLabel")}
+          className="flex border-b border-vx-border gap-1 mb-8 overflow-x-auto"
         >
           {(["leaderboard", "intents", "register"] as const).map((tabId) => (
             <button
@@ -341,7 +420,9 @@ export default function SolvePageClient() {
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-6">
                         <div>
-                          <div className="num text-xs sm:text-sm font-semibold text-vx-text">{s.fills}</div>
+                          <div className="num text-xs sm:text-sm font-semibold text-vx-text">
+                            {s.fills}
+                          </div>
                           <div className="eyebrow text-[10px] sm:text-xs">
                             {t("solve.leaderboard.fills")}
                           </div>
@@ -365,7 +446,9 @@ export default function SolvePageClient() {
                         <div>
                           <div
                             className={`num text-xs sm:text-sm font-semibold ${
-                              s.successRatePct > 99 ? "text-vx-sage" : "text-vx-amber"
+                              s.successRatePct > 99
+                                ? "text-vx-sage"
+                                : "text-vx-amber"
                             }`}
                           >
                             {s.successRatePct}%
@@ -383,13 +466,13 @@ export default function SolvePageClient() {
           </div>
         )}
 
-        {/* ── Open intents tab ── */}
+        {/* ── Open Intents tab ── */}
         {tab === "intents" && (
           <div
             id="panel-intents"
             role="tabpanel"
             aria-labelledby="tab-intents"
-            className="card overflow-hidden"
+            className="space-y-4"
           >
             <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30 flex items-center justify-between">
               <span className="text-sm font-semibold text-vx-text">
@@ -402,15 +485,16 @@ export default function SolvePageClient() {
             </div>
 
             {acceptError && (
-              <div role="alert" className="px-5 py-2.5 text-xs text-red-400 border-b border-vx-line">
+              <div
+                role="alert"
+                className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400"
+              >
                 {acceptError}
               </div>
             )}
 
-            {intentsLoading && openIntents.length === 0 ? (
-              <div className="p-5">
-                <SkeletonCard rows={3} rowHeight="h-14" />
-              </div>
+            {intentsLoading && intents.length === 0 ? (
+              <SkeletonCard rows={3} rowHeight="h-16" />
             ) : intentsError ? (
               <div className="p-8 text-center text-sm text-vx-muted">
                 {t("solve.intents.error")}
@@ -420,11 +504,11 @@ export default function SolvePageClient() {
                 {t("solve.intents.empty")}
               </div>
             ) : (
-              <div className="divide-y divide-vx-line">
-                {openIntents.map((intent) => (
+              <div className="space-y-2">
+                {intents.map((intent) => (
                   <div
                     key={intent.id}
-                    className="px-3 sm:px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 hover:bg-vx-surface/30"
+                    className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="num text-xs text-vx-muted mb-1 capitalize">
@@ -441,14 +525,13 @@ export default function SolvePageClient() {
                         })}
                       </div>
                     </div>
+
                     <button
                       type="button"
                       onClick={() => accept(intent.id)}
                       disabled={acceptingId === intent.id}
                       aria-busy={acceptingId === intent.id}
-                      className="px-3 sm:px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg
-                                 border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0
-                                 w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
+                      className="px-3 sm:px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0 w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
                     >
                       {acceptingId === intent.id
                         ? t("solve.intents.accepting")
@@ -544,13 +627,17 @@ export default function SolvePageClient() {
                   onChange={(e) => handleAddressChange(e.target.value.trim())}
                   placeholder={getMessage("solve.register.addressPlaceholder")}
                   aria-invalid={Boolean(addressError)}
-                  aria-describedby={addressError ? "solver-address-error" : undefined}
-                  className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
-                             text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
-                             focus:border-vx-sage/50 transition-colors"
+                  aria-describedby={
+                    addressError ? "solver-address-error" : undefined
+                  }
+                  className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:ring-2 focus:ring-vx-sage focus:border-vx-sage/50 transition-colors"
                 />
                 {addressError && (
-                  <p id="solver-address-error" role="alert" className="text-xs text-red-400 mt-1.5">
+                  <p
+                    id="solver-address-error"
+                    role="alert"
+                    className="text-xs text-red-400 mt-1.5"
+                  >
                     {addressError}
                   </p>
                 )}
@@ -568,12 +655,14 @@ export default function SolvePageClient() {
                   placeholder={getMessage("solve.register.bondPlaceholder")}
                   aria-invalid={Boolean(bondError)}
                   aria-describedby={bondError ? "solver-bond-error" : undefined}
-                  className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5
-                             text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none
-                             focus:border-vx-sage/50 transition-colors"
+                  className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:ring-2 focus:ring-vx-sage focus:border-vx-sage/50 transition-colors"
                 />
                 {bondError && (
-                  <p id="solver-bond-error" role="alert" className="text-xs text-red-400 mt-1.5">
+                  <p
+                    id="solver-bond-error"
+                    role="alert"
+                    className="text-xs text-red-400 mt-1.5"
+                  >
                     {bondError}
                   </p>
                 )}
@@ -597,10 +686,10 @@ export default function SolvePageClient() {
 
               <button
                 type="button"
-                onClick={handleRegister}
-                disabled={!canRegister && registration.status !== "success"}
-                aria-busy={isRegistering}
-                className="btn-swap"
+                onClick={handleRegisterSubmit}
+                disabled={(!canSubmit && regStatus !== "success") || isBusy}
+                aria-busy={isBusy}
+                className="w-full py-2.5 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {isRegistering
                   ? t(REGISTRATION_LABEL_KEY[registration.status]!)
@@ -612,6 +701,8 @@ export default function SolvePageClient() {
           </div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

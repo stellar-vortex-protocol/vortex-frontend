@@ -126,7 +126,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   useEffect(() => {
     if (showChainPicker) {
-      chainPickerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+      chainPickerRef.current
+        ?.querySelector<HTMLButtonElement>("button")
+        ?.focus();
     }
   }, [showChainPicker]);
 
@@ -334,7 +336,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
           {/* Full grid (always visible) */}
           <div className="grid grid-cols-2 gap-2">
-            {CHAINS.map(c => (
+            {CHAINS.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -408,7 +410,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               onClick={() => setShowTokenPicker(prev => !prev)}
               aria-haspopup="listbox"
               aria-expanded={showTokenPicker}
-              aria-label={t("swap.from.selectToken", { symbol: srcToken.symbol })}
+              aria-label={t("swap.from.selectToken", {
+                symbol: srcToken.symbol,
+              })}
             >
               <span
                 aria-hidden="true"
@@ -465,7 +469,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           {srcValueUSD > 0 && (
             <div className="num text-xs text-vx-muted">
               {t("swap.from.approxValue", {
-                value: srcValueUSD.toLocaleString("en-US", { maximumFractionDigits: 2 }),
+                value: srcValueUSD.toLocaleString("en-US", {
+                  maximumFractionDigits: 2,
+                }),
               })}
               {/* #285 – show "estimated" badge when showing a price-derived value (no live quote yet) */}
               {showPriceEstimateNotice && (
@@ -547,8 +553,12 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                 </div>
               )}
             </div>
-            <div role="group" aria-label={t("swap.to.tokenGroup")} className="flex gap-2">
-              {DST_TOKENS.map(token => (
+            <div
+              role="group"
+              aria-label={t("swap.to.tokenGroup")}
+              className="flex gap-2"
+            >
+              {DST_TOKENS.map((token) => (
                 <button
                   key={token.symbol}
                   type="button"
@@ -745,8 +755,21 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
-              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4 animate-spin-slow"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray="28"
+                  strokeDashoffset="8"
+                />
               </svg>
               {t(SUBMISSION_LABEL_KEY[submission.status]!)}
             </span>
@@ -754,19 +777,37 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             t("swap.submit.success")
           ) : quoting ? (
             <span className="flex items-center justify-center gap-2">
-              <svg aria-hidden="true" className="w-4 h-4 animate-spin-slow" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4 animate-spin-slow"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeDasharray="28"
+                  strokeDashoffset="8"
+                />
               </svg>
               {t("swap.submit.findingRoute")}
             </span>
           ) : quoteIsStale ? (
             t("swap.quote.expired")
           ) : canSwap ? (
-            t(submission.status === "error" ? "swap.submit.retryCta" : "swap.submit.cta", {
-              amount: srcAmount,
-              srcToken: srcToken.symbol,
-              dstToken: dstToken.symbol,
-            })
+            t(
+              submission.status === "error"
+                ? "swap.submit.retryCta"
+                : "swap.submit.cta",
+              {
+                amount: srcAmount,
+                srcToken: srcToken.symbol,
+                dstToken: dstToken.symbol,
+              },
+            )
           ) : (
             t("swap.submit.enterAmount")
           )}

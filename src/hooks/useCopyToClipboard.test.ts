@@ -12,7 +12,7 @@ describe("useCopyToClipboard", () => {
     document.body.innerHTML = "";
   });
 
-  it("copies text to the clipboard and marks as copied", async () => {
+  it("copies text to the clipboard and returns true", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
@@ -21,16 +21,16 @@ describe("useCopyToClipboard", () => {
     });
 
     const { result } = renderHook(() => useCopyToClipboard());
-    await act(async () => result.current.copy("0xabc"));
+    let success = false;
+    await act(async () => {
+      success = await result.current.copy("0xabc");
+    });
 
     expect(writeText).toHaveBeenCalledWith("0xabc");
-    expect(result.current.copied).toBe(true);
-
-    act(() => vi.advanceTimersByTime(1500));
-    expect(result.current.copied).toBe(false);
+    expect(success).toBe(true);
   });
 
-  it("handles clipboard failures gracefully", async () => {
+  it("handles clipboard failures gracefully and returns false", async () => {
     const writeText = vi.fn().mockRejectedValue(new Error("denied"));
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
@@ -39,8 +39,11 @@ describe("useCopyToClipboard", () => {
     });
 
     const { result } = renderHook(() => useCopyToClipboard());
-    await act(async () => result.current.copy("0xabc"));
+    let success = true;
+    await act(async () => {
+      success = await result.current.copy("0xabc");
+    });
 
-    expect(result.current.copied).toBe(false);
+    expect(success).toBe(false);
   });
 });

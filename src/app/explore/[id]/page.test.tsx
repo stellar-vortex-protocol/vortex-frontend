@@ -30,25 +30,47 @@ const detail: IntentDetail = {
 
 describe("IntentDetailPage", () => {
   it("shows a loading skeleton while the intent is being fetched", () => {
-    useIntentMock.mockReturnValue({ intent: undefined, isLoading: true, error: undefined });
-    const { container } = render(<IntentDetailPage params={{ id: "intent-1" }} />);
-    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+    useIntentMock.mockReturnValue({
+      intent: undefined,
+      isLoading: true,
+      error: undefined,
+    });
+    const { container } = render(
+      <IntentDetailPage params={{ id: "intent-1" }} />,
+    );
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("shows an error state when the intent can't be found", () => {
-    useIntentMock.mockReturnValue({ intent: undefined, isLoading: false, error: new Error("not found") });
+    useIntentMock.mockReturnValue({
+      intent: undefined,
+      isLoading: false,
+      error: new Error("not found"),
+    });
     render(<IntentDetailPage params={{ id: "missing" }} />);
     expect(screen.getByText(/Couldn't find that intent/)).toBeInTheDocument();
   });
 
   it("shows a not-found message when the request succeeds with no intent data", () => {
-    useIntentMock.mockReturnValue({ intent: undefined, isLoading: false, error: undefined });
+    useIntentMock.mockReturnValue({
+      intent: undefined,
+      isLoading: false,
+      error: undefined,
+    });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
-    expect(screen.getByText("No details found for this intent.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No details found for this intent."),
+    ).toBeInTheDocument();
   });
 
   it("renders the intent's details", () => {
-    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    useIntentMock.mockReturnValue({
+      intent: detail,
+      isLoading: false,
+      error: undefined,
+    });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
     expect(screen.getByText("500 USDC → 498.5 USDC")).toBeInTheDocument();
@@ -58,7 +80,11 @@ describe("IntentDetailPage", () => {
   });
 
   it("shows a truncated tx hash, a copy button, and a stellar.expert link when a txHash is present", () => {
-    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    useIntentMock.mockReturnValue({
+      intent: detail,
+      isLoading: false,
+      error: undefined,
+    });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
     expect(screen.getByText("abc123...90hash")).toBeInTheDocument();
@@ -67,26 +93,46 @@ describe("IntentDetailPage", () => {
   });
 
   it("links to the settlement tx on stellar.expert when a txHash is present", () => {
-    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    useIntentMock.mockReturnValue({
+      intent: detail,
+      isLoading: false,
+      error: undefined,
+    });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
     const link = screen.getByText(/View on stellar.expert/);
-    expect(link).toHaveAttribute("href", "https://stellar.expert/explorer/testnet/tx/abc1234567890hash");
+    expect(link).toHaveAttribute(
+      "href",
+      "https://stellar.expert/explorer/testnet/tx/abc1234567890hash",
+    );
   });
 
   it("omits the settlement tx section when there is no txHash yet", () => {
-    useIntentMock.mockReturnValue({ intent: { ...detail, txHash: undefined }, isLoading: false, error: undefined });
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, txHash: undefined },
+      isLoading: false,
+      error: undefined,
+    });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
-    expect(screen.queryByText(/View on stellar.expert/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/View on stellar.expert/),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Copy")).not.toBeInTheDocument();
   });
 
   it("links back to the explorer", () => {
-    useIntentMock.mockReturnValue({ intent: detail, isLoading: false, error: undefined });
+    useIntentMock.mockReturnValue({
+      intent: detail,
+      isLoading: false,
+      error: undefined,
+    });
     render(<IntentDetailPage params={{ id: "intent-1" }} />);
 
-    expect(screen.getByText("← Back to explorer")).toHaveAttribute("href", "/explore");
+    expect(screen.getByText("← Back to explorer")).toHaveAttribute(
+      "href",
+      "/explore",
+    );
   });
 
   it("triggers the browser print dialog from the Print / Save as PDF action", async () => {

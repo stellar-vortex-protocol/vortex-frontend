@@ -6,7 +6,11 @@ import { useIntents } from "./useIntents";
 import type { FeedItem } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(SWRConfig, { value: { provider: () => new Map(), dedupingInterval: 0 } }, children);
+  createElement(
+    SWRConfig,
+    { value: { provider: () => new Map(), dedupingInterval: 0 } },
+    children,
+  );
 
 describe("useIntents", () => {
   beforeEach(() => {
@@ -40,7 +44,10 @@ describe("useIntents", () => {
     expect(result.current.intents).toEqual([]);
 
     await waitFor(() => expect(result.current.intents).toEqual(intents));
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/intents"), expect.anything());
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/intents"),
+      expect.anything(),
+    );
   });
 
   it("surfaces a fetch failure as an error", async () => {

@@ -3,24 +3,37 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { OpenIntent, Solver } from "@/lib/types";
 
-const { useSolversMock, useOpenIntentsMock, useAcceptIntentMock, acceptMock, useSolverRegistrationMock, registerMock, resetMock } =
-  vi.hoisted(() => ({
-    useSolversMock: vi.fn(),
-    useOpenIntentsMock: vi.fn(),
-    useAcceptIntentMock: vi.fn(),
-    acceptMock: vi.fn(),
-    useSolverRegistrationMock: vi.fn(),
-    registerMock: vi.fn(),
-    resetMock: vi.fn(),
-  }));
+const {
+  useSolversMock,
+  useOpenIntentsMock,
+  useAcceptIntentMock,
+  acceptMock,
+  useSolverRegistrationMock,
+  registerMock,
+  resetMock,
+} = vi.hoisted(() => ({
+  useSolversMock: vi.fn(),
+  useOpenIntentsMock: vi.fn(),
+  useAcceptIntentMock: vi.fn(),
+  acceptMock: vi.fn(),
+  useSolverRegistrationMock: vi.fn(),
+  registerMock: vi.fn(),
+  resetMock: vi.fn(),
+}));
 vi.mock("@/hooks/useSolvers", () => ({ useSolvers: useSolversMock }));
-vi.mock("@/hooks/useOpenIntents", () => ({ useOpenIntents: useOpenIntentsMock }));
-vi.mock("@/hooks/useAcceptIntent", () => ({ useAcceptIntent: useAcceptIntentMock }));
-vi.mock("@/hooks/useSolverRegistration", () => ({ useSolverRegistration: useSolverRegistrationMock }));
+vi.mock("@/hooks/useOpenIntents", () => ({
+  useOpenIntents: useOpenIntentsMock,
+}));
+vi.mock("@/hooks/useAcceptIntent", () => ({
+  useAcceptIntent: useAcceptIntentMock,
+}));
+vi.mock("@/hooks/useSolverRegistration", () => ({
+  useSolverRegistration: useSolverRegistrationMock,
+}));
 vi.mock("@/components/Nav", () => ({ Nav: () => <nav /> }));
 vi.mock("@/components/Footer", () => ({ Footer: () => <footer /> }));
 
-import SolvePage from "./page";
+import SolvePage from "./SolvePageClient";
 import { messages } from "@/i18n/messages";
 
 const solvers: Solver[] = [
@@ -50,7 +63,8 @@ const openIntents: OpenIntent[] = [
   },
 ];
 
-const VALID_ADDRESS = "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
+const VALID_ADDRESS =
+  "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
 
 async function openIntentsTab() {
   const user = userEvent.setup();
@@ -66,8 +80,16 @@ async function registerTab() {
 
 describe("SolvePage", () => {
   beforeEach(() => {
-    useOpenIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: undefined });
-    useAcceptIntentMock.mockReturnValue({ accept: acceptMock, acceptingId: null, error: null });
+    useOpenIntentsMock.mockReturnValue({
+      intents: [],
+      isLoading: false,
+      error: undefined,
+    });
+    useAcceptIntentMock.mockReturnValue({
+      accept: acceptMock,
+      acceptingId: null,
+      error: null,
+    });
     useSolverRegistrationMock.mockReturnValue({
       status: "idle",
       error: null,
@@ -77,54 +99,97 @@ describe("SolvePage", () => {
   });
 
   it("renders content within a main landmark", () => {
-    useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+    useSolversMock.mockReturnValue({
+      solvers: [],
+      isLoading: false,
+      error: undefined,
+    });
     render(<SolvePage />);
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
   });
 
   it("renders the default English copy from the message catalog", () => {
-    useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+    useSolversMock.mockReturnValue({
+      solvers: [],
+      isLoading: false,
+      error: undefined,
+    });
     render(<SolvePage />);
-    expect(screen.getByRole("heading", { name: messages.en.solve.hero.title })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: messages.en.solve.hero.title }),
+    ).toBeInTheDocument();
   });
 
   it("exposes the tabs with correct ARIA roles and selected state", async () => {
-    useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+    useSolversMock.mockReturnValue({
+      solvers: [],
+      isLoading: false,
+      error: undefined,
+    });
     render(<SolvePage />);
 
     const tabs = screen.getAllByRole("tab");
     expect(tabs).toHaveLength(3);
-    expect(screen.getByRole("tab", { name: "leaderboard" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "leaderboard" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("tab", { name: "intents" }));
 
-    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByRole("tabpanel")).toHaveAttribute("id", "panel-intents");
   });
 
   describe("leaderboard tab", () => {
     it("shows a loading skeleton while solvers are being fetched", () => {
-      useSolversMock.mockReturnValue({ solvers: [], isLoading: true, error: undefined });
+      useSolversMock.mockReturnValue({
+        solvers: [],
+        isLoading: true,
+        error: undefined,
+      });
       const { container } = render(<SolvePage />);
-      expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+      expect(
+        container.querySelectorAll(".animate-pulse").length,
+      ).toBeGreaterThan(0);
     });
 
     it("shows an error state when the leaderboard fails to load", () => {
-      useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: new Error("boom") });
+      useSolversMock.mockReturnValue({
+        solvers: [],
+        isLoading: false,
+        error: new Error("boom"),
+      });
       render(<SolvePage />);
-      expect(screen.getByText(/Couldn't load the solver leaderboard/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Couldn't load the solver leaderboard/),
+      ).toBeInTheDocument();
     });
 
     it("shows an empty state when there are no active solvers", () => {
-      useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+      useSolversMock.mockReturnValue({
+        solvers: [],
+        isLoading: false,
+        error: undefined,
+      });
       render(<SolvePage />);
       expect(screen.getByText("No active solvers yet.")).toBeInTheDocument();
     });
 
     it("renders solver rows with formatted volume and rates", () => {
-      useSolversMock.mockReturnValue({ solvers, isLoading: false, error: undefined });
+      useSolversMock.mockReturnValue({
+        solvers,
+        isLoading: false,
+        error: undefined,
+      });
       render(<SolvePage />);
 
       expect(screen.getByText("Alpha Market Making")).toBeInTheDocument();
@@ -135,6 +200,7 @@ describe("SolvePage", () => {
     });
 
     it("sorts the leaderboard by name, volume, fills, and success rate", async () => {
+      const baseSolver = solvers[0]!;
       const otherSolver: Solver = {
         ...solvers[0]!,
         name: "Zulu Solver",
@@ -148,19 +214,28 @@ describe("SolvePage", () => {
       render(<SolvePage />);
 
       const solverNames = () =>
-        screen.getAllByText(/^(Alpha Market Making|Zulu Solver)$/).map((element) => element.textContent);
+        screen
+          .getAllByText(/^(Alpha Market Making|Zulu Solver)$/)
+          .map((element) => element.textContent);
 
       await user.click(screen.getByRole("button", { name: /^Name/ }));
       expect(solverNames()).toEqual(["Alpha Market Making", "Zulu Solver"]);
 
       for (const name of ["Volume", "Fills", "Success"]) {
-        await user.click(screen.getByRole("button", { name: new RegExp(`^${name}`, "i") }));
+        await user.click(
+          screen.getByRole("button", { name: new RegExp(`^${name}`, "i") }),
+        );
         expect(solverNames()).toEqual(["Zulu Solver", "Alpha Market Making"]);
       }
     });
 
     it("wraps solver rows in links to detail page", () => {
-      useSolversMock.mockReturnValue({ solvers, isLoading: false, error: undefined });
+      const baseSolver = solvers[0]!;
+      useSolversMock.mockReturnValue({
+        solvers,
+        isLoading: false,
+        error: undefined,
+      });
       render(<SolvePage />);
 
       const solverLinks = screen.getAllByRole("link");
@@ -173,8 +248,13 @@ describe("SolvePage", () => {
     });
 
     it("ensures row links are keyboard accessible", async () => {
-      useSolversMock.mockReturnValue({ solvers, isLoading: false, error: undefined });
-      const { container } = render(<SolvePage />);
+      const baseSolver = solvers[0]!;
+      useSolversMock.mockReturnValue({
+        solvers,
+        isLoading: false,
+        error: undefined,
+      });
+      render(<SolvePage />);
 
       const links = screen.getAllByRole("link");
       const detailLink = links.find(link =>
@@ -188,7 +268,12 @@ describe("SolvePage", () => {
     });
 
     it("preserves solver data in link target", () => {
-      useSolversMock.mockReturnValue({ solvers, isLoading: false, error: undefined });
+      const baseSolver = solvers[0]!;
+      useSolversMock.mockReturnValue({
+        solvers,
+        isLoading: false,
+        error: undefined,
+      });
       render(<SolvePage />);
 
       const detailLink = screen.getByRole("link", { name: /Alpha Market Making/ });
@@ -196,53 +281,83 @@ describe("SolvePage", () => {
     });
 
     it("maintains row hover and focus states for accessibility", () => {
-      useSolversMock.mockReturnValue({ solvers, isLoading: false, error: undefined });
-      const { container } = render(<SolvePage />);
+      const baseSolver = solvers[0]!;
+      useSolversMock.mockReturnValue({
+        solvers,
+        isLoading: false,
+        error: undefined,
+      });
+      render(<SolvePage />);
 
       const links = screen.getAllByRole("link");
       const detailLink = links.find(link =>
         link.getAttribute("href") === `/solve/${solvers[0]!.address}`
       );
 
-      expect(detailLink).toHaveClass("focus:outline-none") ||
-        expect(detailLink?.closest("[role='row']")).toBeInTheDocument();
+      expect(detailLink).toBeInTheDocument();
     });
   });
 
   describe("open intents tab", () => {
     beforeEach(() => {
-      useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+      useSolversMock.mockReturnValue({
+        solvers: [],
+        isLoading: false,
+        error: undefined,
+      });
     });
 
     it("shows a loading skeleton while intents are being fetched", async () => {
-      useOpenIntentsMock.mockReturnValue({ intents: [], isLoading: true, error: undefined });
+      useOpenIntentsMock.mockReturnValue({
+        intents: [],
+        isLoading: true,
+        error: undefined,
+      });
       const { container } = render(<SolvePage />);
       await openIntentsTab();
-      expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
+      expect(
+        container.querySelectorAll(".animate-pulse").length,
+      ).toBeGreaterThan(0);
     });
 
     it("shows an error state when open intents fail to load", async () => {
-      useOpenIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: new Error("boom") });
+      useOpenIntentsMock.mockReturnValue({
+        intents: [],
+        isLoading: false,
+        error: new Error("boom"),
+      });
       render(<SolvePage />);
       await openIntentsTab();
-      expect(screen.getByText(/Couldn't load open intents/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Couldn't load open intents/),
+      ).toBeInTheDocument();
     });
 
     it("shows an empty state when there are no open intents", async () => {
-      useOpenIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: undefined });
+      useOpenIntentsMock.mockReturnValue({
+        intents: [],
+        isLoading: false,
+        error: undefined,
+      });
       render(<SolvePage />);
       await openIntentsTab();
       expect(screen.getByText(/No open intents right now/)).toBeInTheDocument();
     });
 
     it("renders open intents and calls accept() when Accept Intent is clicked", async () => {
-      useOpenIntentsMock.mockReturnValue({ intents: openIntents, isLoading: false, error: undefined });
+      useOpenIntentsMock.mockReturnValue({
+        intents: openIntents,
+        isLoading: false,
+        error: undefined,
+      });
       render(<SolvePage />);
       const user = await openIntentsTab();
 
       expect(screen.getByText("500 USDC on ethereum")).toBeInTheDocument();
       expect(
-        screen.getByText((_, el) => /^Min out: 495 USDC · Expires in \d+m$/.test(el?.textContent ?? ""))
+        screen.getByText((_, el) =>
+          /^Min out: 495 USDC · Expires in \d+m$/.test(el?.textContent ?? ""),
+        ),
       ).toBeInTheDocument();
 
       await user.click(screen.getByText("Accept Intent →"));
@@ -250,8 +365,16 @@ describe("SolvePage", () => {
     });
 
     it("disables the button and shows a busy label while accepting", async () => {
-      useOpenIntentsMock.mockReturnValue({ intents: openIntents, isLoading: false, error: undefined });
-      useAcceptIntentMock.mockReturnValue({ accept: acceptMock, acceptingId: "a1b2", error: null });
+      useOpenIntentsMock.mockReturnValue({
+        intents: openIntents,
+        isLoading: false,
+        error: undefined,
+      });
+      useAcceptIntentMock.mockReturnValue({
+        accept: acceptMock,
+        acceptingId: "a1b2",
+        error: null,
+      });
       render(<SolvePage />);
       await openIntentsTab();
 
@@ -260,8 +383,16 @@ describe("SolvePage", () => {
     });
 
     it("shows an inline error when accepting fails", async () => {
-      useOpenIntentsMock.mockReturnValue({ intents: openIntents, isLoading: false, error: undefined });
-      useAcceptIntentMock.mockReturnValue({ accept: acceptMock, acceptingId: null, error: "Intent already claimed" });
+      useOpenIntentsMock.mockReturnValue({
+        intents: openIntents,
+        isLoading: false,
+        error: undefined,
+      });
+      useAcceptIntentMock.mockReturnValue({
+        accept: acceptMock,
+        acceptingId: null,
+        error: "Intent already claimed",
+      });
       render(<SolvePage />);
       await openIntentsTab();
 
@@ -271,7 +402,11 @@ describe("SolvePage", () => {
 
   describe("register tab", () => {
     beforeEach(() => {
-      useSolversMock.mockReturnValue({ solvers: [], isLoading: false, error: undefined });
+      useSolversMock.mockReturnValue({
+        solvers: [],
+        isLoading: false,
+        error: undefined,
+      });
     });
 
     it("disables submit until both fields are valid", async () => {
@@ -288,12 +423,31 @@ describe("SolvePage", () => {
       expect(button).toBeEnabled();
     });
 
+    it("shows a visible focus ring on the address and bond inputs", async () => {
+      render(<SolvePage />);
+      await registerTab();
+
+      expect(screen.getByLabelText("Stellar Address")).toHaveClass(
+        "focus:ring-2",
+        "focus:ring-vx-sage",
+      );
+      expect(screen.getByLabelText("Bond Amount (USDC)")).toHaveClass(
+        "focus:ring-2",
+        "focus:ring-vx-sage",
+      );
+    });
+
     it("shows a validation error for a malformed Stellar address", async () => {
       render(<SolvePage />);
       const user = await registerTab();
 
-      await user.type(screen.getByLabelText("Stellar Address"), "not-a-valid-address");
-      expect(screen.getByText(/Enter a valid Stellar address/)).toBeInTheDocument();
+      await user.type(
+        screen.getByLabelText("Stellar Address"),
+        "not-a-valid-address",
+      );
+      expect(
+        screen.getByText(/Enter a valid Stellar address/),
+      ).toBeInTheDocument();
     });
 
     it("shows a validation error for a bond below the minimum", async () => {

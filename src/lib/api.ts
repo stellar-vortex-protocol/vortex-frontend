@@ -14,6 +14,7 @@ import {
   isSubmitRegistrationResponse,
 } from "./schemas";
 
+const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000";
 const TIMEOUT_MS = 10_000;
 
 // Validate API_URL at module load time for supply-chain defense

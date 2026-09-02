@@ -16,7 +16,13 @@ import { CHAINS } from "@/lib/marketData";
 import { sanitizeDisplayText } from "@/lib/textSafety";
 import type { IntentStatus } from "@/lib/types";
 
-const STATUS_OPTIONS: Array<IntentStatus | "all"> = ["all", "pending", "accepted", "filled", "failed"];
+const STATUS_OPTIONS: Array<IntentStatus | "all"> = [
+  "all",
+  "pending",
+  "accepted",
+  "filled",
+  "failed",
+];
 const SORT_OPTIONS = ["newest", "oldest", "largest"] as const;
 type SortOption = (typeof SORT_OPTIONS)[number];
 const CHAIN_IDS = new Set(CHAINS.map((c) => c.id));
@@ -67,21 +73,39 @@ export default function ExplorePageClient() {
 
   const filtered = useMemo(() => {
     let result = intents;
+
     if (statusFilter !== "all") {
       result = result.filter((i) => i.status === statusFilter);
     }
     if (chainFilter !== "all") {
       result = result.filter((i) => i.srcChain === chainFilter);
     }
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
+      result = result.filter(
+        (i) =>
+          i.id.toLowerCase().includes(q) ||
+          i.srcToken.toLowerCase().includes(q) ||
+          i.dstToken.toLowerCase().includes(q) ||
+          i.srcChain.toLowerCase().includes(q) ||
+          i.solver.toLowerCase().includes(q),
+      );
+    }
 
     result = [...result].sort((a, b) => {
-      if (sort === "newest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (sort === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      if (sort === "newest")
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      if (sort === "oldest")
+        return (
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       return parseFloat(b.srcAmount) - parseFloat(a.srcAmount);
     });
 
     return result;
-  }, [intents, statusFilter, chainFilter, sort]);
+  }, [intents, debouncedSearch, statusFilter, chainFilter, sort]);
 
   // Pagination is superseded by virtualization (#228): the full filtered/sorted
   // list is windowed instead of paginated, so `page` is intentionally not a URL param.
@@ -97,6 +121,14 @@ export default function ExplorePageClient() {
     rowVirtualizer.scrollToIndex(0);
   }, [statusFilter, chainFilter, sort, rowVirtualizer]);
 
+  const handleExportCsv = () => {
+    downloadCsv("vortex-intents.csv", buildIntentsCsv(filtered));
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen">
       <Nav variant="breadcrumb" label="Explore" />
@@ -105,9 +137,12 @@ export default function ExplorePageClient() {
         <div className="mb-8 flex items-start justify-between gap-4">
           <div>
             <div className="eyebrow mb-3">Intent Explorer</div>
-            <h1 className="text-3xl font-bold text-vx-text mb-3">Browse all intents</h1>
+            <h1 className="text-3xl font-bold text-vx-text mb-3">
+              Browse all intents
+            </h1>
             <p className="text-vx-muted text-sm max-w-lg leading-relaxed">
-              Every swap intent submitted to Vortex, from open auctions to completed fills.
+              Every swap intent submitted to Vortex, from open auctions to
+              completed fills.
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-vx-muted px-1 pt-1 flex-shrink-0">
@@ -116,27 +151,45 @@ export default function ExplorePageClient() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters and Search */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
-          <label htmlFor="status-filter" className="sr-only">Filter by status</label>
+          <label htmlFor="intent-search" className="sr-only">
+            Search intents
+          </label>
+          <input
+            id="intent-search"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by id, token, chain or solver"
+            className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
+          />
+
+          <label htmlFor="status-filter" className="sr-only">
+            Filter by status
+          </label>
           <select
             id="status-filter"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as IntentStatus | "all")}
+            onChange={handleStatusChange}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {s === "all" ? "All statuses" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s === "all"
+                  ? "All statuses"
+                  : s.charAt(0).toUpperCase() + s.slice(1)}
               </option>
             ))}
           </select>
 
-          <label htmlFor="chain-filter" className="sr-only">Filter by chain</label>
+          <label htmlFor="chain-filter" className="sr-only">
+            Filter by chain
+          </label>
           <select
             id="chain-filter"
             value={chainFilter}
-            onChange={(e) => setChainFilter(e.target.value)}
+            onChange={handleChainChange}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
           >
             <option value="all">All chains</option>
@@ -147,11 +200,13 @@ export default function ExplorePageClient() {
             ))}
           </select>
 
-          <label htmlFor="sort-order" className="sr-only">Sort order</label>
+          <label htmlFor="sort-order" className="sr-only">
+            Sort order
+          </label>
           <select
             id="sort-order"
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortOption)}
+            onChange={handleSortChange}
             className="bg-vx-surface border border-vx-border rounded-lg px-3 py-2 text-sm text-vx-text"
           >
             <option value="newest">Newest first</option>
@@ -176,7 +231,7 @@ export default function ExplorePageClient() {
 
         {/* Results */}
         {isLoading && intents.length === 0 ? (
-          <SkeletonCard rows={4} rowHeight="h-14" />
+          <IntentListSkeleton count={4} />
         ) : error ? (
           <div className="card p-8 text-center">
             <p className="text-sm font-medium text-vx-text mb-1">{t("explore.error.title")}</p>

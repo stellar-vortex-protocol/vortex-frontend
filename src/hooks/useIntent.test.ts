@@ -6,7 +6,11 @@ import { useIntent } from "./useIntent";
 import type { IntentDetail } from "@/lib/types";
 
 const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(SWRConfig, { value: { provider: () => new Map(), dedupingInterval: 0 } }, children);
+  createElement(
+    SWRConfig,
+    { value: { provider: () => new Map(), dedupingInterval: 0 } },
+    children,
+  );
 
 const detail: IntentDetail = {
   id: "intent-1",
@@ -48,7 +52,10 @@ describe("useIntent", () => {
     const { result } = renderHook(() => useIntent("intent-1"), { wrapper });
 
     await waitFor(() => expect(result.current.intent).toEqual(detail));
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/intents/intent-1"), expect.anything());
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/intents/intent-1"),
+      expect.anything(),
+    );
   });
 
   it("surfaces a fetch failure as an error", async () => {

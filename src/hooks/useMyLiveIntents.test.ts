@@ -29,7 +29,11 @@ describe("useMyLiveIntents", () => {
   const address = "GABC123";
 
   it("falls back to the REST list when there is no live message yet", () => {
-    useMyIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
+    useMyIntentsMock.mockReturnValue({
+      intents: restItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "open", lastMessage: null });
 
     const { result } = renderHook(() => useMyLiveIntents(address));
@@ -50,8 +54,15 @@ describe("useMyLiveIntents", () => {
   });
 
   it("reports isLive as false when the socket is not open", () => {
-    useMyIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
-    useWebSocketMock.mockReturnValue({ status: "connecting", lastMessage: null });
+    useMyIntentsMock.mockReturnValue({
+      intents: restItems,
+      isLoading: false,
+      error: undefined,
+    });
+    useWebSocketMock.mockReturnValue({
+      status: "connecting",
+      lastMessage: null,
+    });
 
     const { result } = renderHook(() => useMyLiveIntents(address));
 
@@ -59,7 +70,11 @@ describe("useMyLiveIntents", () => {
   });
 
   it("closes the WebSocket when address is null", () => {
-    useMyIntentsMock.mockReturnValue({ intents: restItems, isLoading: false, error: undefined });
+    useMyIntentsMock.mockReturnValue({
+      intents: restItems,
+      isLoading: false,
+      error: undefined,
+    });
     useWebSocketMock.mockReturnValue({ status: "closed", lastMessage: null });
 
     renderHook(() => useMyLiveIntents(null));
@@ -71,8 +86,15 @@ describe("useMyLiveIntents", () => {
     const initialItem: FeedItem = { ...restItems[0]!, status: "pending" };
     const updatedItem: FeedItem = { ...initialItem, status: "filled" };
 
-    useMyIntentsMock.mockReturnValue({ intents: [initialItem], isLoading: false, error: undefined });
-    useWebSocketMock.mockReturnValue({ status: "open", lastMessage: updatedItem });
+    useMyIntentsMock.mockReturnValue({
+      intents: [initialItem],
+      isLoading: false,
+      error: undefined,
+    });
+    useWebSocketMock.mockReturnValue({
+      status: "open",
+      lastMessage: updatedItem,
+    });
 
     const { result } = renderHook(() => useMyLiveIntents(address));
 

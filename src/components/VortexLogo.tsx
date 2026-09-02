@@ -1,4 +1,10 @@
-export function VortexLogo({ className, title }: { className?: string; title?: string }) {
+export function VortexLogo({
+  className,
+  title,
+}: {
+  className?: string;
+  title?: string;
+}) {
   // When `title` is provided the SVG is meaningful (e.g. a standalone link icon);
   // otherwise it is decorative and hidden from assistive technology.
   return (

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createElement } from "react";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { useWalletStore } from "@/store/wallet";
 import { Nav } from "./Nav";
@@ -34,8 +33,13 @@ describe("Nav", () => {
   it("renders My Intents link when wallet is connected", () => {
     useWalletStore.setState({ isConnected: true });
     renderNav({ variant: "home" });
-    expect(screen.getByRole("link", { name: "My Intents" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "My Intents" })).toHaveAttribute("href", "/my-intents");
+    expect(
+      screen.getByRole("link", { name: "My Intents" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "My Intents" })).toHaveAttribute(
+      "href",
+      "/my-intents",
+    );
   });
 
   it("renders a breadcrumb for non-home variants", () => {
@@ -54,11 +58,17 @@ describe("Nav", () => {
       const user = userEvent.setup();
       renderNav({ variant: "home" });
 
-      expect(screen.queryByRole("combobox", { name: /switch language/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("combobox", { name: /switch language/i }),
+      ).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Settings" }));
 
-      expect(screen.getByRole("combobox", { name: /switch language/i })).toBeInTheDocument();
-      expect(screen.getByRole("combobox", { name: /motion preference/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("combobox", { name: /switch language/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("combobox", { name: /motion preference/i }),
+      ).toBeInTheDocument();
     });
 
     it("defaults to the locale provided by I18nProvider", async () => {
@@ -97,11 +107,13 @@ describe("Nav", () => {
       renderNav({ variant: "home" });
 
       await user.click(screen.getByRole("button", { name: "Settings" }));
-      const select = screen.getByRole("combobox", { name: /motion preference/i });
+      const select = screen.getByRole("combobox", {
+        name: /motion preference/i,
+      });
       await user.selectOptions(select, "reduce");
 
       expect((select as HTMLSelectElement).value).toBe("reduce");
-      expect(document.documentElement.dataset.motion).toBe("reduce");
+      expect(document.documentElement.dataset["motion"]).toBe("reduce");
     });
 
     it("also renders settings in the breadcrumb variant", async () => {
@@ -109,7 +121,9 @@ describe("Nav", () => {
       renderNav({ variant: "breadcrumb", label: "Solver Portal" });
 
       await user.click(screen.getByRole("button", { name: "Settings" }));
-      expect(screen.getByRole("combobox", { name: /switch language/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("combobox", { name: /switch language/i }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -124,7 +138,10 @@ describe("Nav", () => {
 
       await user.click(toggle);
 
-      expect(screen.getByLabelText("Close menu")).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByLabelText("Close menu")).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
       expect(screen.getAllByText("Explore")).toHaveLength(2);
     });
 
@@ -134,7 +151,10 @@ describe("Nav", () => {
 
       await user.click(screen.getByLabelText("Open menu"));
       const links = screen.getAllByText("Explore");
-      await user.click(links[links.length - 1]!);
+      const lastLink = links[links.length - 1];
+      if (lastLink) {
+        await user.click(lastLink);
+      }
 
       expect(screen.getByLabelText("Open menu")).toBeInTheDocument();
       expect(screen.getAllByText("Explore")).toHaveLength(1);
@@ -147,7 +167,9 @@ describe("Nav", () => {
 
       await user.click(screen.getByLabelText("Open menu"));
 
-      expect(screen.getAllByRole("link", { name: "My Intents" })).toHaveLength(2);
+      expect(screen.getAllByRole("link", { name: "My Intents" })).toHaveLength(
+        2,
+      );
     });
 
     it("closes menu when My Intents is clicked", async () => {

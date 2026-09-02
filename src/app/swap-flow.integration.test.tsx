@@ -3,7 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SWRConfig } from "swr";
 
-const { signTransactionMock } = vi.hoisted(() => ({ signTransactionMock: vi.fn() }));
+const { signTransactionMock } = vi.hoisted(() => ({
+  signTransactionMock: vi.fn(),
+}));
 vi.mock("@stellar/freighter-api", () => ({
   default: {
     isConnected: vi.fn(),
@@ -35,7 +37,7 @@ function renderSwapFlow() {
     <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
       <SwapCard />
       <ToastViewport />
-    </SWRConfig>
+    </SWRConfig>,
   );
 }
 
@@ -43,7 +45,15 @@ const initialWalletState = useWalletStore.getState();
 
 describe("swap submission flow (integration)", () => {
   beforeEach(() => {
-    useWalletStore.setState({ ...initialWalletState, isConnected: true, address: "GABC123", network: "TESTNET" }, true);
+    useWalletStore.setState(
+      {
+        ...initialWalletState,
+        isConnected: true,
+        address: "GABC123",
+        network: "TESTNET",
+      },
+      true,
+    );
   });
 
   afterEach(() => {
@@ -60,9 +70,15 @@ describe("swap submission flow (integration)", () => {
       protocolFeePct: 0.05,
       rate: "1 USDC = 8.4600 XLM",
     });
-    createIntentMock.mockResolvedValue({ intentId: "intent-1", unsignedXdr: "unsigned-xdr" });
+    createIntentMock.mockResolvedValue({
+      intentId: "intent-1",
+      unsignedXdr: "unsigned-xdr",
+    });
     signTransactionMock.mockResolvedValue("signed-xdr");
-    submitIntentMock.mockResolvedValue({ intentId: "intent-1", status: "pending" });
+    submitIntentMock.mockResolvedValue({
+      intentId: "intent-1",
+      status: "pending",
+    });
 
     const user = userEvent.setup();
     renderSwapFlow();
@@ -70,18 +86,25 @@ describe("swap submission flow (integration)", () => {
     const input = screen.getByPlaceholderText("0");
     await user.type(input, "500");
 
-    await waitFor(() => expect(screen.getByText("Beta Liquidity Co")).toBeInTheDocument(), { timeout: 2000 });
+    await waitFor(
+      () => expect(screen.getByText("Beta Liquidity Co")).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
 
     await user.click(screen.getByText("Swap 500 USDC → USDC"));
 
     await waitFor(() => {
-      expect(screen.getByText("Swap submitted successfully.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Swap submitted successfully."),
+      ).toBeInTheDocument();
     });
 
     expect(createIntentMock).toHaveBeenCalledWith(
-      expect.objectContaining({ srcAmount: "500", dstAddress: "GABC123" })
+      expect.objectContaining({ srcAmount: "500", dstAddress: "GABC123" }),
     );
-    expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", { network: "TESTNET" });
+    expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", {
+      network: "TESTNET",
+    });
     expect(submitIntentMock).toHaveBeenCalledWith("intent-1", "signed-xdr");
   });
 });

@@ -1,11 +1,12 @@
 import { messages } from "./messages";
 import { secureLogger } from "./secureLogging";
 
-type NestedKeyOf<T> = T extends Record<string, infer V>
-  ? V extends Record<string, unknown>
-    ? `${string & keyof T}.${string & keyof V}`
-    : string & keyof T
-  : never;
+type NestedKeyOf<T> =
+  T extends Record<string, infer V>
+    ? V extends Record<string, unknown>
+      ? `${string & keyof T}.${string & keyof V}`
+      : string & keyof T
+    : never;
 
 /**
  * Get a message from the catalog using dot notation

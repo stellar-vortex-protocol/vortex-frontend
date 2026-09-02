@@ -13,10 +13,14 @@ describe("formatCurrency", () => {
 
 describe("formatTokenAmount", () => {
   it("formats token amounts for en-US locale", () => {
-    expect(formatTokenAmount(1234.5678, "en-US", { maximumFractionDigits: 4 })).toBe("1,234.5678");
+    expect(
+      formatTokenAmount(1234.5678, "en-US", { maximumFractionDigits: 4 }),
+    ).toBe("1,234.5678");
   });
 
   it("formats token amounts for de-DE locale", () => {
-    expect(formatTokenAmount(1234.5678, "de-DE", { maximumFractionDigits: 4 })).toBe("1.234,5678");
+    expect(
+      formatTokenAmount(1234.5678, "de-DE", { maximumFractionDigits: 4 }),
+    ).toBe("1.234,5678");
   });
 });

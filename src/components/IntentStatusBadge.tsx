@@ -11,16 +11,44 @@ const STATUS_STYLES: Record<IntentStatus, string> = {
 // alone to differentiate — helps colorblind users tell statuses apart at a glance.
 const STATUS_ICONS: Record<IntentStatus, JSX.Element> = {
   pending: (
-    <circle cx="6" cy="6" r="4.25" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2" fill="none" />
+    <circle
+      cx="6"
+      cy="6"
+      r="4.25"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeDasharray="2 2"
+      fill="none"
+    />
   ),
   accepted: (
-    <path d="M2.5 6l2.5 2.5L9.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <path
+      d="M2.5 6l2.5 2.5L9.5 3.5"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
   ),
   filled: (
-    <path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <path
+      d="M2 6.5l2.5 2.5L10 3"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="none"
+    />
   ),
   failed: (
-    <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+    <path
+      d="M3 3l6 6M9 3l-6 6"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      fill="none"
+    />
   ),
 };
 
@@ -29,7 +57,12 @@ export function IntentStatusBadge({ status }: { status: IntentStatus }) {
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${STATUS_STYLES[status]}`}
     >
-      <svg aria-hidden="true" className="w-2.5 h-2.5 flex-shrink-0" viewBox="0 0 12 12" fill="none">
+      <svg
+        aria-hidden="true"
+        className="w-2.5 h-2.5 flex-shrink-0"
+        viewBox="0 0 12 12"
+        fill="none"
+      >
         {STATUS_ICONS[status]}
       </svg>
       {status}
