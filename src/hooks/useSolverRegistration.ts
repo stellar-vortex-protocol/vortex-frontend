@@ -4,7 +4,7 @@ import { walletAdapter } from "@/lib/wallet";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { verifySignedXdrMatches } from "@/lib/xdrReview";
-import { useWalletStore } from "@/store/wallet";
+import { useWalletStore, EXPECTED_NETWORK } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { decodeXdr, validateRegistrationXdr, XdrMismatchError } from "@/lib/xdrReview";
 
@@ -86,6 +86,14 @@ export function useSolverRegistration() {
       // ──────────────────────────────────────────────────────────────────────
 
       setStatus("awaiting-signature");
+      // Defense-in-depth (#248): validate network against the expected
+      // passphrase immediately before calling Freighter — guards against
+      // stale-closure or UI-bypass scenarios.
+      if ((wallet.network ?? "").toUpperCase() !== EXPECTED_NETWORK) {
+        throw new Error(
+          `Network mismatch: Freighter is on "${wallet.network ?? "unknown"}" but this app requires "${EXPECTED_NETWORK}". Switch networks in Freighter and try again.`,
+        );
+      }
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });

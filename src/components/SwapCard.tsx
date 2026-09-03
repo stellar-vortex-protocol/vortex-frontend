@@ -6,6 +6,7 @@ import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useRecentChains } from "@/hooks/useRecentChains";
 import { useToastStore } from "@/store/toast";
+import { useWalletStore } from "@/store/wallet";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { formatTokenAmount } from "@/lib/format";
@@ -214,12 +215,14 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
   const isSubmitting = submission.status in SUBMISSION_LABEL_KEY;
+  const networkMismatch = useWalletStore((s) => s.networkMismatch);
   const canSwap =
     Boolean(srcAmount) &&
     parseFloat(srcAmount) > 0 &&
     !quoting &&
     !isSubmitting &&
-    !dstAddressError;
+    !dstAddressError &&
+    !networkMismatch;
 
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
@@ -673,6 +676,16 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           </p>
         )}
 
+        {networkMismatch && (
+          <p role="alert" className="text-center text-xs text-yellow-400 px-1">
+            ⚠ Wrong network — switch Freighter to{" "}
+            <span className="font-semibold">
+              {process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"}
+            </span>{" "}
+            before swapping.
+          </p>
+        )}
+
         <button
           type="button"
           className="btn-swap"
@@ -722,6 +735,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               </svg>
               {t("swap.submit.findingRoute")}
             </span>
+          ) : networkMismatch ? (
+            t("swap.submit.wrongNetwork")
           ) : canSwap ? (
             t(submission.status === "error" ? "swap.submit.retryCta" : "swap.submit.cta", {
               amount: srcAmount,
@@ -797,6 +812,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             </span>
           ) : quoteIsStale ? (
             t("swap.quote.expired")
+          ) : networkMismatch ? (
+            t("swap.submit.wrongNetwork")
           ) : canSwap ? (
             t(
               submission.status === "error"

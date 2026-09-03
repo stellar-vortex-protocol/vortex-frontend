@@ -76,6 +76,7 @@ export const en = {
   "swap.submit.enterAmount": "Enter an amount",
   "swap.submit.cta": "Swap {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta": "Retry: Swap {amount} {srcToken} → {dstToken}",
+  "swap.submit.wrongNetwork": "Wrong network — switch Freighter first",
 
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
@@ -104,6 +105,7 @@ export const en = {
   "solve.register.info.withdraw": "Your solver bond earns you exclusive rights to solve intents.",
   "solve.register.button.registered": "Registered ✓",
   "solve.register.button.connect": "Connect to Register",
+  "solve.register.button.wrongNetwork": "Wrong network — switch Freighter first",
 
   "solve.leaderboard.title": "Active Solvers",
   "solve.leaderboard.error": "Failed to load leaderboard.",

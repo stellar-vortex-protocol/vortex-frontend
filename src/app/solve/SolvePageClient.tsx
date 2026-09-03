@@ -684,10 +684,20 @@ export default function SolvePageClient() {
                 </p>
               )}
 
+              {networkMismatch && (
+                <p role="alert" className="text-xs text-yellow-400">
+                  ⚠ Wrong network — switch Freighter to{" "}
+                  <span className="font-semibold">
+                    {process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"}
+                  </span>{" "}
+                  before registering.
+                </p>
+              )}
+
               <button
                 type="button"
                 onClick={handleRegisterSubmit}
-                disabled={(!canSubmit && regStatus !== "success") || isBusy}
+                disabled={(!canRegister && regStatus !== "success") || isBusy}
                 aria-busy={isBusy}
                 className="w-full py-2.5 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
@@ -695,6 +705,8 @@ export default function SolvePageClient() {
                   ? t(REGISTRATION_LABEL_KEY[registration.status]!)
                   : registration.status === "success"
                   ? t("solve.register.button.registered")
+                  : networkMismatch
+                  ? t("solve.register.button.wrongNetwork")
                   : t("solve.register.button.connect")}
               </button>
             </div>

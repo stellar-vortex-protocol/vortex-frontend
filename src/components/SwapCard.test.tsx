@@ -289,4 +289,74 @@ describe("SwapCard", () => {
       }),
     );
   });
+
+  // ── Issue #248: networkMismatch submission guard ──────────────────────────
+
+  it("disables the swap button and shows an inline alert when connected to the wrong network", async () => {
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "MAINNET",
+      networkMismatch: true,
+    });
+
+    const user = userEvent.setup();
+    renderSwapCard();
+
+    const input = screen.getByPlaceholderText("0");
+    await user.type(input, "500");
+
+    // Inline alert must be visible.
+    await waitFor(() => {
+      expect(screen.getAllByRole("alert").some((el) =>
+        el.textContent?.toLowerCase().includes("wrong network")
+      )).toBe(true);
+    });
+
+    // The swap button must be disabled.
+    const swapButton = screen.getAllByRole("button").find(
+      (btn) => btn.textContent?.toLowerCase().includes("wrong network")
+    );
+    expect(swapButton).toBeDefined();
+    expect(swapButton).toBeDisabled();
+
+    // Freighter must never be called.
+    expect(signTransactionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not show the network-mismatch alert when networkMismatch is false", async () => {
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "TESTNET",
+      networkMismatch: false,
+    });
+
+    renderSwapCard();
+
+    // No mismatch alert should be present.
+    const alerts = screen.queryAllByRole("alert");
+    const mismatchAlert = alerts.find((el) =>
+      el.textContent?.toLowerCase().includes("wrong network")
+    );
+    expect(mismatchAlert).toBeUndefined();
+  });
+
+  it("does not show the network-mismatch alert when wallet is not connected (networkMismatch defaults to false)", () => {
+    // networkMismatch defaults to false before any connection — the guard
+    // must not falsely block a pre-connection state.
+    useWalletStore.setState({
+      isConnected: false,
+      address: null,
+      networkMismatch: false,
+    });
+
+    renderSwapCard();
+
+    const alerts = screen.queryAllByRole("alert");
+    const mismatchAlert = alerts.find((el) =>
+      el.textContent?.toLowerCase().includes("wrong network")
+    );
+    expect(mismatchAlert).toBeUndefined();
+  });
 });

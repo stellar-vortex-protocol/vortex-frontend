@@ -16,7 +16,7 @@ export type PersistedWalletState = {
 export const PERSIST_KEY = "vortex-wallet";
 
 /** The network name the app expects, normalised to upper-case for comparison. */
-const EXPECTED_NETWORK = (
+export const EXPECTED_NETWORK = (
   process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"
 ).toUpperCase();
 
