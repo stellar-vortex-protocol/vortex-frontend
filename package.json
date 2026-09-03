@@ -46,7 +46,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10",
-    "editorconfig-checker": "^6.0.0",
+    "editorconfig-checker": "^7.0.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "husky": "^9.1.7",
