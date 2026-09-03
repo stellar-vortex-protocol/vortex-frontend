@@ -76,6 +76,7 @@ export const es = {
   "swap.submit.cta": "Intercambiar {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta":
     "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
+  "swap.submit.wrongNetwork": "Red incorrecta — cambia Freighter primero",
 
   "swap.destination.label": "Dirección de destino",
   "swap.destination.placeholder": "G...",
