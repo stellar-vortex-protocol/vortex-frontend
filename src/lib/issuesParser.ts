@@ -9,6 +9,8 @@ export type WaveIssue = {
   points: number;
   status: IssueStatus;
   contributor: string | null;
+  /** Curated onboarding signal from `Good first issue: yes` in issues.md. */
+  goodFirstIssue: boolean;
 };
 
 export type CategorySummary = {
@@ -97,6 +99,7 @@ export function parseIssuesMarkdown(markdown: string): WaveMetrics {
         let points = 150;
         let status: IssueStatus = "Open";
         let contributor: string | null = null;
+        let goodFirstIssue = false;
 
         for (const part of detailsParts) {
           const [key, val] = part.split(":").map((s) => s?.trim());
@@ -119,6 +122,8 @@ export function parseIssuesMarkdown(markdown: string): WaveMetrics {
             if (val && val !== "None") {
               contributor = val;
             }
+          } else if (keyLower === "good first issue") {
+            goodFirstIssue = val.toLowerCase() === "yes";
           }
         }
 
@@ -130,6 +135,7 @@ export function parseIssuesMarkdown(markdown: string): WaveMetrics {
           points,
           status,
           contributor,
+          goodFirstIssue,
         });
       } catch {
         // Graceful error handling for unexpected lines
