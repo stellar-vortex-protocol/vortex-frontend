@@ -5,25 +5,28 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useRecentChains } from "@/hooks/useRecentChains";
+import { useTrustline } from "@/hooks/useTrustline";
+import { useMarketRegistry } from "@/hooks/useMarketRegistry";
+import TokenSelector from "@/components/TokenSelector";
 import { useToastStore } from "@/store/toast";
+import { useWalletStore } from "@/store/wallet";
+import { walletAdapter } from "@/lib/wallet";
+import { buildChangeTrustXdr } from "@/lib/chain/trustline";
+import { validateChangeTrustXdr } from "@/lib/xdrReview";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { formatTokenAmount } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
+import type { Quote, QuoteRequest } from "@/lib/types";
 
 export const DEFAULT_SLIPPAGE_PCT = 0.5;
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
-export const STALE_QUOTE_THRESHOLD_MS = 60_000;
-
-// A quote older than this is considered stale and must refresh before submit.
 export const STALE_QUOTE_THRESHOLD_MS = 30_000;
 
 // How long the "quote changed" delta indicator stays on screen after a refresh.
 const QUOTE_DELTA_TTL_MS = 4000;
-
-// A quote older than this must refresh before a submit is allowed.
-export const STALE_QUOTE_THRESHOLD_MS = 30_000;
+const PRICES_AS_OF = "bundled snapshot";
 
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
@@ -87,6 +90,13 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   const [slippagePct, setSlippagePct] = useState(String(DEFAULT_SLIPPAGE_PCT));
   const [showChainPicker, setShowChainPicker] = useState(false);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
+  const [pastedAddress, setPastedAddress] = useState<string | null>(null);
+  const [showPasteConfirmation, setShowPasteConfirmation] = useState(false);
+  const dstAddressInputRef = useRef<HTMLInputElement>(null);
+  const { recentChains, addRecentChain } = useRecentChains();
+  const { registry } = useMarketRegistry();
+  const { address: walletAddress } = useWalletStore();
+  const [trustlineSubmitting, setTrustlineSubmitting] = useState(false);
 
   const chainToggleRef = useRef<HTMLButtonElement>(null);
   const chainPickerRef = useRef<HTMLDivElement>(null);
@@ -124,6 +134,18 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     }
   };
 
+  const handleSelectChain = (chainId: string) => {
+    setSrcChain(chainId);
+    const nextToken = registry.srcTokens[chainId]?.[0] ?? SRC_TOKENS[chainId]?.[0];
+    if (nextToken) setSrcToken(nextToken);
+    addRecentChain(chainId);
+    closeChainPicker();
+  };
+
+  const handleTokenPickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") { e.preventDefault(); setShowTokenPicker(false); tokenToggleRef.current?.focus(); }
+  };
+
   useEffect(() => {
     if (showChainPicker) {
       chainPickerRef.current
@@ -134,7 +156,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   const debouncedAmount = useDebouncedValue(srcAmount, 500);
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
-  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError, quoteFetchedAt } = useQuote(
+  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError, quoteFetchedAt, phase: quotePhaseState, secondsRemaining: quoteExpiresInSeconds, refreshQuote, lockQuote } = useQuote(
     hasAmount && !previewQuote
       ? {
           srcChain,
@@ -147,9 +169,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
-  const quoteErrorType: { kind: "no-solver" | "generic" } | null = quoteError
-    ? { kind: /no[_ ]solver/i.test(quoteError.message ?? "") ? "no-solver" : "generic" }
-    : null;
+  const quoteIsStale = quotePhaseState === "stale";
+  const trustline = useTrustline(dstAddress || walletAddress, dstToken);
 
   // === "Quote changed" delta indicator (#297)
   // Compare each fresh quote to the immediately-previous one for the *same
@@ -195,21 +216,12 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       : 0;
 
   const srcValueUSD = srcAmount ? parseFloat(srcAmount) * srcToken.priceUsd : 0;
+  const showPriceEstimateNotice = !quote;
   const parsedSlippagePct = Math.max(0, Math.min(50, parseFloat(slippagePct) || 0));
   const minOut = dstAmount > 0 ? (dstAmount * (1 - parsedSlippagePct / 100)).toFixed(dstToken.symbol === "XLM" ? 2 : 4) : "0";
   const hasHighPriceImpact = quote ? quote.priceImpactPct > HIGH_PRICE_IMPACT_THRESHOLD_PCT : false;
 
-  const quoteErrorType = (() => {
-    if (!quoteError) return null;
-    const message = quoteError instanceof Error ? quoteError.message : String(quoteError);
-    const lowered = message.toLowerCase();
-    if (lowered.includes("no solver") || lowered.includes("no_solver") || lowered.includes("no solver found")) {
-      return { kind: "no-solver" as const };
-    }
-    return { kind: "generic" as const };
-  })();
-
-  const quoteErrorType = quoteError as { kind?: string } | null | undefined;
+  const quoteErrorType = quoteError ? { kind: /no[_ ]solver/i.test(quoteError.message ?? "") ? "no-solver" : "generic" } : null;
 
   // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
@@ -219,7 +231,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     parseFloat(srcAmount) > 0 &&
     !quoting &&
     !isSubmitting &&
-    !dstAddressError;
+    !dstAddressError && trustline.state !== "missing" && !quoteIsStale;
 
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
@@ -241,6 +253,22 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       setPastedAddress(pasted);
       setShowPasteConfirmation(true);
     }
+  };
+
+  const addTrustline = async () => {
+    if (!walletAddress || !dstToken.issuer) return;
+    setTrustlineSubmitting(true);
+    try {
+      const xdr = buildChangeTrustXdr(walletAddress, dstToken, (process.env.NEXT_PUBLIC_NETWORK ?? "testnet") as "testnet" | "mainnet");
+      validateChangeTrustXdr(xdr, process.env.NEXT_PUBLIC_NETWORK ?? "testnet", { code: dstToken.symbol, issuer: dstToken.issuer });
+      const signed = await walletAdapter.signTransaction(xdr, { network: (process.env.NEXT_PUBLIC_NETWORK ?? "testnet").toUpperCase() });
+      const horizon = (process.env.NEXT_PUBLIC_HORIZON_URL ?? "https://horizon-testnet.stellar.org").replace(/\/$/, "");
+      const body = new URLSearchParams({ tx: signed });
+      const response = await fetch(`${horizon}/transactions`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+      if (!response.ok) throw new Error("Trustline transaction was rejected");
+      useToastStore.getState().addToast("Trustline submitted; waiting for confirmation", "success");
+    } catch (error) { useToastStore.getState().addToast(error instanceof Error ? error.message : "Unable to add trustline", "error"); }
+    finally { setTrustlineSubmitting(false); }
   };
 
   const confirmPastedAddress = () => {
@@ -268,6 +296,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       return;
     }
 
+    const locked = lockQuote();
+    if (!locked) return;
+
     if (submission.status === "success") {
       submission.reset();
       setSrcAmount("");
@@ -292,6 +323,14 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   return (
     <div className="relative">
+      <TokenSelector
+        open={showTokenPicker}
+        onClose={() => setShowTokenPicker(false)}
+        chains={registry.chains}
+        srcTokens={registry.srcTokens}
+        value={{ ...srcToken, chainId: srcChain, chainName: chain.name }}
+        onSelect={(token) => { setSrcChain(token.chainId); setSrcToken(token); addRecentChain(token.chainId); }}
+      />
       {showChainPicker && (
         <div
           ref={chainPickerRef}
@@ -438,7 +477,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           </div>
 
           {/* ── Token picker inline overlay ── */}
-          {showTokenPicker && (
+          {false && showTokenPicker && (
             <div
               ref={tokenPickerRef}
               role="listbox"
@@ -642,10 +681,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               </p>
             )}
             {quoteFetchedAt && !quoteIsStale && quoteExpiresInSeconds !== null && quoteExpiresInSeconds <= 5 && (
-              <p role="status" className="text-xs text-amber-300">
-                {t("swap.quote.expiresIn", { seconds: quoteExpiresInSeconds })}
-              </p>
+              <p role="timer" aria-live="polite" className="text-xs text-amber-300">Quote expires in {quoteExpiresInSeconds}s</p>
             )}
+            {quoteFetchedAt && quoteExpiresInSeconds > 5 && <p role="timer" className="text-xs text-vx-muted">Quote valid for {quoteExpiresInSeconds}s</p>}
             {quoteIsStale && (
               <div className="flex items-center justify-between gap-2">
                 <p role="alert" className="text-xs text-amber-300">{t("swap.quote.expired")}</p>
@@ -658,6 +696,14 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {trustline.state === "missing" && dstToken.symbol !== "XLM" && (
+          <div role="alert" className="rounded-xl border border-amber-400/40 bg-amber-500/10 p-3 text-xs text-amber-200">
+            <p className="font-semibold">Add a {dstToken.symbol} trustline before swapping.</p>
+            {dstAddress && dstAddress !== walletAddress ? <p className="mt-1">Only the destination account can add this trustline.</p> : <p className="mt-1">This increases the account reserve by about 0.5 XLM.</p>}
+            {dstAddress === walletAddress && <button type="button" disabled={trustlineSubmitting} className="mt-2 rounded-lg bg-amber-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50" onClick={addTrustline}>{trustlineSubmitting ? "Signing…" : "Add trustline"}</button>}
           </div>
         )}
 

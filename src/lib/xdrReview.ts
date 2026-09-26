@@ -67,8 +67,16 @@ export type XdrSorobanSummary = {
   /** Raw argument count. */
   argCount: number;
 };
+export type XdrChangeTrustSummary = { kind: "change-trust"; asset: string; amount: string };
 
-export type XdrOperationSummary = XdrPaymentSummary | XdrSorobanSummary;
+export type XdrOperationSummary = XdrPaymentSummary | XdrSorobanSummary | XdrChangeTrustSummary;
+
+export function validateChangeTrustXdr(unsignedXdr: string, network: NetworkPassphrase, expectedAsset: { code: string; issuer: string }): XdrReviewResult {
+  const result = decodeXdr(unsignedXdr, network);
+  const operation = result.operations[0] as unknown as { kind?: string; asset?: string };
+  if (result.operationCount !== 1 || operation.kind !== "change-trust" || operation.asset !== expectedAsset.code) throw new Error("XDR is not the reviewed trustline change");
+  return result;
+}
 
 export type XdrReviewResult = {
   networkPassphrase: string;
@@ -121,6 +129,11 @@ export function decodeXdr(
           asset: asset.isNative() ? "XLM (native)" : asset.getCode(),
           amount: op.amount as string,
         };
+      }
+
+      if (op.type === "changeTrust" && "asset" in op) {
+        const asset = op.asset as Asset;
+        return { kind: "change-trust", asset: asset.isNative() ? "XLM" : asset.getCode(), amount: "0" } as XdrOperationSummary;
       }
 
       if (op.type === "invokeHostFunction") {

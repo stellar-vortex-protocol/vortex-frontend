@@ -29,3 +29,39 @@ export const DST_TOKENS = [
   { symbol: "XLM",  decimals: 7, priceUsd: 0.1182, contract: "native" },
   { symbol: "yXLM", decimals: 7, priceUsd: 0.1180, contract: "CCZX67..." },
 ] satisfies Token[];
+
+export type RegistrySnapshot = {
+  chains: Chain[];
+  srcTokens: Record<string, Token[]>;
+  dstTokens: Token[];
+  pricesAsOf: string | null;
+  priceSource: string | null;
+};
+
+export const FALLBACK_REGISTRY: RegistrySnapshot = {
+  chains: CHAINS,
+  srcTokens: SRC_TOKENS,
+  dstTokens: DST_TOKENS,
+  pricesAsOf: null,
+  priceSource: "bundled-fallback",
+};
+
+export function validateRegistryPayload(value: unknown): RegistrySnapshot {
+  if (!value || typeof value !== "object") throw new Error("invalid registry payload");
+  const input = value as Record<string, unknown>;
+  const chains = Array.isArray(input.chains) ? input.chains.filter(isChain) : [];
+  const rawTokens = input.srcTokens && typeof input.srcTokens === "object" ? input.srcTokens as Record<string, unknown> : {};
+  const srcTokens = Object.fromEntries(Object.entries(rawTokens).map(([id, tokens]) => [id, Array.isArray(tokens) ? tokens.filter(isToken) : []]));
+  const dstTokens = Array.isArray(input.dstTokens) ? input.dstTokens.filter(isToken) : [];
+  if (!chains.length || !dstTokens.length) throw new Error("registry contains no valid assets");
+  return { chains, srcTokens, dstTokens, pricesAsOf: typeof input.pricesAsOf === "string" ? input.pricesAsOf : null, priceSource: typeof input.priceSource === "string" ? input.priceSource : "relay" };
+}
+
+function isChain(value: unknown): value is Chain {
+  const c = value as Partial<Chain>;
+  return !!c && typeof c.id === "string" && typeof c.name === "string" && typeof c.shortName === "string" && typeof c.color === "string";
+}
+function isToken(value: unknown): value is Token {
+  const token = value as Partial<Token>;
+  return !!token && typeof token.symbol === "string" && Number.isInteger(token.decimals) && token.decimals >= 0 && typeof token.priceUsd === "number" && token.priceUsd >= 0;
+}

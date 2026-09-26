@@ -7,9 +7,11 @@ export type Chain = {
 
 export type Token = {
   symbol: string;
+  name?: string;
   decimals: number;
   priceUsd: number;
   contract?: string;
+  issuer?: string;
 };
 
 export type QuoteRequest = {
@@ -31,6 +33,7 @@ export type Quote = {
   priceImpactPct: number;
   protocolFeePct: number;
   rate: string;
+  expiresAt?: string | number;
 };
 
 export type IntentStatus = "pending" | "accepted" | "filled" | "failed";
