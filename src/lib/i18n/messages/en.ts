@@ -22,11 +22,7 @@ export const en = {
   "swap.chainPicker.recent": "Recent",
   "swap.chainPicker.selectChain": "Select {name}",
 
-  "activityFeed.status.live": "Live",
-  "activityFeed.status.polling": "Polling",
-  "activityFeed.error.unavailable": "Live feed unavailable right now.",
   "activityFeed.empty": "No fills yet.",
-  "activityFeed.item.route": "{chain} · via {solver}",
 
   "swap.from.label": "From",
   "swap.from.amountLabel": "Amount to swap",
@@ -60,10 +56,8 @@ export const en = {
   "swap.quote.fillTime.tooltip": "Estimated time for a solver to fill your swap after you submit. Actual time may vary.",
   "swap.quote.priceImpact.tooltip": "How much your trade moves the effective price relative to the mid-market rate. A high impact means you receive less than the quoted mid-market rate.",
   "swap.quote.protocolFee.tooltip": "A small percentage fee charged by the Vortex protocol on each settled swap. It is deducted from the destination amount.",
-  "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
   "swap.quote.unavailable": "Live quote unavailable — showing an estimated rate.",
   "swap.quote.noSolver": "No solver is available for this route right now.",
-  "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
   "swap.quote.staleWarning": "Quote is stale. Please wait for a refresh before submitting.",
   "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
 
@@ -76,11 +70,6 @@ export const en = {
   "swap.submit.enterAmount": "Enter an amount",
   "swap.submit.cta": "Swap {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta": "Retry: Swap {amount} {srcToken} → {dstToken}",
-
-  "swap.destination.label": "Destination address",
-  "swap.destination.placeholder": "G...",
-  "swap.destination.invalidAddress":
-    "Enter a valid Stellar address (starts with G).",
 
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
@@ -176,7 +165,7 @@ export const en = {
   "myIntents.empty.cta": "Make your first swap →",
 
   // /my-intents — filter combination matches nothing
-  "myIntents.filterEmpty.title": "No intents match your filters",
+  "myIntents.filterEmpty.title": "No intents match your filters.",
   "myIntents.filterEmpty.message": "Try a different status or chain filter, or clear all filters to see everything.",
   "myIntents.filterEmpty.clearFilters": "Clear filters",
 

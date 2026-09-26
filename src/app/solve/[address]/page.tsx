@@ -6,12 +6,15 @@ import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { CopyButton } from "@/components/CopyButton";
 import { SkeletonCard } from "@/components/Skeleton";
+import { EmptyState } from "@/components/EmptyState";
+import { SolverTimeline } from "@/components/SolverTimeline";
 import { useSolver } from "@/hooks/useSolver";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { sanitizeDisplayText } from "@/lib/textSafety";
 
 const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",

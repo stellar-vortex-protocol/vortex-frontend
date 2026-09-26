@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { mutate } from "swr";
 import { acceptIntent, ApiError } from "@/lib/api";
+import { useRetry } from "@/hooks/useRetry";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import type { OpenIntent } from "@/lib/types";
@@ -51,32 +52,34 @@ export function useAcceptIntent() {
             throw new Error(wallet.error ?? "Connect a wallet to accept an intent.");
           }
         }
+        const solverAddress = wallet.address;
+
+        await mutate<OpenIntent[]>(
+          "/intents/open",
+          async (current) => {
+            // Retried on transient failures; 4xx (e.g. a 409 race) surfaces immediately.
+            await withRetry(() => acceptIntent(intentId, solverAddress));
+            return (current ?? []).filter((intent) => intent.id !== intentId);
+          },
+          {
+            optimisticData: (current) => (current ?? []).filter((intent) => intent.id !== intentId),
+            rollbackOnError: true,
+            populateCache: true,
+            revalidate: false,
+          },
+        );
+
+        useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
+      } catch (err) {
+        const message = AcceptErrorMessage(err);
+        setError(message);
+        useToastStore.getState().addToast(message, "error");
+      } finally {
+        setAcceptingId(null);
       }
-      const solverAddress = wallet.address;
-
-      await mutate<OpenIntent[]>(
-        "/intents/open",
-        async (current) => {
-          await acceptIntent(intentId, solverAddress);
-          return (current ?? []).filter((intent) => intent.id !== intentId);
-        },
-        {
-          optimisticData: (current) => (current ?? []).filter((intent) => intent.id !== intentId),
-          rollbackOnError: true,
-          populateCache: true,
-          revalidate: false,
-        },
-      );
-
-      useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
-    } catch (err) {
-      const message = AcceptErrorMessage(err);
-      setError(message);
-      useToastStore.getState().addToast(message, "error");
-    } finally {
-      setAcceptingId(null);
-    }
-  }, []);
+    },
+    [withRetry],
+  );
 
   return { accept, acceptingId, error };
 }

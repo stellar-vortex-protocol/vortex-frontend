@@ -19,15 +19,8 @@ export const es = {
   "wallet.error.connectFailed": "No se pudo conectar la billetera.",
 
   "swap.chainPicker.title": "Seleccionar cadena origen",
-  "swap.destination.label": "Dirección de destino",
-  "swap.destination.placeholder": "G...",
-  "swap.destination.invalidAddress": "Ingresa una dirección Stellar válida (comienza con G).",
 
-  "activityFeed.status.live": "En vivo",
-  "activityFeed.status.polling": "Actualizando",
-  "activityFeed.error.unavailable": "El feed en vivo no está disponible ahora.",
   "activityFeed.empty": "Aún no hay llenados.",
-  "activityFeed.item.route": "{chain} · vía {solver}",
 
   "swap.from.label": "De",
   "swap.from.amountLabel": "Cantidad a intercambiar",
@@ -76,10 +69,6 @@ export const es = {
   "swap.submit.cta": "Intercambiar {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta":
     "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
-
-  "swap.destination.label": "Dirección de destino",
-  "swap.destination.placeholder": "G...",
-  "swap.destination.invalidAddress": "Ingresa una dirección de Stellar válida (empieza con G).",
 
   "swap.disclaimer": "El swap se liquida directamente en Stellar · Sin tokens envueltos · Protegido por bonos de solver",
 

@@ -3,6 +3,9 @@ import "./globals.css";
 import { WalletHydrator } from "@/components/WalletHydrator";
 import { ToastViewport } from "@/components/ToastViewport";
 import { IntentStatusWatcher } from "@/components/IntentStatusWatcher";
+import { GlobalErrorCapture } from "@/components/GlobalErrorCapture";
+import { CommandPalette } from "@/components/CommandPalette";
+import { ConnectivityBanner } from "@/components/ConnectivityBanner";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { DEFAULT_LOCALE } from "@/lib/i18n";
 
