@@ -14,6 +14,7 @@ import {
 import { validateCommentText } from "@/lib/textSafety";
 import { timeRemaining } from "@/lib/time";
 import { getMessage } from "@/i18n/messages";
+import { ProposalImpactPreview } from "./ProposalImpactPreview";
 
 const MAX_COMMENT_LENGTH = 500;
 
@@ -108,6 +109,8 @@ export default function ProposalDetailClient({ proposalId }: { proposalId: strin
               <div className="text-lg font-bold text-vx-amber">{proposal.votesAgainst.toLocaleString()}</div>
             </div>
           </div>
+
+          <ProposalImpactPreview proposal={proposal} />
         </div>
 
         {/* ── Community Discussion / Comment Thread Section ── */}

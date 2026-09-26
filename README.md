@@ -26,7 +26,7 @@ registrations. Part of the multi-repo Vortex stack — see also
 | `/explore/[id]` | `src/app/explore/[id]/page.tsx` | Single intent detail, with a settlement tx link once filled |
 | `/solve` | `src/app/solve/page.tsx` | Solver leaderboard, open intents feed, and solver registration |
 | `/governance` | `src/app/governance/page.tsx` | Governance proposals list and voting overview |
-| `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread |
+| `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread and, for minimum-bond proposals, an impact preview ("N of M current solvers would no longer qualify", from `src/lib/governanceImpact.ts`) |
 | `/contributors` | `src/app/contributors/page.tsx` | Drips Wave contribution transparency dashboard parsing repository issue metrics |
 
 ---

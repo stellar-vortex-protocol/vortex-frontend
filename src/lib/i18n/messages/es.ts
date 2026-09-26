@@ -151,4 +151,16 @@ export const es = {
   // solve/[address] — historial de llenados vacío
   "solverDetail.fillHistory.empty.title": "Sin llenados aún",
   "solverDetail.fillHistory.empty.message": "Una vez que este solver empiece a aceptar y llenar intenciones, su historial aparecerá aquí.",
+
+  "governance.impact.title": "Vista previa del impacto",
+  "governance.impact.unavailable": "No hay una vista previa automática del impacto para este tipo de propuesta.",
+  "governance.impact.loading": "Calculando el impacto con los datos actuales de solvers…",
+  "governance.impact.error": "No se pudieron cargar los datos de solvers, así que no hay vista previa del impacto por ahora.",
+  "governance.impact.noSolvers": "Todavía no hay solvers registrados, así que este cambio no afectaría a nadie.",
+  "governance.impact.raise": "Subir el bono mínimo de ${current} a ${proposed} descalificaría a {lose} de los {total} solvers actuales con su bono actual.",
+  "governance.impact.raiseNoneAffected": "Subir el bono mínimo de ${current} a ${proposed}: los {total} solvers actuales ya lo cumplen.",
+  "governance.impact.lower": "Bajar el bono mínimo de ${current} a ${proposed}: los {total} solvers actuales seguirían calificando.",
+  "governance.impact.lowerWithGain": "Bajar el bono mínimo de ${current} a ${proposed}: todos los solvers actuales seguirían calificando y {gain} de los {total} pasarían a cumplirlo.",
+  "governance.impact.unchanged": "El bono mínimo propuesto (${proposed}) es igual al actual, así que ningún solver se ve afectado.",
+  "governance.impact.basis": "Según los {total} solvers que devuelve actualmente el relay.",
 } as const;

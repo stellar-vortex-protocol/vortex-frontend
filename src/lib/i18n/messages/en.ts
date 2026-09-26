@@ -193,4 +193,16 @@ export const en = {
   // solve/[address] — fill history empty
   "solverDetail.fillHistory.empty.title": "No fills yet",
   "solverDetail.fillHistory.empty.message": "Once this solver starts accepting and filling intents, their history will appear here.",
+
+  "governance.impact.title": "Impact preview",
+  "governance.impact.unavailable": "No automated impact preview is available for this proposal type.",
+  "governance.impact.loading": "Calculating impact from current solver data…",
+  "governance.impact.error": "Couldn't load solver data, so no impact preview is available right now.",
+  "governance.impact.noSolvers": "No registered solvers yet, so there's no one this change would affect.",
+  "governance.impact.raise": "Raising the minimum bond from ${current} to ${proposed} would disqualify {lose} of the {total} current solvers at their present bond.",
+  "governance.impact.raiseNoneAffected": "Raising the minimum bond from ${current} to ${proposed}: all {total} current solvers already meet it.",
+  "governance.impact.lower": "Lowering the minimum bond from ${current} to ${proposed}: all {total} current solvers would still qualify.",
+  "governance.impact.lowerWithGain": "Lowering the minimum bond from ${current} to ${proposed}: all current solvers would still qualify, and {gain} of the {total} would newly meet it.",
+  "governance.impact.unchanged": "The proposed minimum bond (${proposed}) is the same as today's, so no solver is affected.",
+  "governance.impact.basis": "Based on the {total} solvers currently returned by the relay.",
 } as const;
