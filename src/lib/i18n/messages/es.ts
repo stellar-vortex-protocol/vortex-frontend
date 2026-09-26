@@ -163,4 +163,14 @@ export const es = {
   "governance.impact.lowerWithGain": "Bajar el bono mínimo de ${current} a ${proposed}: todos los solvers actuales seguirían calificando y {gain} de los {total} pasarían a cumplirlo.",
   "governance.impact.unchanged": "El bono mínimo propuesto (${proposed}) es igual al actual, así que ningún solver se ve afectado.",
   "governance.impact.basis": "Según los {total} solvers que devuelve actualmente el relay.",
+
+  "feedback.open": "Sugerir una función",
+  "feedback.title": "Sugerir una función",
+  "feedback.titleLabel": "Título",
+  "feedback.descriptionLabel": "¿Qué te gustaría y qué problema resuelve?",
+  "feedback.count": "{current} / {max} caracteres",
+  "feedback.githubNote": "Al enviar se abre un issue de GitHub prellenado en una pestaña nueva. Necesitarás una cuenta de GitHub para publicarlo.",
+  "feedback.required": "Agrega un título y una descripción.",
+  "feedback.cancel": "Cancelar",
+  "feedback.submit": "Continuar en GitHub",
 } as const;

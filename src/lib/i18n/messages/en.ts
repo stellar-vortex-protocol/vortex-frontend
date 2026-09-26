@@ -205,4 +205,14 @@ export const en = {
   "governance.impact.lowerWithGain": "Lowering the minimum bond from ${current} to ${proposed}: all current solvers would still qualify, and {gain} of the {total} would newly meet it.",
   "governance.impact.unchanged": "The proposed minimum bond (${proposed}) is the same as today's, so no solver is affected.",
   "governance.impact.basis": "Based on the {total} solvers currently returned by the relay.",
+
+  "feedback.open": "Suggest a feature",
+  "feedback.title": "Suggest a feature",
+  "feedback.titleLabel": "Title",
+  "feedback.descriptionLabel": "What would you like, and what problem does it solve?",
+  "feedback.count": "{current} / {max} characters",
+  "feedback.githubNote": "Submitting opens a pre-filled GitHub issue in a new tab. You'll need a GitHub account to post it.",
+  "feedback.required": "Add a title and a description.",
+  "feedback.cancel": "Cancel",
+  "feedback.submit": "Continue on GitHub",
 } as const;
