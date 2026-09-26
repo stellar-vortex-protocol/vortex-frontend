@@ -24,6 +24,7 @@ import {
   Networks,
   Operation,
   Asset,
+  xdr,
 } from "@stellar/stellar-sdk";
 
 // Amount tolerance: allow up to 1 % deviation between the quoted amount and
@@ -290,4 +291,84 @@ export function validateRegistrationXdr(
       }
     }
   }
+}
+
+// ─── Signed-XDR verification (#308) ─────────────────────────────────────────
+
+export type SignedXdrVerification = {
+  valid: boolean;
+  error?: string;
+};
+
+/** Source account and operations of an envelope, as comparable XDR strings. */
+function transactionCore(envelopeXdr: string): { source: string; operations: string[] } {
+  const envelope = xdr.TransactionEnvelope.fromXDR(envelopeXdr, "base64");
+  switch (envelope.switch()) {
+    case xdr.EnvelopeType.envelopeTypeTxV0(): {
+      const tx = envelope.v0().tx();
+      return {
+        source: tx.sourceAccountEd25519().toString("base64"),
+        operations: tx.operations().map((op) => op.toXDR("base64")),
+      };
+    }
+    case xdr.EnvelopeType.envelopeTypeTx(): {
+      const tx = envelope.v1().tx();
+      return {
+        source: tx.sourceAccount().toXDR("base64"),
+        operations: tx.operations().map((op) => op.toXDR("base64")),
+      };
+    }
+    case xdr.EnvelopeType.envelopeTypeTxFeeBump(): {
+      const tx = envelope.feeBump().tx().innerTx().v1().tx();
+      return {
+        source: tx.sourceAccount().toXDR("base64"),
+        operations: tx.operations().map((op) => op.toXDR("base64")),
+      };
+    }
+    default:
+      throw new Error("Unsupported transaction envelope type.");
+  }
+}
+
+/**
+ * Defense-in-depth check after signing: the XDR the wallet returns must carry
+ * the same source account and exactly the same operations (type, destination,
+ * asset, amount, …) as the unsigned XDR that was reviewed. Fee and time bounds
+ * are not compared, since a wallet may legitimately adjust them. Any decode
+ * failure or difference is reported as invalid — never signed-and-submitted.
+ */
+export function verifySignedXdrMatches(
+  unsignedXdr: string,
+  signedXdr: string,
+): SignedXdrVerification {
+  let unsigned: ReturnType<typeof transactionCore>;
+  let signed: ReturnType<typeof transactionCore>;
+  try {
+    unsigned = transactionCore(unsignedXdr);
+    signed = transactionCore(signedXdr);
+  } catch {
+    return {
+      valid: false,
+      error:
+        "Failed to decode the signed transaction. It may be corrupted or in an unexpected format.",
+    };
+  }
+
+  if (unsigned.source !== signed.source) {
+    return {
+      valid: false,
+      error: "The signed transaction's source account does not match what was reviewed.",
+    };
+  }
+  if (
+    unsigned.operations.length !== signed.operations.length ||
+    unsigned.operations.some((op, i) => op !== signed.operations[i])
+  ) {
+    return {
+      valid: false,
+      error:
+        "Transaction verification failed. The signed transaction does not match what was reviewed.",
+    };
+  }
+  return { valid: true };
 }

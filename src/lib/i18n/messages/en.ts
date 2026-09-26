@@ -74,6 +74,16 @@ export const en = {
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
   "swap.destination.invalidAddress": "Enter a valid Stellar address (starts with G).",
+  "swap.destination.pasteConfirm": "Address pasted from clipboard. Check it matches before using it:",
+  "swap.destination.pasteConfirmCta": "Use this address",
+  "swap.destination.pasteDismissCta": "Dismiss",
+  "swap.quote.expiresIn": "Refreshes in {seconds}s",
+  "swap.quote.expired": "Quote expired",
+  "swap.quote.refreshCta": "Refresh quote",
+  "swap.error.troubleshoot.title": "Why did this happen?",
+  "swap.error.troubleshoot.balance": "Check your wallet has enough balance on the source chain (plus gas).",
+  "swap.error.troubleshoot.network": "Confirm Freighter is on the expected network.",
+  "swap.error.troubleshoot.retry": "Wait a moment and try again — the relay or a solver may be briefly unavailable.",
 
   "swap.disclaimer": "Swap settles directly on Stellar · No wrapped tokens · Protected by solver bonds",
 

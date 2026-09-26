@@ -12,6 +12,7 @@ import {
   validateSwapXdr,
   validateRegistrationXdr,
   XdrMismatchError,
+  verifySignedXdrMatches,
 } from "./xdrReview";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -277,5 +278,56 @@ describe("validateRegistrationXdr", () => {
         solverAddress: DESTINATION,
       })
     ).toThrow(XdrMismatchError);
+  });
+});
+
+describe("verifySignedXdrMatches", () => {
+  function paymentTx(amount: string) {
+    return new TransactionBuilder(new Account(SOURCE_KP.publicKey(), "1"), {
+      fee: "100",
+      networkPassphrase: PASSPHRASE,
+    })
+      .addOperation(Operation.payment({ destination: DESTINATION, asset: Asset.native(), amount }))
+      .setTimeout(300)
+      .build();
+  }
+
+  it("accepts a signed XDR carrying the same transaction", () => {
+    const tx = paymentTx("10");
+    const unsignedXdr = tx.toXDR();
+    tx.sign(SOURCE_KP);
+
+    expect(verifySignedXdrMatches(unsignedXdr, tx.toXDR())).toEqual({ valid: true });
+  });
+
+  it("rejects a signed XDR whose operations were altered", () => {
+    const unsignedXdr = paymentTx("10").toXDR();
+    const tampered = paymentTx("9999");
+    tampered.sign(SOURCE_KP);
+
+    const result = verifySignedXdrMatches(unsignedXdr, tampered.toXDR());
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/does not match what was reviewed/);
+  });
+
+  it("rejects a signed XDR from a different source account", () => {
+    const unsignedXdr = paymentTx("10").toXDR();
+    const other = new TransactionBuilder(new Account(OTHER_ADDRESS, "1"), {
+      fee: "100",
+      networkPassphrase: PASSPHRASE,
+    })
+      .addOperation(Operation.payment({ destination: DESTINATION, asset: Asset.native(), amount: "10" }))
+      .setTimeout(300)
+      .build();
+
+    const result = verifySignedXdrMatches(unsignedXdr, other.toXDR());
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/source account/);
+  });
+
+  it("rejects XDR that cannot be decoded", () => {
+    const result = verifySignedXdrMatches(paymentTx("10").toXDR(), "not-xdr");
+    expect(result.valid).toBe(false);
+    expect(result.error).toMatch(/Failed to decode/);
   });
 });

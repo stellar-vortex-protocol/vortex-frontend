@@ -1,5 +1,14 @@
 import type { Chain, Token } from "@/lib/types";
 
+/**
+ * PRICES_AS_OF
+ *
+ * The date the hardcoded token prices below were last updated (ISO 8601).
+ * Shown as the "as of" tooltip on the estimated-value badge in SwapCard.
+ * Update it whenever the `priceUsd` values change.
+ */
+export const PRICES_AS_OF = "2026-08-30";
+
 export const CHAINS = [
   { id: "ethereum",  name: "Ethereum",  shortName: "ETH",  color: "#627EEA" },
   { id: "base",      name: "Base",      shortName: "BASE", color: "#0052FF" },

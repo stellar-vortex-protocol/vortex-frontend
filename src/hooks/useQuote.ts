@@ -56,5 +56,13 @@ export function useQuote(params: QuoteRequest | null) {
 
   const quoteError = error ? classifyQuoteError(error) : null;
 
-  return { quote: data, quoteFetchedAt, isLoading, error, quoteErrorType: quoteError };
+  return {
+    quote: data,
+    quoteFetchedAt,
+    isLoading,
+    error,
+    quoteErrorType: quoteError,
+    /** Re-fetch the current quote (e.g. after it went stale). */
+    refresh: () => mutate(),
+  };
 }
