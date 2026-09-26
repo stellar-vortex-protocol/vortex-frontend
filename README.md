@@ -287,6 +287,10 @@ The CI pipeline runs visual regression tests on every build, preventing CSS regr
 - [ ] Solver reputation detail (fill history, uptime over time)
 - [ ] Localization
 
+Quarterly community reports on protocol activity, shipped changes and governance
+live in [`docs/reports/`](./docs/reports/): start with the latest,
+[2026 Q3](./docs/reports/2026-q3.md), or the [template](./docs/reports/TEMPLATE.md).
+
 ---
 
 ## Contributing
