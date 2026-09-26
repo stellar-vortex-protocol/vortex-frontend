@@ -3,6 +3,9 @@
 import { useEffect } from "react";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
+import { truncateAddress } from "@/lib/stellarAddress";
+import { QrCode } from "@/components/QrCode";
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
 const NETWORK_CHECK_INTERVAL_MS = 8000;
@@ -14,6 +17,8 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
     isConnected,
     isConnecting,
     error,
+    errorKey,
+    lastKnownAddress,
     networkMismatch,
     notInstalled,
     wasSessionCleared,
@@ -21,7 +26,29 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
     disconnect,
   } = useWalletStore();
 
-  const displayError = error ?? null;
+  // Detect a Freighter account/network switch that happens after connect,
+  // since the extension doesn't push change events. Only polls while
+  // connected, and never calls requestAccess() — that would pop the
+  // Freighter approval UI unprompted (see docs/wallet-hydration.md).
+  useEffect(() => {
+    if (!isConnected) return;
+
+    const check = () => void useWalletStore.getState().checkForChanges();
+    check();
+    const intervalId = setInterval(check, NETWORK_CHECK_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", check);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", check);
+    };
+  }, [isConnected]);
 
   const handleConnect = async () => {
     await connect();
@@ -74,22 +101,10 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
 
         {networkMismatch && (
           <p role="alert" className="text-xs text-yellow-400">
-            ⚠ Wrong network. Switch Freighter to <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
+            ⚠ Wrong network. Switch Freighter to <span className="font-semibold">{process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"}</span>.
           </p>
         )}
       </div>
-    );
-  }
-
-  if (wasSessionCleared && !address && !isConnected) {
-    return (
-      <button
-        type="button"
-        onClick={handleConnect}
-        className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
-      >
-        Reconnect {truncateAddress("GABCDEFGHIJKLMNOPQRSTUVWXYZ23456")}
-      </button>
     );
   }
 
@@ -141,7 +156,7 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
       type="button"
       onClick={handleConnect}
       disabled={isConnecting}
-      title={error ?? undefined}
+      title={displayError ?? undefined}
       className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
     >
       {isConnecting ? (

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import freighterApi from "@stellar/freighter-api";
+import { walletAdapter } from "@/lib/wallet";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 export type WalletErrorKey =
   "wallet.error.freighterUnavailable" | "wallet.error.connectFailed";
@@ -20,12 +21,13 @@ const EXPECTED_NETWORK = (
   process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"
 ).toUpperCase();
 
-function isValidPersistedState(state: unknown): state is {
-  address: string | null;
-  lastKnownAddress: string | null;
-  network: string | null;
-  isConnected: boolean;
-} {
+/**
+ * Guards rehydration: a persisted payload is only merged into the store if it
+ * has exactly the `PersistedWalletState` shape and any addresses in it are
+ * valid Stellar public keys. Anything else (corrupted or hand-edited
+ * localStorage) is ignored and the store starts disconnected.
+ */
+function isValidPersistedState(state: unknown): state is PersistedWalletState {
   if (typeof state !== "object" || state === null) {
     return false;
   }
@@ -33,39 +35,39 @@ function isValidPersistedState(state: unknown): state is {
   const obj = state as Record<string, unknown>;
 
   if (
-    typeof obj.address !== "string" &&
-    obj.address !== null &&
-    obj.address !== undefined
+    typeof obj["address"] !== "string" &&
+    obj["address"] !== null &&
+    obj["address"] !== undefined
   ) {
     return false;
   }
 
   if (
-    typeof obj.lastKnownAddress !== "string" &&
-    obj.lastKnownAddress !== null &&
-    obj.lastKnownAddress !== undefined
+    typeof obj["lastKnownAddress"] !== "string" &&
+    obj["lastKnownAddress"] !== null &&
+    obj["lastKnownAddress"] !== undefined
   ) {
     return false;
   }
 
   if (
-    typeof obj.network !== "string" &&
-    obj.network !== null &&
-    obj.network !== undefined
+    typeof obj["network"] !== "string" &&
+    obj["network"] !== null &&
+    obj["network"] !== undefined
   ) {
     return false;
   }
 
-  if (typeof obj.isConnected !== "boolean") {
+  if (typeof obj["isConnected"] !== "boolean") {
     return false;
   }
 
-  const address = obj.address;
+  const address = obj["address"];
   if (typeof address === "string" && !isValidStellarPublicKey(address)) {
     return false;
   }
 
-  const lastKnownAddress = obj.lastKnownAddress;
+  const lastKnownAddress = obj["lastKnownAddress"];
   if (
     typeof lastKnownAddress === "string" &&
     !isValidStellarPublicKey(lastKnownAddress)
@@ -77,57 +79,55 @@ function isValidPersistedState(state: unknown): state is {
 }
 
 export type WalletState = {
+  /** Connected Stellar public key, or `null` when disconnected. */
   address: string | null;
+  /**
+   * Last address this browser was connected with. Kept after a disconnect or a
+   * cleared session so the UI can offer a one-click "Reconnect G...".
+   */
   lastKnownAddress: string | null;
+  /** Network reported by the wallet (e.g. `TESTNET`), or `null`. */
   network: string | null;
   isConnected: boolean;
+  /** `true` while a user-initiated `connect()` is in flight. */
   isConnecting: boolean;
+  /**
+   * `true` when the session ended without the user asking in this tab: a
+   * persisted session that could no longer be restored on hydrate, or an
+   * explicit disconnect. Drives the reconnect prompt.
+   */
   wasSessionCleared: boolean;
-  /** Generic connection error message (e.g. user declined access). */
+  /**
+   * Raw error message to show when there's no translated copy — typically a
+   * pass-through message from the extension (e.g. "User declined access").
+   */
   error: string | null;
-  errorKey: WalletErrorKey | null;
   /**
-   * Stable i18n key for the connection error, when one applies (currently only
-   * the "Freighter not installed" case). `null` for generic/unknown failures,
-   * where `error` carries the raw message instead.
+   * i18n key for errors whose copy we own (Freighter missing, generic connect
+   * failure); `null` otherwise. Consumers show `t(errorKey)` when set, else
+   * `error`.
    */
   errorKey: WalletErrorKey | null;
   /**
-   * Translation key for `error` when the failure is one we control the copy for
-   * (Freighter missing, generic connect failure). `null` when `error` is a
-   * pass-through message from the wallet/extension that has no translation.
-   * Consumers should prefer `t(errorKey)` when it is set, else fall back to the
-   * raw `error` string.
-   */
-  errorKey: WalletErrorKey | null;
-  /**
-   * Stable i18n key for the error when it maps to a known category, else null
-   * (a raw error message from Freighter is surfaced via `error` only).
-   */
-  errorKey: WalletErrorKey | null;
-  /**
-   * `true` when a persisted session was dropped on hydrate because the
-   * extension no longer allows this site - the UI can offer a one-click
-   * reconnect keyed off `lastKnownAddress`.
-   */
-  wasSessionCleared: boolean;
-  /**
-   * `true` when the wallet is connected but on a different network than the
-   * one configured via NEXT_PUBLIC_NETWORK. The wallet is still treated as
-   * connected so the address remains accessible, but the UI should surface a
-   * clear warning.
+   * `true` when the wallet is connected but on a different network than
+   * NEXT_PUBLIC_NETWORK (default `testnet`). The wallet stays connected so the
+   * address remains usable; the UI surfaces a warning.
    */
   networkMismatch: boolean;
   /**
-   * `true` when the connect attempt failed specifically because the Freighter
-   * extension is not installed (as opposed to a generic failure). The UI can
-   * use this to show an install link instead of a generic retry CTA.
+   * `true` when the last connect attempt failed because the Freighter
+   * extension isn't installed, so the UI can offer an install link.
    */
   notInstalled: boolean;
-  errorKey: WalletErrorKey | null;
   connect: () => Promise<void>;
   disconnect: () => void;
+  /** Silently restore a persisted session on app load (never prompts). */
   hydrate: () => Promise<void>;
+  /**
+   * Re-read the account and network from the wallet while connected, to pick
+   * up a switch made in the extension (it doesn't push change events).
+   */
+  checkForChanges: () => Promise<void>;
   /**
    * Reconcile this tab's state with a persisted snapshot written by another
    * tab (delivered via the `storage` event). Trusts an explicit cross-tab
@@ -149,7 +149,6 @@ export const useWalletStore = create<WalletState>()(
       errorKey: null,
       networkMismatch: false,
       notInstalled: false,
-      errorKey: null,
 
       connect: async () => {
         set({
@@ -215,15 +214,15 @@ export const useWalletStore = create<WalletState>()(
         const state = get();
         if (!state.isConnected) return;
         try {
-          const isAppConnected = await freighterApi.isConnected();
-          const allowed = isAppConnected && (await freighterApi.isAllowed());
+          const isAppConnected = await walletAdapter.isConnected();
+          const allowed = isAppConnected && (await walletAdapter.isAllowed());
           // Don't clear the session here: an extension that's momentarily
           // locked isn't the same as the user revoking access, and connect()
           // already owns the "not installed" flow.
           if (!allowed) return;
 
-          const address = await freighterApi.getPublicKey();
-          const network = await freighterApi.getNetwork();
+          const address = await walletAdapter.getPublicKey();
+          const network = await walletAdapter.getNetwork();
           const mismatch = network.toUpperCase() !== EXPECTED_NETWORK;
 
           if (address !== state.address || network !== state.network || mismatch !== state.networkMismatch) {
@@ -271,24 +270,18 @@ export const useWalletStore = create<WalletState>()(
         try {
           const isAppConnected = await walletAdapter.isConnected();
           const allowed = isAppConnected && (await walletAdapter.isAllowed());
+          // A user-initiated connect() that started while we were waiting on
+          // the extension owns the state from here; don't overwrite it.
+          if (get().isConnecting) return;
           if (!allowed) {
-            set({
-              address: null,
-              lastKnownAddress: get().address ?? get().lastKnownAddress,
-              network: null,
-              isConnected: false,
-              wasSessionCleared: true,
-              error: null,
-              errorKey: null,
-              networkMismatch: false,
-              notInstalled: false,
-            });
+            set(clearedSession);
             return;
           }
 
           const address = await walletAdapter.getPublicKey();
           const network = await walletAdapter.getNetwork();
           const mismatch = network.toUpperCase() !== EXPECTED_NETWORK;
+          if (get().isConnecting) return;
 
           set({
             address,
@@ -302,16 +295,9 @@ export const useWalletStore = create<WalletState>()(
             notInstalled: false,
           });
         } catch {
-          set({
-            address: null,
-            network: null,
-            isConnected: false,
-            wasSessionCleared: false,
-            error: null,
-            errorKey: null,
-            networkMismatch: false,
-            notInstalled: false,
-          });
+          // Extension removed or unreachable since the last session.
+          if (get().isConnecting) return;
+          set(clearedSession);
         }
       },
 
@@ -353,6 +339,9 @@ export const useWalletStore = create<WalletState>()(
     {
       name: PERSIST_KEY,
       storage: createJSONStorage(() => localStorage),
+      // Ignore a corrupted/hand-edited persisted payload rather than trusting it.
+      merge: (persisted, current) =>
+        isValidPersistedState(persisted) ? { ...current, ...persisted } : current,
       partialize: (state): PersistedWalletState => ({
         address: state.address,
         lastKnownAddress: state.lastKnownAddress,
