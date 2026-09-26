@@ -27,6 +27,7 @@ registrations. Part of the multi-repo Vortex stack — see also
 | `/solve` | `src/app/solve/page.tsx` | Solver leaderboard, open intents feed, and solver registration |
 | `/governance` | `src/app/governance/page.tsx` | Governance proposals list and voting overview |
 | `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread and, for minimum-bond proposals, an impact preview ("N of M current solvers would no longer qualify", from `src/lib/governanceImpact.ts`) |
+| `/requests` | `src/app/requests/page.tsx` | Community chain/token support requests: a connected wallet can request a chain or token (rejected with a clear message if it's already in `marketData.ts` or already requested) and upvote requests once each, sorted by upvotes. Backed by the in-memory mock `src/lib/supportRequestStore.ts` (same pattern as the governance mock store), so data resets on reload until a backend endpoint exists. A standalone route rather than a governance tab, because it's lightweight signal-gathering, not a parameter proposal with a vote |
 | `/contributors` | `src/app/contributors/page.tsx` | Drips Wave contribution transparency dashboard parsing repository issue metrics |
 
 ---
