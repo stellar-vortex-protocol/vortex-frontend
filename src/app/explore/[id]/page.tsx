@@ -11,6 +11,7 @@ import { SkeletonDetailCard } from "@/components/Skeleton";
 import { CopyButton } from "@/components/CopyButton";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useIntent } from "@/hooks/useIntent";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
 import { truncateAddress } from "@/lib/stellarAddress";
 
@@ -34,6 +35,7 @@ export default function IntentDetailPage({
 }: {
   params: { id: string };
 }) {
+  const { t } = useTranslation();
   const { intent, isLoading, error } = useIntent(params.id);
   const { copy } = useCopyToClipboard();
   const [txHashCopied, setTxHashCopied] = useState(false);
@@ -63,6 +65,15 @@ export default function IntentDetailPage({
             >
               Print / Save as PDF
             </button>
+          )}
+          {intent?.status === "filled" && (
+            <Link
+              href={`/explore/${params.id}/receipt`}
+              className="print:hidden text-xs px-3 py-1.5 rounded-lg border border-vx-border text-vx-muted
+                          hover:text-vx-text hover:border-vx-sage/40 transition-colors"
+            >
+              {t("receipt.view")}
+            </Link>
           )}
         </div>
 

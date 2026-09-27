@@ -130,3 +130,30 @@ vi.mock("@stellar/freighter-api", () => ({
 End-to-end flows that span multiple hooks/components. Keep them in `src/app/<route>/` alongside the page.
 
 **Reference:** `src/app/solve/accept-intent.integration.test.tsx:40-76`
+
+## Explore virtual list (#444)
+
+`src/components/VirtualList.tsx` is a reusable windowed list (single-column
+`role="grid"` with `aria-rowcount`/`aria-rowindex` and `aria-activedescendant`).
+Rows are measured with TanStack Virtual's `measureElement`, so wrapped chips and
+long solver names never clip.
+
+- **Keyboard:** Up/Down/Home/End/PageUp/PageDown move the active row, Enter opens
+  the intent, and `/` focuses the search box from anywhere on `/explore`.
+- **Scroll restoration:** scroll offset + active row are saved to
+  `sessionStorage` under `vortex-vlist:explore?<query>` (filters live in the URL)
+  and restored on back navigation. Restoration is skipped if the first row
+  changed or the row count moved by more than 20%.
+- **Prepends:** when new intents stream in above the viewport the scroll offset
+  is shifted so the visible row stays anchored.
+- Pure helpers (`nextActiveIndex`, `isRestorable`) are unit-tested in
+  `src/components/VirtualList.test.ts`.
+
+### Performance measurement method
+
+1. `npm run build && npm start`, open `/explore` with a relay (or mocked
+   `useLiveIntents`) returning 5,000 intents.
+2. Chrome DevTools → Performance → CPU 4× slowdown ("mid-range laptop" profile).
+3. Record while scrolling the list top→bottom with the mouse wheel for ~10 s.
+4. Read the FPS track / frames summary; the budget is ≥ 55 fps average with no
+   long tasks > 50 ms during scroll.

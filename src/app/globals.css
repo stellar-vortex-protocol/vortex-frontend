@@ -268,3 +268,53 @@ html[data-motion="allow"] *::after {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* ── Print (#447) ─────────────────────────────────────────────────────────
+ * Printed receipts/records always use a light palette regardless of the
+ * user's theme, and drop navigation and interactive chrome.
+ */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  :root,
+  :root[data-theme] {
+    --vx-ink: #ffffff;
+    --vx-base: #ffffff;
+    --vx-surface: #f5f5f5;
+    --vx-card: #ffffff;
+    --vx-border: rgba(0, 0, 0, 0.2);
+    --vx-line: rgba(0, 0, 0, 0.1);
+    --vx-text: #111111;
+    --vx-muted: #444444;
+    --vx-dim: #666666;
+    --vx-sage: #1b6b49;
+    --vx-body-bg: #ffffff;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .receipt dd {
+    word-break: break-all;
+  }
+
+  .receipt dl > div {
+    break-inside: avoid;
+  }
+}

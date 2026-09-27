@@ -80,6 +80,7 @@ function buildCsp() {
     `script-src 'self' 'unsafe-inline'`, // see tradeoff note 1 above
     "style-src 'self' 'unsafe-inline'",  // Tailwind injects inline styles via CSS-in-JS in dev
     `connect-src ${connectSrc}`,
+    "worker-src 'self' blob:",          // intent export worker (src/lib/export)
     "img-src 'self' data:",
     "font-src 'self'",
     "object-src 'none'",

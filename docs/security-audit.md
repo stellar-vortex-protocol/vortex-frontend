@@ -291,3 +291,18 @@ No unsafe rendering sinks were found. The codebase does not use `dangerouslySetI
 - **Stellar address note:** Stellar public keys are fixed-format 56-character base32 G-strkeys validated structurally by `isValidStellarPublicKey` before any display or form submission. Confusable-character risk is inherently limited there. No address-adjacent free-text field (such as a future memo field) currently bypasses validation, but any future memo or label field must route through `sanitizeDisplayText` before display — this is the expected pattern established by this change.
 
 **Tests:** `src/lib/textSafety.test.ts` — real Unicode attack fixtures for every bidi control (U+202A–U+202E, U+2066–U+2069), every zero-width character (U+200B–U+200D, U+FEFF, U+00AD), combined payloads, safe ASCII/non-Latin strings asserted unchanged.
+
+## Intent export center (#445)
+
+- Exports (CSV/JSON) are serialised in a Web Worker
+  (`src/lib/export/export.worker.ts`) in 500-row chunks and assembled as Blob
+  parts; the worker is terminated on cancel. If a worker can't be created the
+  same runner (`src/lib/export/runner.ts`) runs in-thread, yielding between chunks.
+- CSV cells keep the `escapeCsv` formula-injection neutralisation from
+  `src/lib/csv.ts`; files start with a UTF-8 BOM for Excel.
+- JSON exports carry `schemaVersion`, `network` and `generatedAt` and contain only
+  whitelisted public `FeedItem` columns - no XDR, keys or signatures.
+- The relay has no paginated history endpoint, so only loaded intents are
+  exported; the dialog says so explicitly.
+- CSP gains `worker-src 'self' blob:` (`next.config.mjs`) for the export worker.
+- Object URLs are revoked right after the download click.

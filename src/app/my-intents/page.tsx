@@ -7,13 +7,12 @@ import { Footer } from "@/components/Footer";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { ConnectWalletButton } from "@/components/ConnectWalletButton";
 import { EmptyState } from "@/components/EmptyState";
+import { ExportDialog } from "@/components/ExportDialog";
 import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
 import { useIntent } from "@/hooks/useIntent";
 import { CHAINS } from "@/lib/marketData";
-import { downloadCsv, buildIntentsCsv } from "@/lib/csv";
 import { SkeletonCard } from "@/components/Skeleton";
-import { buildIntentsCsv, downloadCsv } from "@/lib/csv";
 import type { IntentStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = [
@@ -104,18 +103,6 @@ export default function MyIntentsPage() {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
-  const exportCsv = useMemo(() => buildIntentsCsv(filtered, selectedColumns), [filtered, selectedColumns]);
-
-  const handleExportCsv = () => {
-    downloadCsv("vortex-my-intents.csv", exportCsv);
-  };
-
-  const toggleColumn = (column: string) => {
-    setSelectedColumns((prev) =>
-      prev.includes(column) ? prev.filter((c) => c !== column) : [...CSV_HEADERS].filter((c) => c === column || prev.includes(c))
-    );
-  };
-
   return (
     <div className="min-h-screen">
       <Nav variant="breadcrumb" label="My Intents" />
@@ -199,35 +186,12 @@ export default function MyIntentsPage() {
                 </select>
               </label>
 
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                disabled={filtered.length === 0 || selectedColumns.length === 0}
-                className="ml-auto px-3 py-2 rounded-lg border border-vx-border text-xs font-semibold text-vx-muted hover:text-vx-text hover:border-vx-sage/40 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-vx-border disabled:hover:text-vx-muted"
-              >
-                Export CSV
-              </button>
+              <ExportDialog items={filtered} filenameBase="vortex-my-intents" />
 
               <span className="text-xs text-vx-muted ml-auto" aria-live="polite" aria-atomic="true">
                 {filtered.length} intent{filtered.length === 1 ? "" : "s"}
               </span>
             </fieldset>
-
-            {isConnected && (
-              <fieldset className="flex flex-wrap items-center gap-3 mb-6 border-0 p-0">
-                <legend className="text-xs text-vx-muted mb-1">Export columns</legend>
-                {CSV_HEADERS.map((col) => (
-                  <label key={col} className="flex items-center gap-1.5 text-xs text-vx-muted">
-                    <input
-                      type="checkbox"
-                      checked={selectedColumns.includes(col)}
-                      onChange={() => toggleColumn(col)}
-                    />
-                    {col}
-                  </label>
-                ))}
-              </fieldset>
-            )}
 
             {/* List */}
             {isLoading ? (

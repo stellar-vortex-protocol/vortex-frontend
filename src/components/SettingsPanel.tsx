@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 type MotionPreference = "system" | "reduce" | "allow";
 
@@ -112,7 +113,7 @@ export function SettingsPanel() {
           aria-modal="true"
           aria-label="Settings"
           onKeyDown={handleKeyDown}
-          className="absolute right-0 mt-2 w-64 rounded-xl border border-vx-border bg-vx-card p-4 shadow-xl z-50"
+          className="absolute right-0 mt-2 w-72 max-h-[80vh] overflow-y-auto rounded-xl border border-vx-border bg-vx-card p-4 shadow-xl z-50"
         >
           <div className="space-y-4">
             <div>
@@ -165,6 +166,8 @@ export function SettingsPanel() {
                 </option>
               </select>
             </div>
+
+            <NotificationSettings />
           </div>
         </div>
       )}
