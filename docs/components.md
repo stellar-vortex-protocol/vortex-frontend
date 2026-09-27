@@ -113,3 +113,23 @@ import { Tooltip } from "@/components/Tooltip";
 - Currently applied to `Price impact`, `Protocol fee`, and `Est. fill time` in
   SwapCard's quote details panel. See `Tooltip.stories.tsx` for interactive examples.
 
+
+## `DataTable`
+
+Generic accessible table (`src/components/DataTable.tsx`), first used by the solver leaderboard.
+
+- Real `<table>` with a screen-reader caption, `scope`d headers, a row header per row and `aria-sort` on the primary sorted column.
+- Sort buttons in headers: click = single sort (asc → desc → cleared), **shift-click / Shift+Enter / Shift+Space** = add a secondary key. Sort state is owned by the caller (`sorts` / `onSort`), so it can live in the URL.
+- Sticky header; below 640 px each row collapses into a labelled card via CSS (`data-label`), keeping a single DOM.
+- More than `virtualizeAbove` (default 200) rows are windowed with `@tanstack/react-virtual`.
+- Story: `DataTable.stories.tsx` (ties, zero fills, spoofing characters, 500 rows, mobile).
+
+## Solver portal (`/solve`)
+
+All portal state is URL-synced (`useQueryState`) so views are shareable and the back button works.
+
+- **`SolverLeaderboard`** — ranking from `rankSolvers()` (`src/lib/solverRanking.ts`): volume → fills → success rate → avg fill time → address (stable tiebreak); success rate is recomputed from fills/failed and is 0 for solvers without attempts. Time windows `24h | 7d | 30d | all` read `GET /solvers?window=…` (the relay aggregates per window). Rank deltas use the relay's `previousRank` when present, otherwise a snapshot persisted in `localStorage` per window. Filters: chain, status, min bond, verified-only. Column visibility via `useColumnVisibility`. CSV export of the visible rows/columns through the injection-safe `buildCsv`. URL keys: `window`, `sort` (`key:dir,…`), `chain`, `status`, `minBond`, `verified`.
+- **`OpenIntentsBoard`** — `useOpenIntentBoard` merges the `/intents/open` REST snapshot with `intent.open` / `intent.closed` WebSocket events (see `websocket-protocol.md`). Sorted by soonest deadline; countdowns use `formatTimeRemaining` and turn urgent under 60 s; Accept is disabled once expired, on a network mismatch, or when the connected wallet is not a registered solver. Accept outcomes drive a per-row state machine (`rowReducer`): 409 → "Taken by another solver" (announced, removed after 3 s), 410/expired → explanatory state, success → "Accepted by you". While the pointer or focus is inside the list, updates are buffered (no jumping rows) and offered via a "show N updates" button. URL keys: `ichain`, `itoken`, `minUsd`, `density`.
+  - *Performance (200 rows):* one shared 1 s ticker (`useNow`, `useSyncExternalStore`) drives every countdown instead of a timer per row, filtering/sorting is memoised, and a tick only changes countdown text, so 200 rows cost one interval and one list re-render per second (no per-row effects). If profiling shows otherwise at larger sizes, the list can adopt the same virtualisation as `DataTable`.
+- **`RegistrationWizard`** — steps *eligibility → verify address → bond → review & sign → done* driven by the pure `wizardReducer` with per-step validators (`src/lib/registrationWizard.ts`). Eligibility checks (wallet, network, valid address, not already registered, account funded via the `/api/account-status` Horizon proxy — cancelable) each show pass/fail/pending plus remediation text. Bond maths uses 7-decimal integer (BigInt) units; minimum, suggestions and the unbonding period come from `SOLVER_BOND_CONFIG`. Progress is saved per wallet with a 24 h TTL (`useLocalStorageDraft`) and restored only through an explicit "Resume registration" banner; switching wallets mid-flow resets with a notice; a draft whose bond is now below the minimum is sent back to the bond step. The step is mirrored in `?step=` so the browser back button moves between steps.
+- **`SolverBadge` / `SolverIdentityChip`** — optional stellar.toml identity chip (`verified | unverified | mismatch | unavailable`) with icon + text + tooltip (never colour-only). Display only — see the threat model in `security-audit.md`.

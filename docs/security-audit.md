@@ -291,3 +291,28 @@ No unsafe rendering sinks were found. The codebase does not use `dangerouslySetI
 - **Stellar address note:** Stellar public keys are fixed-format 56-character base32 G-strkeys validated structurally by `isValidStellarPublicKey` before any display or form submission. Confusable-character risk is inherently limited there. No address-adjacent free-text field (such as a future memo field) currently bypasses validation, but any future memo or label field must route through `sanitizeDisplayText` before display — this is the expected pattern established by this change.
 
 **Tests:** `src/lib/textSafety.test.ts` — real Unicode attack fixtures for every bidi control (U+202A–U+202E, U+2066–U+2069), every zero-width character (U+200B–U+200D, U+FEFF, U+00AD), combined payloads, safe ASCII/non-Latin strings asserted unchanged.
+
+---
+
+### Solver domain verification proxy — threat model (`/api/verify-solver`)
+
+**Feature:** solvers may claim a home domain. The app fetches `https://<domain>/.well-known/stellar.toml` (SEP-0001) server-side and shows a *verified* badge when the file's `ACCOUNTS` list contains the solver's address. Implemented in `src/app/api/verify-solver/route.ts`, `src/lib/server/safeFetch.ts`, `src/lib/stellarToml.ts`, `src/lib/solverIdentity.ts`, `src/hooks/useSolverIdentity.ts`.
+
+**Trust boundary:** the domain string comes from solver-controlled data, so the proxy is an attacker-steerable server-side HTTP client (SSRF surface). The TOML body is attacker-controlled content.
+
+| Threat | Mitigation |
+| --- | --- |
+| SSRF to internal services / cloud metadata (`169.254.169.254`, `10.0.0.0/8`, `::1`, …) | `safeFetch` resolves DNS itself and rejects the request if **any** resolved address is loopback, private, link-local, CGNAT, multicast, reserved, documentation, IPv4-mapped/NAT64-embedded private, or unspecified. IP-literal hosts, non-443 ports, credentials in the URL and non-https schemes are refused before resolution. |
+| DNS rebinding (public IP at check time, private IP at connect time) | Validation runs inside the socket's own `lookup` hook and the validated address is the one connected to — there is no second resolution between check and use. |
+| Redirect to an internal host or another domain | Redirects are followed manually (max 3), each hop is re-validated, and only same-host https redirects are allowed. |
+| Resource exhaustion (huge / slow responses) | 100 KB body cap (declared `Content-Length` and streamed bytes), 3 s overall timeout, per-IP token bucket (burst 10, 1 req / 6 s) on uncached lookups, bounded in-memory caches (1 000 entries). Results — including failures — are cached for 1 h. |
+| Malformed or hostile TOML | Strict-subset parser: only top-level `ACCOUNTS` and `[DOCUMENTATION] ORG_NAME / ORG_URL` are read; line, string-length and account-count caps; non-G-strkey accounts dropped; non-https `ORG_URL` dropped. No `eval`, no general TOML library. |
+| Name spoofing / homographs | Org name passes through `sanitizeDisplayText`. IDN domains are normalised to punycode for fetching; the badge tooltip shows both the Unicode and punycode forms when they differ. |
+| Arbitrary-origin images | `ORG_LOGO` is **deliberately ignored** — logos are never loaded, so the CSP (`img-src 'self' data:`) is unchanged and no image proxy is needed. |
+| Verification used as an authorization signal | Identity state is **display-only**. It is never sent to the relay, never gates accepting intents, registering, or any transaction. Tooltip copy says "not an endorsement". |
+
+**Residual risks:** the rate limiter and cache are per server instance (not shared across serverless instances); a solver can serve different TOML to the proxy than to users (only affects its own badge); domain ownership proves control of the domain, not real-world identity.
+
+**Related same-origin proxy:** `/api/account-status?address=` (registration wizard funding check) only calls the fixed Horizon URL for the configured network with a validated G-address, so it is not an SSRF vector; it exists so the browser CSP `connect-src` stays unchanged.
+
+**Tests:** `src/lib/server/safeFetch.test.ts` (blocked ranges, mixed DNS answers, redirects, size/timeout caps, domain normalisation, token bucket), `src/app/api/verify-solver/route.test.ts`, `src/lib/stellarToml.test.ts`.

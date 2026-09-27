@@ -24,7 +24,9 @@ registrations. Part of the multi-repo Vortex stack — see also
 | `/analytics` | `src/app/analytics/page.tsx` | Protocol aggregation view for volume, route trends, and status distribution over the loaded live intent feed |
 | `/explore` | `src/app/explore/page.tsx` | Browse all intents with status/chain filters, sorting, and pagination |
 | `/explore/[id]` | `src/app/explore/[id]/page.tsx` | Single intent detail, with a settlement tx link once filled |
-| `/solve` | `src/app/solve/page.tsx` | Solver leaderboard, open intents feed, and solver registration |
+| `/solve` | `src/app/solve/page.tsx` | Solver leaderboard (sortable, time windows, filters, CSV), live open-intents board, and the solver registration wizard. State is URL-synced (`?tab=`, `?window=`, `?sort=`, `?step=` …) |
+| `/api/verify-solver` | `src/app/api/verify-solver/route.ts` | Server-side, SSRF-guarded stellar.toml fetch for solver home-domain badges (display only; see `docs/security-audit.md`) |
+| `/api/account-status` | `src/app/api/account-status/route.ts` | Same-origin Horizon proxy used by the registration wizard's "account funded" check |
 | `/governance` | `src/app/governance/page.tsx` | Governance proposals list and voting overview |
 | `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread |
 | `/contributors` | `src/app/contributors/page.tsx` | Drips Wave contribution transparency dashboard parsing repository issue metrics |
