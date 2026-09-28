@@ -47,6 +47,16 @@ jobs:
           path: .next
           retention-days: 1
 
+      - name: Generate CycloneDX SBOM
+        run: node scripts/generate-sbom.mjs sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
+
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
@@ -72,6 +82,12 @@ jobs:
         with:
           name: nextjs-build-${{ needs.build.outputs.build-id }}
           path: .next
+
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sbom
+          path: .
 
       - name: Deploy to Vercel
         id: deploy

@@ -13,11 +13,14 @@
     "check:editorconfig": "editorconfig-checker",
     "check:env": "node scripts/check-env-vars.mjs",
     "typecheck": "tsc --noEmit",
-    "check:env": "node scripts/check-env-vars.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "check:env": "node scripts/check-env-vars.mjs",
     "check:i18n": "node scripts/check-i18n-parity.mjs",
+    "check:dependencies": "node scripts/check-dependencies.mjs",
+    "check:lockfile": "node scripts/lint-lockfile.mjs",
+    "check:provenance": "node scripts/verify-provenance.mjs",
+    "sbom": "node scripts/generate-sbom.mjs sbom.json",
+    "dependency-report": "node scripts/dependency-diff-report.mjs",
     "prepare": "husky"
   },
   "dependencies": {
