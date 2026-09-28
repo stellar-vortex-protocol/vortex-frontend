@@ -182,4 +182,22 @@ export const es = {
   // solve/[address] — historial de llenados vacío
   "solverDetail.fillHistory.empty.title": "Sin llenados aún",
   "solverDetail.fillHistory.empty.message": "Una vez que este solver empiece a aceptar y llenar intenciones, su historial aparecerá aquí.",
+
+  // SwapConfirmation — pre-sign review step (#419)
+  "swap.confirm.title": "Revisar intercambio",
+  "swap.confirm.pay": "Pagas",
+  "swap.confirm.receive": "Recibes",
+  "swap.confirm.minReceived": "Mínimo recibido",
+  "swap.confirm.route": "Ruta",
+  "swap.confirm.slippage": "Tolerancia de deslizamiento",
+  "swap.confirm.nearExpiry": "La cotización expira en {seconds}s.",
+  "swap.confirm.expired": "Cotización expirada — espera una actualización antes de confirmar.",
+  "swap.confirm.unverifiedSolver": "No se pudo verificar este solver en la lista de solvers registrados.",
+  "swap.confirm.newDestination": "Nunca has enviado a esta dirección de destino — verifícala.",
+  "swap.confirm.priceChanged": "El precio cambió mientras revisabas.",
+  "swap.confirm.acceptNewPrice": "Aceptar nuevo precio",
+  "swap.confirm.refreshing": "Actualizando cotización…",
+  "swap.confirm.cta": "Confirmar intercambio",
+  "swap.confirm.ctaWithSeconds": "Confirmar intercambio ({seconds}s)",
+  "swap.confirm.cancel": "Cancelar",
 } as const;

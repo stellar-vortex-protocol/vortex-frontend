@@ -5,6 +5,8 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useRecentChains } from "@/hooks/useRecentChains";
+import { useSolverVerification } from "@/hooks/useSolverVerification";
+import { SwapConfirmation } from "@/components/SwapConfirmation";
 import { useToastStore } from "@/store/toast";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
@@ -220,6 +222,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const { getDisplayName: getSolverDisplayName, isLoading: solversLoading } = useSolverVerification();
   const isSubmitting = submission.status in SUBMISSION_LABEL_KEY;
   const canSwap =
     Boolean(srcAmount) &&
@@ -287,6 +291,13 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       return;
     }
 
+    // Review step (#419): show route, fees and minimum received before the
+    // wallet is asked to sign. Without a live quote there is nothing to review.
+    if (quote) {
+      setShowConfirmation(true);
+      return;
+    }
+
     submission.submit({
       srcChain,
       srcToken: srcToken.symbol,
@@ -296,10 +307,41 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     });
   };
 
+  const handleConfirmSwap = ({ minOut: confirmedMinOut }: { minOut: string }) => {
+    setShowConfirmation(false);
+    submission.submit({
+      srcChain,
+      srcToken: srcToken.symbol,
+      srcAmount,
+      dstToken: dstToken.symbol,
+      minOut: confirmedMinOut,
+    });
+  };
+
+  const solverIdentity = quote ? getSolverDisplayName(quote.solver) : null;
+
   const hiddenTabIndex = showChainPicker ? -1 : undefined;
 
   return (
     <div className="relative">
+      {showConfirmation && quote && (
+        <SwapConfirmation
+          quote={quote}
+          srcChainName={chain.name}
+          srcAmount={srcAmount}
+          srcToken={srcToken}
+          dstToken={dstToken}
+          dstAddress={dstAddress}
+          slippagePct={slippagePct}
+          highPriceImpactThresholdPct={HIGH_PRICE_IMPACT_THRESHOLD_PCT}
+          quoteExpiresAt={quoteFetchedAt ? quoteFetchedAt + STALE_QUOTE_THRESHOLD_MS : null}
+          isRefreshing={quoting}
+          solverVerified={solversLoading ? undefined : solverIdentity?.isVerified}
+          solverDisplayName={solverIdentity?.name}
+          onConfirm={handleConfirmSwap}
+          onCancel={() => setShowConfirmation(false)}
+        />
+      )}
       {showChainPicker && (
         <div
           ref={chainPickerRef}

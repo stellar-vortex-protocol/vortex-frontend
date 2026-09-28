@@ -224,4 +224,22 @@ export const en = {
   // solve/[address] — fill history empty
   "solverDetail.fillHistory.empty.title": "No fills yet",
   "solverDetail.fillHistory.empty.message": "Once this solver starts accepting and filling intents, their history will appear here.",
+
+  // SwapConfirmation — pre-sign review step (#419)
+  "swap.confirm.title": "Review swap",
+  "swap.confirm.pay": "You pay",
+  "swap.confirm.receive": "You receive",
+  "swap.confirm.minReceived": "Minimum received",
+  "swap.confirm.route": "Route",
+  "swap.confirm.slippage": "Slippage tolerance",
+  "swap.confirm.nearExpiry": "Quote expires in {seconds}s.",
+  "swap.confirm.expired": "Quote expired — wait for a refresh before confirming.",
+  "swap.confirm.unverifiedSolver": "This solver could not be verified against the registered solver list.",
+  "swap.confirm.newDestination": "You haven't sent to this destination address before — double-check it.",
+  "swap.confirm.priceChanged": "The price changed while you were reviewing.",
+  "swap.confirm.acceptNewPrice": "Accept new price",
+  "swap.confirm.refreshing": "Refreshing quote…",
+  "swap.confirm.cta": "Confirm swap",
+  "swap.confirm.ctaWithSeconds": "Confirm swap ({seconds}s)",
+  "swap.confirm.cancel": "Cancel",
 } as const;
