@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { parseIntentId, parseStrKey } from "@/lib/inputs";
 
 // === Static navigation targets
 // The four top-level routes the palette can jump to. Keeping this list here
@@ -44,7 +44,7 @@ function buildCommands(query: string): Command[] {
   if (trimmed.length === 0) return routes;
 
   const lookups: Command[] = [];
-  if (isValidStellarPublicKey(trimmed)) {
+  if (parseStrKey(trimmed)) {
     lookups.push({
       id: "lookup-solver",
       label: `Go to solver ${truncateMiddle(trimmed)}`,
@@ -59,12 +59,15 @@ function buildCommands(query: string): Command[] {
     // Only offer a direct intent-id jump when the query matches no route -
     // otherwise a plain search term like "solve" would sprout a bogus
     // "Open intent solve" row alongside the real route match.
-    lookups.push({
-      id: "lookup-intent",
-      label: `Open intent ${truncateMiddle(trimmed)}`,
-      hint: "Intent",
-      href: `/explore/${trimmed}`,
-    });
+    const maybeIntent = parseIntentId(trimmed);
+    if (maybeIntent) {
+      lookups.push({
+        id: "lookup-intent",
+        label: `Open intent ${truncateMiddle(trimmed)}`,
+        hint: "Intent",
+        href: `/explore/${trimmed}`,
+      });
+    }
   }
 
   return [...lookups, ...routes];

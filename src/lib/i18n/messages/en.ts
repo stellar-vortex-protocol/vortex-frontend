@@ -82,6 +82,8 @@ export const en = {
   "swap.destination.invalidAddress":
     "Enter a valid Stellar address (starts with G).",
 
+  "intent.invalidId": "Invalid intent identifier.",
+
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
   "swap.destination.invalidAddress": "Enter a valid Stellar address (starts with G).",

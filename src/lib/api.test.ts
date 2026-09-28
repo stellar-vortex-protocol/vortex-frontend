@@ -135,3 +135,85 @@ describe("apiFetch", () => {
     vi.useRealTimers();
   });
 });
+
+// ─── Path safety — encodeURIComponent prevents traversal ───
+
+describe("path safety — encodeURIComponent prevents traversal", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("encodes ../ so it cannot alter the API path", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "ok" }),
+    });
+
+    await apiFetch(`/intents/${encodeURIComponent("../etc/passwd")}/submit`, {
+      method: "POST",
+    });
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledUrl).not.toContain("/../");
+    expect(calledUrl).not.toContain("../");
+    expect(calledUrl).toContain(encodeURIComponent("../etc/passwd"));
+  });
+
+  it("encodes ? so it cannot inject query params into the path", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "ok" }),
+    });
+
+    await apiFetch(
+      `/intents/${encodeURIComponent("abc?evil=true")}/submit`,
+      { method: "POST" },
+    );
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledUrl).not.toContain("?evil=true");
+    expect(calledUrl).toContain("%3F");
+  });
+
+  it("encodes # so it cannot inject fragments into the path", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "ok" }),
+    });
+
+    await apiFetch(
+      `/intents/${encodeURIComponent("abc#fragment")}/submit`,
+      { method: "POST" },
+    );
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(calledUrl).not.toContain("#fragment");
+    expect(calledUrl).toContain("%23");
+  });
+
+  it("encodes / so it cannot create sub-paths in the id segment", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "ok" }),
+    });
+
+    await apiFetch(
+      `/intents/${encodeURIComponent("abc/def")}/submit`,
+      { method: "POST" },
+    );
+
+    const calledUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // The slash is encoded, keeping the id as a single path segment
+    expect(calledUrl).toBe("/intents/abc%2Fdef/submit");
+    const segments = calledUrl.split("/").filter(Boolean);
+    expect(segments).toHaveLength(3);
+  });
+});

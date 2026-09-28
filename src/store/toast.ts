@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { parseInternalHref, parseExternalUrl } from "@/lib/inputs";
+import { secureLogger } from "@/lib/secureLogging";
 
 export type ToastVariant = "success" | "error" | "info";
 
@@ -34,7 +36,26 @@ export const useToastStore = create<ToastState>((set, get) => ({
 
   addToast: (message, variant = "info", href) => {
     const id = crypto.randomUUID();
-    set({ toasts: [...get().toasts, { id, message, variant }] });
+
+    let safeHref: string | undefined;
+    if (href !== undefined) {
+      const internal = parseInternalHref(href);
+      if (internal) {
+        safeHref = internal;
+      } else {
+        const external = parseExternalUrl(href);
+        if (external) {
+          safeHref = external;
+        } else if (process.env.NODE_ENV === "development") {
+          secureLogger.warn(
+            `[toast] Dropping toast with invalid href`,
+            href,
+          );
+        }
+      }
+    }
+
+    set({ toasts: [...get().toasts, { id, message, variant, href: safeHref }] });
     timers.set(id, {
       timeoutId: setTimeout(() => get().dismissToast(id), TOAST_DURATION_MS),
       remainingMs: TOAST_DURATION_MS,

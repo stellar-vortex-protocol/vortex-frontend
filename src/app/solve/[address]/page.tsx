@@ -11,7 +11,7 @@ import { useIntentFeed } from "@/hooks/useIntentFeed";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
-import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { parseStrKey } from "@/lib/inputs";
 
 const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -22,15 +22,15 @@ const usdCompact = new Intl.NumberFormat("en-US", {
 
 export default function SolverDetailPage({ params }: { params: { address: string } }) {
   const { t } = useTranslation();
-  const isValidAddress = isValidStellarPublicKey(params.address);
-  const { solver, isLoading, error } = useSolver(isValidAddress ? params.address : null);
+  const strKey = parseStrKey(params.address);
+  const { solver, isLoading, error } = useSolver(strKey);
   const { items: fillHistory, isLoading: historyLoading, error: historyError } = useIntentFeed();
 
   return (
     <div className="min-h-screen">
       <Nav
         variant="breadcrumb"
-        label={`Solver ${params.address.slice(0, 8)}`}
+        label={`Solver ${strKey ? strKey.slice(0, 8) : params.address}`}
       />
 
       <main
@@ -45,7 +45,7 @@ export default function SolverDetailPage({ params }: { params: { address: string
           ← Back to solvers
         </Link>
 
-        {!isValidAddress ? (
+        {!strKey ? (
           <EmptyState variant="error" message="Invalid solver address format." />
         ) : isLoading ? (
           <div
@@ -83,7 +83,7 @@ export default function SolverDetailPage({ params }: { params: { address: string
               </div>
 
               <div className="text-xs sm:text-sm text-vx-muted font-mono break-all">
-                Address: {params.address}
+                Address: {strKey}
               </div>
 
               {/* Metrics grid */}

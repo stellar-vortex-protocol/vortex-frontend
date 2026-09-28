@@ -87,6 +87,8 @@ export const es = {
   "swap.destination.placeholder": "G...",
   "swap.destination.invalidAddress": "Ingresa una dirección Stellar válida (comienza con G).",
 
+  "intent.invalidId": "Identificador de intención no válido.",
+
   "home.hero.eyebrow": "Stellar Agentic Hackathon 2025",
   "home.hero.titleLine1": "Intercambia desde cualquier cadena",
   "home.hero.titleLine2": "directamente a Stellar.",

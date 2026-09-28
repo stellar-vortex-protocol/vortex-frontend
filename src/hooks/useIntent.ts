@@ -12,8 +12,9 @@ import type { IntentDetail } from "@/lib/types";
 // dedupingInterval: 5 s prevents rapid focus events from firing duplicate
 // requests during the short window after the initial load.
 export function useIntent(id: string | null) {
+  const encodedId = id ? encodeURIComponent(id) : null;
   const { data, error, isLoading } = useSWR<IntentDetail>(
-    id ? `/intents/${id}` : null,
+    encodedId ? `/intents/${encodedId}` : null,
     fetcher,
     {
       refreshInterval: 0,

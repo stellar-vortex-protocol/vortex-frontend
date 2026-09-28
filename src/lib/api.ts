@@ -121,7 +121,7 @@ export function createIntent(req: CreateIntentRequest) {
 
 export function submitIntent(intentId: string, signedXdr: string) {
   return apiFetch<SubmitIntentResponse>(
-    `/intents/${intentId}/submit`,
+    `/intents/${encodeURIComponent(intentId)}/submit`,
     {
       method: "POST",
       body: JSON.stringify({ signedXdr }),
@@ -132,7 +132,7 @@ export function submitIntent(intentId: string, signedXdr: string) {
 
 export function acceptIntent(intentId: string, solverAddress: string) {
   return apiFetch<SubmitIntentResponse>(
-    `/intents/${intentId}/accept`,
+    `/intents/${encodeURIComponent(intentId)}/accept`,
     {
       method: "POST",
       body: JSON.stringify({ solverAddress }),
@@ -154,7 +154,7 @@ export function registerSolver(req: RegisterSolverRequest) {
 
 export function submitSolverRegistration(registrationId: string, signedXdr: string) {
   return apiFetch<SubmitRegistrationResponse>(
-    `/solvers/${registrationId}/submit`,
+    `/solvers/${encodeURIComponent(registrationId)}/submit`,
     {
       method: "POST",
       body: JSON.stringify({ signedXdr }),

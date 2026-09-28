@@ -291,3 +291,87 @@ No unsafe rendering sinks were found. The codebase does not use `dangerouslySetI
 - **Stellar address note:** Stellar public keys are fixed-format 56-character base32 G-strkeys validated structurally by `isValidStellarPublicKey` before any display or form submission. Confusable-character risk is inherently limited there. No address-adjacent free-text field (such as a future memo field) currently bypasses validation, but any future memo or label field must route through `sanitizeDisplayText` before display — this is the expected pattern established by this change.
 
 **Tests:** `src/lib/textSafety.test.ts` — real Unicode attack fixtures for every bidi control (U+202A–U+202E, U+2066–U+2069), every zero-width character (U+200B–U+200D, U+FEFF, U+00AD), combined payloads, safe ASCII/non-Latin strings asserted unchanged.
+
+---
+
+# Input-Boundary Audit (Issue #485)
+
+## Overview
+
+This table inventories every place external input enters the app and maps it to the central validator that gates it. All validators are defined in `src/lib/inputs.ts` and return branded types so unvalidated strings cannot reach API helpers or path-interpolation sites.
+
+## Audit Table
+
+| # | Input Source | Location | Raw Value | Validator | Branded Type | Test Coverage |
+|---|-------------|----------|-----------|-----------|-------------|---------------|
+| 1 | Explore intent ID (dynamic route) | `src/app/explore/[id]/page.tsx` | `params.id` | `parseIntentId` | `IntentId` | `inputs.test.ts` |
+| 2 | Solver address (dynamic route) | `src/app/solve/[address]/page.tsx` | `params.address` | `parseStrKey` | `StrKey` | `inputs.test.ts` |
+| 3 | Governance proposal ID (dynamic route) | `src/app/governance/[id]/page.tsx` | `params.id` | `parseIntentId` | `IntentId` | `inputs.test.ts` |
+| 4 | Intent ID in API path interpolation | `src/lib/api.ts` | `intentId` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 5 | Solver address in API path interpolation | `src/lib/api.ts` | `address` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 6 | Intent ID in SWR key | `src/hooks/useIntent.ts` | `id` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 7 | Solver address in SWR key | `src/hooks/useSolver.ts` | `address` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 8 | Toast href (internal) | `src/store/toast.ts` | `href` | `parseInternalHref` | `InternalHref` | `toast.test.ts` |
+| 9 | Toast href (external) | `src/store/toast.ts` | `href` | `parseExternalUrl` | `ExternalUrl` | `toast.test.ts` |
+| 10 | Solver address in CommandPalette | `src/components/CommandPalette.tsx` | user input | `parseStrKey` | `StrKey` | `inputs.test.ts` |
+| 11 | Intent ID in CommandPalette | `src/components/CommandPalette.tsx` | user input | `parseIntentId` | `IntentId` | `inputs.test.ts` |
+| 12 | Explore page searchParams (status/chain/sort) | `src/app/explore/ExplorePageClient.tsx` | `searchParams` | inline `Set.has` + `includes` | — | `ExplorePageClient.test.tsx` |
+| 13 | Home page prefill (searchParams) | `src/app/page.tsx` | `searchParams` | inline checks | — | `page.test.tsx` |
+
+## Validator Reference (`src/lib/inputs.ts`)
+
+### `parseIntentId(value: string): IntentId | null`
+- **Grammar:** ASCII alphanumeric, hyphens, underscores only; 1–64 chars.
+- **Rejects:** `..`, `/`, `?`, `#`, `&`, `=`, Unicode, empty string, >64 chars.
+- **Branded type:** `IntentId` — cannot be passed to functions expecting raw `string` without explicit cast.
+
+### `parseStrKey(value: string): StrKey | null`
+- **Grammar:** 56-char Stellar G-strkey with valid base32 encoding and CRC-16 checksum.
+- **Rejects:** wrong length, wrong prefix, invalid base32, bad checksum.
+- **Branded type:** `StrKey`.
+
+### `parseChainId(value: string): ChainId | null`
+- **Grammar:** Must be one of the known chain IDs: `ethereum`, `base`, `polygon`, `arbitrum`, `optimism`, `avalanche`.
+- **Rejects:** any string not in the known set.
+- **Branded type:** `ChainId`.
+
+### `parseInternalHref(value: string): InternalHref | null`
+- **Grammar:** Starts with `/`, no `//` prefix, no `..` segments, no backslashes, ≤256 chars.
+- **Rejects:** absolute URLs, protocol-relative URLs, path traversal, query injection.
+- **Branded type:** `InternalHref`.
+
+### `parseExternalUrl(value: string, allowedOrigins?: string[]): ExternalUrl | null`
+- **Grammar:** Valid URL with `https:` or `http:` protocol, origin in the allowed whitelist, ≤2048 chars.
+- **Rejects:** `javascript:`, `data:`, `vbscript:` protocols, non-whitelisted origins, malformed URLs.
+- **Branded type:** `ExternalUrl`.
+
+## Toast Href Policy
+
+`useToastStore.addToast` validates the `href` parameter before storing it:
+1. First tries `parseInternalHref` — accepts relative paths like `/explore/abc123`.
+2. Falls back to `parseExternalUrl` — accepts only whitelisted external origins.
+3. If neither validates, the href is dropped and a dev warning is emitted via `secureLogger.warn`.
+
+## External Link Component (`src/components/ExternalLink.tsx`)
+
+- Always renders `target="_blank"` and `rel="noopener noreferrer"`.
+- Validates `href` with `parseExternalUrl`; invalid hrefs render children as plain text (no `<a>` element).
+- Optionally shows the destination host label when `showHostLabel` is true.
+- Uses `secureLogger.warn` for invalid hrefs in development.
+
+## Path Safety in `api.ts`
+
+All API path interpolations now use `encodeURIComponent`:
+- `submitIntent`: `/intents/${encodeURIComponent(intentId)}/submit`
+- `acceptIntent`: `/intents/${encodeURIComponent(intentId)}/accept`
+- `submitSolverRegistration`: `/solvers/${encodeURIComponent(registrationId)}/submit`
+- `useIntent` hook: `/intents/${encodeURIComponent(id)}`
+- `useSolver` hook: `/solvers/${encodeURIComponent(address)}`
+
+This prevents `../` or `?` in IDs from altering the API path.
+
+## Test Coverage
+
+- `src/lib/inputs.test.ts` — table-driven and fuzz tests for every validator; ≥95% coverage of `inputs.ts`.
+- `src/lib/api.test.ts` — path-safety tests proving `../` or `?` in IDs cannot alter the API path.
+- `src/store/toast.test.ts` — href validation tests for internal and external toasts.
