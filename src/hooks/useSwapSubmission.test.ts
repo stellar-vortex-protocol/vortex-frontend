@@ -201,10 +201,11 @@ describe("useSwapSubmission", () => {
     });
 
     expect(result.current.status).toBe("error");
-    expect(result.current.error).toBe("User declined access");
+    // Raw extension text is normalised to a typed kind and our own copy.
+    expect(result.current.error).toBe("The request was declined in Freighter.");
     expect(result.current.errorKind).toBe("user-rejected");
     expect(submitIntentMock).not.toHaveBeenCalled();
-    expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
+    expect(addToastMock).toHaveBeenCalledWith("The request was declined in Freighter.", "error");
   });
 
   it("blocks signing and surfaces an error when XDR decode fails", async () => {

@@ -161,7 +161,7 @@ describe("useWalletStore", () => {
 
     const state = useWalletStore.getState();
     expect(state.notInstalled).toBe(false);
-    expect(state.error).toBe("User declined access");
+    expect(state.errorKind).toBe("user-rejected");
   });
 
   it("sets an error when requestAccess rejects", async () => {
@@ -172,7 +172,10 @@ describe("useWalletStore", () => {
 
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(false);
-    expect(state.error).toBe("User declined access");
+    expect(state.errorKind).toBe("user-rejected");
+    expect(state.errorKey).toBe("wallet.error.user-rejected");
+    // Raw extension text never reaches the UI-facing error string.
+    expect(state.error).not.toContain("User declined access");
   });
 
   it("clears wallet state on disconnect", async () => {

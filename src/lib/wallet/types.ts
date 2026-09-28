@@ -1,3 +1,4 @@
+/** Implementations must reject with a `WalletError` (see ./errors). */
 export interface WalletAdapter {
   isConnected(): Promise<boolean>;
   isAllowed(): Promise<boolean>;

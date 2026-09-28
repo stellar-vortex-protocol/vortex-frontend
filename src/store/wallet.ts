@@ -1,9 +1,42 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import freighterApi from "@stellar/freighter-api";
+import { walletAdapter, normalizeWalletError } from "@/lib/wallet";
+import type { WalletErrorKind } from "@/lib/wallet";
+import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
-export type WalletErrorKey =
-  "wallet.error.freighterUnavailable" | "wallet.error.connectFailed";
+export type { WalletErrorKind } from "@/lib/wallet";
+
+/** i18n key for each wallet error kind; see `docs/wallet-hydration.md`. */
+export type WalletErrorKey = `wallet.error.${WalletErrorKind}`;
+
+export function walletErrorKey(kind: WalletErrorKind): WalletErrorKey {
+  return `wallet.error.${kind}`;
+}
+
+/**
+ * English fallback copy per kind, for non-React callers (hooks that throw).
+ * UI should render `t(errorKey)` instead.
+ */
+export const WALLET_ERROR_FALLBACK: Record<WalletErrorKind, string> = {
+  "not-installed": "Freighter extension is not installed or enabled.",
+  locked: "Freighter is locked. Unlock it and try again.",
+  "user-rejected": "The request was declined in Freighter.",
+  "wrong-network": "Freighter is on the wrong network.",
+  "unsupported-method": "This version of Freighter does not support this action. Update the extension.",
+  timeout: "Freighter did not respond in time.",
+  unknown: "Failed to connect wallet.",
+};
+
+function errorFields(kind: WalletErrorKind) {
+  return {
+    error: WALLET_ERROR_FALLBACK[kind],
+    errorKind: kind,
+    errorKey: walletErrorKey(kind),
+  };
+}
+
+const NO_ERROR = { error: null, errorKind: null, errorKey: null } as const;
 
 /** Shape of the slice persisted to localStorage under `PERSIST_KEY`. */
 export type PersistedWalletState = {
@@ -82,28 +115,11 @@ export type WalletState = {
   network: string | null;
   isConnected: boolean;
   isConnecting: boolean;
-  wasSessionCleared: boolean;
-  /** Generic connection error message (e.g. user declined access). */
+  /** English fallback copy for the current error; never raw extension text. */
   error: string | null;
-  errorKey: WalletErrorKey | null;
-  /**
-   * Stable i18n key for the connection error, when one applies (currently only
-   * the "Freighter not installed" case). `null` for generic/unknown failures,
-   * where `error` carries the raw message instead.
-   */
-  errorKey: WalletErrorKey | null;
-  /**
-   * Translation key for `error` when the failure is one we control the copy for
-   * (Freighter missing, generic connect failure). `null` when `error` is a
-   * pass-through message from the wallet/extension that has no translation.
-   * Consumers should prefer `t(errorKey)` when it is set, else fall back to the
-   * raw `error` string.
-   */
-  errorKey: WalletErrorKey | null;
-  /**
-   * Stable i18n key for the error when it maps to a known category, else null
-   * (a raw error message from Freighter is surfaced via `error` only).
-   */
+  /** Typed failure category; hooks and UI should branch on this. */
+  errorKind: WalletErrorKind | null;
+  /** i18n key for the current error (`t(errorKey)`), derived from `errorKind`. */
   errorKey: WalletErrorKey | null;
   /**
    * `true` when a persisted session was dropped on hydrate because the
@@ -124,7 +140,6 @@ export type WalletState = {
    * use this to show an install link instead of a generic retry CTA.
    */
   notInstalled: boolean;
-  errorKey: WalletErrorKey | null;
   connect: () => Promise<void>;
   disconnect: () => void;
   hydrate: () => Promise<void>;
@@ -145,17 +160,14 @@ export const useWalletStore = create<WalletState>()(
       isConnected: false,
       isConnecting: false,
       wasSessionCleared: false,
-      error: null,
-      errorKey: null,
+      ...NO_ERROR,
       networkMismatch: false,
       notInstalled: false,
-      errorKey: null,
 
       connect: async () => {
         set({
           isConnecting: true,
-          error: null,
-          errorKey: null,
+          ...NO_ERROR,
           networkMismatch: false,
           notInstalled: false,
         });
@@ -168,8 +180,7 @@ export const useWalletStore = create<WalletState>()(
               isConnected: false,
               isConnecting: false,
               wasSessionCleared: false,
-              error: "Freighter extension is not installed or enabled.",
-              errorKey: "wallet.error.freighterUnavailable",
+              ...errorFields("not-installed"),
               notInstalled: true,
             });
             return;
@@ -186,27 +197,23 @@ export const useWalletStore = create<WalletState>()(
             isConnected: true,
             isConnecting: false,
             wasSessionCleared: false,
-            error: null,
-            errorKey: null,
+            ...NO_ERROR,
             networkMismatch: mismatch,
             notInstalled: false,
           });
         } catch (err) {
-          // A real Error from the extension carries a user-meaningful message
-          // (e.g. "User declined access") that we surface verbatim. Anything
-          // else is an opaque failure we describe with our own translated copy.
-          const externalError = err instanceof Error ? err.message : null;
-          const message = externalError ?? "Failed to connect wallet.";
+          // Adapters already reject with a WalletError; normalise anything
+          // else so the UI only ever sees a typed kind and our own copy.
+          const { kind } = normalizeWalletError(err);
           set({
             address: null,
             network: null,
             isConnected: false,
             isConnecting: false,
             wasSessionCleared: false,
-            error: message,
-            errorKey: externalError ? null : "wallet.error.connectFailed",
+            ...errorFields(kind),
             networkMismatch: false,
-            notInstalled: false,
+            notInstalled: kind === "not-installed",
           });
         }
       },
@@ -241,8 +248,7 @@ export const useWalletStore = create<WalletState>()(
           isConnected: false,
           isConnecting: false,
           wasSessionCleared: true,
-          error: null,
-          errorKey: null,
+          ...NO_ERROR,
           networkMismatch: false,
           notInstalled: false,
         });
@@ -263,8 +269,7 @@ export const useWalletStore = create<WalletState>()(
           isConnected: false,
           lastKnownAddress: previousAddress,
           wasSessionCleared: Boolean(previousAddress),
-          error: null,
-          errorKey: null,
+          ...NO_ERROR,
           networkMismatch: false,
           notInstalled: false,
         };
@@ -278,8 +283,7 @@ export const useWalletStore = create<WalletState>()(
               network: null,
               isConnected: false,
               wasSessionCleared: true,
-              error: null,
-              errorKey: null,
+              ...NO_ERROR,
               networkMismatch: false,
               notInstalled: false,
             });
@@ -296,8 +300,7 @@ export const useWalletStore = create<WalletState>()(
             network,
             isConnected: true,
             wasSessionCleared: false,
-            error: null,
-            errorKey: null,
+            ...NO_ERROR,
             networkMismatch: mismatch,
             notInstalled: false,
           });
@@ -307,8 +310,7 @@ export const useWalletStore = create<WalletState>()(
             network: null,
             isConnected: false,
             wasSessionCleared: false,
-            error: null,
-            errorKey: null,
+            ...NO_ERROR,
             networkMismatch: false,
             notInstalled: false,
           });
@@ -331,8 +333,7 @@ export const useWalletStore = create<WalletState>()(
             address: null,
             network: null,
             isConnected: false,
-            error: null,
-            errorKey: null,
+            ...NO_ERROR,
             networkMismatch: false,
             notInstalled: false,
           });

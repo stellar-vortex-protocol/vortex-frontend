@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { useWalletStore } from "@/store/wallet";
+import { useWalletStore, WALLET_ERROR_FALLBACK } from "@/store/wallet";
+import { isWalletError } from "@/lib/wallet";
 import { classifyFlowError, isAbortError } from "./errors";
 import {
   flowReducer,
@@ -134,9 +135,12 @@ export function useTransactionFlow<TParams, TResult>(
       }
       runRef.current = null;
       setActiveParams(null);
+      // WalletError messages are just the kind (#417); show our own copy.
       const message = getErrorMessage
         ? getErrorMessage(err)
-        : err instanceof Error && err.message
+        : isWalletError(err)
+          ? WALLET_ERROR_FALLBACK[err.kind]
+          : err instanceof Error && err.message
           ? err.message
           : fallbackMessage;
       const kind = classifyError(err);

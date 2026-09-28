@@ -103,3 +103,29 @@ value and calls `useWalletStore.getState().syncFromStorage(persisted)`:
 
 The `storage` event never fires in the tab that made the change, so the
 originating tab keeps the correct state from its own `set()` and is unaffected.
+
+## Wallet error kinds (#417)
+
+Every adapter rejects with a `WalletError` (`src/lib/wallet/errors.ts`), and
+the store exposes the failure as `errorKind` plus a derived i18n `errorKey`
+(`wallet.error.<kind>`). Raw extension text is kept only on `WalletError.cause`
+and logged through `secureLogger`; it never reaches the UI. `normalizeWalletError`
+accepts thrown strings (freighter-api <= 2.x), thrown `Error`s and `{ error }`
+result objects (>= 3.x); a call that doesn't settle within `WALLET_TIMEOUT_MS`
+becomes `timeout`, and a method missing from the installed API becomes
+`unsupported-method`.
+
+| Kind | Typical cause | Recovery UI in `ConnectWalletButton` |
+| --- | --- | --- |
+| `not-installed` | `isConnected()` is false; no extension (incl. mobile) | Install link for the detected browser (Chrome/Edge store, Firefox add-ons, else freighter.app) |
+| `locked` | Extension is locked / user not logged in | "I've unlocked it — retry" button |
+| `user-rejected` | User declined access or a signature | "Retry Connection" button |
+| `wrong-network` | Extension reports a different network | Instructions to switch to `NEXT_PUBLIC_NETWORK` (a connected wallet on the wrong network sets `networkMismatch` instead) |
+| `unsupported-method` | Installed Freighter lacks the API method | Update Freighter, then retry |
+| `timeout` | Extension never responded | "Retry Connection" button |
+| `unknown` | Anything unmatched | "Retry Connection" button |
+
+Guidance is rendered in a `role="alert"` element with copy from
+`wallet.error.<kind>` and `wallet.errorHint.<kind>` (en/es). Hooks branch on
+`kind`: `classifySwapError` maps `user-rejected` to its `user-rejected`
+category and `timeout` to `network`, with no message-substring matching.

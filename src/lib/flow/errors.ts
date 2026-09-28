@@ -19,6 +19,14 @@ export function isAbortError(err: unknown): boolean {
  */
 export function classifyFlowError(err: unknown): FlowErrorKind {
   if (!(err instanceof Error)) return "generic";
+  // Wallet failures carry a typed kind from the adapter (#417); never infer a
+  // rejection from their message text.
+  if (err.name === "WalletError") {
+    const kind = (err as { kind?: unknown }).kind;
+    if (kind === "user-rejected") return "user-rejected";
+    if (kind === "timeout") return "network";
+    return "generic";
+  }
   if (err.name === "TimeoutError") return "network";
   if (err.name === "XdrMismatchError" || err.name === "ValidationError") return "validation";
 

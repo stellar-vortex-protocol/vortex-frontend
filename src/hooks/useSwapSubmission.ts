@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { walletAdapter } from "@/lib/wallet";
+import { walletAdapter, WalletError } from "@/lib/wallet";
 import { createIntent, submitIntent } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
@@ -32,7 +32,10 @@ export function useSwapSubmission() {
           await useWalletStore.getState().connect();
           const next = useWalletStore.getState();
           if (!next.isConnected || !next.address) {
-            throw new Error(next.error ?? "Connect a wallet to submit a swap.");
+            // Typed wallet failure (#417) so the flow classifies it by kind.
+            throw next.errorKind
+              ? new WalletError(next.errorKind)
+              : new Error("Connect a wallet to submit a swap.");
           }
           return next;
         });
