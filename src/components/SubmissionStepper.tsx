@@ -1,6 +1,13 @@
+import type { FlowStatus, FlowStep } from "@/lib/flow";
+
 const STEP_ORDER = ["connecting", "building", "awaiting-signature", "submitting"] as const;
 type StepId = (typeof STEP_ORDER)[number];
-export type SubmissionStatus = "idle" | StepId | "success" | "error";
+export type SubmissionStatus = FlowStatus;
+
+/** The shared flow's "reviewing" step is rendered as part of "Build". */
+function toStepId(step: FlowStep): StepId {
+  return step === "reviewing" ? "building" : step;
+}
 
 const STEP_LABELS: Record<StepId, string> = {
   connecting: "Connect",
@@ -12,7 +19,7 @@ const STEP_LABELS: Record<StepId, string> = {
 export type SubmissionStepperProps = {
   status: SubmissionStatus;
   /** The step that was active when an error occurred, for the "error" status. */
-  errorStep?: StepId | null;
+  errorStep?: FlowStep | null;
 };
 
 /**
@@ -27,8 +34,8 @@ export function SubmissionStepper({ status, errorStep }: SubmissionStepperProps)
     status === "success"
       ? STEP_ORDER.length
       : status === "error"
-        ? STEP_ORDER.indexOf(errorStep ?? STEP_ORDER[STEP_ORDER.length - 1])
-        : STEP_ORDER.indexOf(status);
+        ? STEP_ORDER.indexOf(errorStep ? toStepId(errorStep) : "submitting")
+        : STEP_ORDER.indexOf(toStepId(status));
 
   return (
     <ol className="flex items-start gap-2" aria-label="Submission progress">

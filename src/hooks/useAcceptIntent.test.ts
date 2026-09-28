@@ -77,7 +77,7 @@ describe("useAcceptIntent", () => {
       await result.current.accept("intent-1");
     });
 
-    expect(acceptIntentMock).toHaveBeenCalledWith("intent-1", "GABC123");
+    expect(acceptIntentMock).toHaveBeenCalledWith("intent-1", "GABC123", expect.any(AbortSignal));
     expect(openIntentsStore.get(OPEN_INTENTS_KEY)).toEqual([{ id: "intent-4" }]);
     expect(result.current.error).toBeNull();
     expect(result.current.acceptingId).toBeNull();
@@ -102,7 +102,7 @@ describe("useAcceptIntent", () => {
       await result.current.accept("intent-1");
     });
 
-    expect(acceptIntentMock).toHaveBeenCalledWith("intent-1", "GXYZ999");
+    expect(acceptIntentMock).toHaveBeenCalledWith("intent-1", "GXYZ999", expect.any(AbortSignal));
   });
 
   it("surfaces an error when the wallet connection fails", async () => {

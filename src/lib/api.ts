@@ -73,6 +73,11 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // Caller-supplied signal (e.g. a cancelled transaction flow) also aborts the request.
+  const callerSignal = init?.signal ?? undefined;
+  const abortFromCaller = () => controller.abort();
+  if (callerSignal?.aborted) controller.abort();
+  else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
 
   try {
     const res = await fetch(`${API_URL}${path}`, {
@@ -100,64 +105,73 @@ export async function apiFetch<T>(
   } catch (err) {
     clearTimeout(timeoutId);
     if (err instanceof DOMException && err.name === "AbortError") {
+      // A caller abort is a cancellation, not a timeout: propagate it as-is.
+      if (callerSignal?.aborted) throw err;
       throw new TimeoutError();
     }
     throw err;
+  } finally {
+    callerSignal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
 export const fetcher = <T>(path: string) => apiFetch<T>(path);
 
-export function createIntent(req: CreateIntentRequest) {
+export function createIntent(req: CreateIntentRequest, signal?: AbortSignal) {
   return apiFetch<CreateIntentResponse>(
     "/intents",
     {
       method: "POST",
       body: JSON.stringify(req),
+      ...(signal ? { signal } : {}),
     },
     isCreateIntentResponse
   );
 }
 
-export function submitIntent(intentId: string, signedXdr: string) {
+export function submitIntent(intentId: string, signedXdr: string, signal?: AbortSignal) {
   return apiFetch<SubmitIntentResponse>(
     `/intents/${intentId}/submit`,
     {
       method: "POST",
       body: JSON.stringify({ signedXdr }),
+      ...(signal ? { signal } : {}),
     },
     isSubmitIntentResponse
   );
 }
 
-export function acceptIntent(intentId: string, solverAddress: string) {
+export function acceptIntent(intentId: string, solverAddress: string, signal?: AbortSignal) {
   return apiFetch<SubmitIntentResponse>(
     `/intents/${intentId}/accept`,
     {
       method: "POST",
       body: JSON.stringify({ solverAddress }),
+      ...(signal ? { signal } : {}),
     },
     isSubmitIntentResponse
   );
 }
 
-export function registerSolver(req: RegisterSolverRequest) {
+export function registerSolver(req: RegisterSolverRequest, signal?: AbortSignal) {
   return apiFetch<RegisterSolverResponse>(
     "/solvers",
     {
       method: "POST",
       body: JSON.stringify(req),
+      ...(signal ? { signal } : {}),
     },
     isRegisterSolverResponse
   );
 }
 
-export function submitSolverRegistration(registrationId: string, signedXdr: string) {
+export function submitSolverRegistration(registrationId: string, signedXdr: string, signal?: AbortSignal) {
   return apiFetch<SubmitRegistrationResponse>(
     `/solvers/${registrationId}/submit`,
     {
       method: "POST",
       body: JSON.stringify({ signedXdr }),
+      ...(signal ? { signal } : {}),
     },
     isSubmitRegistrationResponse
   );

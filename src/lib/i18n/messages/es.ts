@@ -77,6 +77,12 @@ export const es = {
   "swap.submit.retryCta":
     "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
 
+  "flow.error.network": "El relay no respondió a tiempo. Revisa tu conexión e inténtalo de nuevo.",
+  "flow.error.userRejected": "La firma fue rechazada en Freighter. Aprueba la solicitud para continuar.",
+  "flow.error.balance": "El saldo en la cadena de origen parece insuficiente. Reduce el monto o recarga y vuelve a intentarlo.",
+  "flow.error.noSolver": "No hay ningún solver disponible para este intercambio ahora mismo. Prueba otro monto o vuelve más tarde.",
+  "flow.error.validation": "La transacción no superó la validación y no se firmó. Revisa los detalles e inténtalo de nuevo.",
+
   "swap.destination.label": "Dirección de destino",
   "swap.destination.placeholder": "G...",
   "swap.destination.invalidAddress": "Ingresa una dirección de Stellar válida (empieza con G).",

@@ -77,6 +77,12 @@ export const en = {
   "swap.submit.cta": "Swap {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta": "Retry: Swap {amount} {srcToken} → {dstToken}",
 
+  "flow.error.network": "The relay didn't respond in time. Check your connection and try again.",
+  "flow.error.userRejected": "The signature was declined in Freighter. Approve the request to continue.",
+  "flow.error.balance": "The source-chain balance looks too low. Lower the amount or top up, then retry.",
+  "flow.error.noSolver": "No solver is available to fill this swap right now. Try a different amount or check back shortly.",
+  "flow.error.validation": "The transaction failed validation and was not signed. Review the details and try again.",
+
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",
   "swap.destination.invalidAddress":

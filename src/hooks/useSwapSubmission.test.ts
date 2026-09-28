@@ -144,9 +144,9 @@ describe("useSwapSubmission", () => {
       srcAmount: "500",
       dstAddress: "GABC123",
     });
-    expect(createIntentMock).toHaveBeenCalledWith({ ...params, dstAddress: "GABC123" });
+    expect(createIntentMock).toHaveBeenCalledWith({ ...params, dstAddress: "GABC123" }, expect.any(AbortSignal));
     expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", { network: "TESTNET" });
-    expect(submitIntentMock).toHaveBeenCalledWith("intent-1", "signed-xdr");
+    expect(submitIntentMock).toHaveBeenCalledWith("intent-1", "signed-xdr", expect.any(AbortSignal));
     expect(result.current.status).toBe("success");
     expect(result.current.intentId).toBe("intent-1");
     expect(result.current.error).toBeNull();

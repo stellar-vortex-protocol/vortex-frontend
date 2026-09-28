@@ -124,9 +124,9 @@ describe("useSolverRegistration", () => {
       bondUsd: 50,
       solverAddress: "GXYZ999",
     });
-    expect(registerSolverMock).toHaveBeenCalledWith({ address: "GXYZ999", bondUsd: 50 });
+    expect(registerSolverMock).toHaveBeenCalledWith({ address: "GXYZ999", bondUsd: 50 }, expect.any(AbortSignal));
     expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", { network: "TESTNET" });
-    expect(submitSolverRegistrationMock).toHaveBeenCalledWith("reg-1", "signed-xdr");
+    expect(submitSolverRegistrationMock).toHaveBeenCalledWith("reg-1", "signed-xdr", expect.any(AbortSignal));
     expect(mutateMock).toHaveBeenCalledWith("/solvers");
     expect(result.current.status).toBe("success");
     expect(addToastMock).toHaveBeenCalledWith(

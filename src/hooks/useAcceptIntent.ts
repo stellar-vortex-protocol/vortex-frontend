@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { mutate } from "swr";
 import { acceptIntent, ApiError } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useTransactionFlow } from "@/lib/flow";
 import type { OpenIntent } from "@/lib/types";
 
 function AcceptErrorMessage(err: unknown): string {
@@ -18,65 +19,69 @@ function AcceptErrorMessage(err: unknown): string {
 /**
  * useAcceptIntent
  *
- * Accepts an open intent on behalf of the connected solver. The `accept()`
- * call is wrapped with `withRetry` from useRetry so transient 5xx errors or
- * brief network blips are automatically retried with exponential back-off,
- * without the solver needing to act again.
- *
- * Retry policy (from useRetry defaults):
- * - Up to 3 retry attempts.
- * - Exponential back-off: 1 s, 2 s, 4 s.
- * - 4xx errors are NOT retried — they represent a definitive server rejection
- *   (e.g. intent already claimed) and should surface to the user immediately.
- *
- * Signature-requiring flows are intentionally excluded from retry logic —
- * see useRetry.ts for rationale.
+ * Accepts an open intent on behalf of the connected solver, built on the
+ * shared transaction-flow machine (connecting → submitting). The open-intents
+ * list is updated optimistically and rolled back on error. Only one accept can
+ * be in flight at a time; cancellation (unmount, wallet switch) aborts the
+ * request. Failures are never auto-retried — see useRetry.ts for rationale.
  */
 export function useAcceptIntent() {
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const { withRetry } = useRetry();
+  const flow = useTransactionFlow<string, void>({
+    getErrorMessage: AcceptErrorMessage,
+    run: async (intentId, { step }) => {
+      let wallet = useWalletStore.getState();
+      if (!wallet.isConnected || !wallet.address) {
+        wallet = await step("connecting", async () => {
+          await useWalletStore.getState().connect();
+          const next = useWalletStore.getState();
+          if (!next.isConnected || !next.address) {
+            throw new Error(next.error ?? "Connect a wallet to accept an intent.");
+          }
+          return next;
+        });
+      }
+      const solverAddress = wallet.address as string;
 
+      await step("submitting", (signal) =>
+        mutate<OpenIntent[]>(
+          "/intents/open",
+          async (current) => {
+            await acceptIntent(intentId, solverAddress, signal);
+            return (current ?? []).filter((intent) => intent.id !== intentId);
+          },
+          {
+            optimisticData: (current) => (current ?? []).filter((intent) => intent.id !== intentId),
+            rollbackOnError: true,
+            populateCache: true,
+            revalidate: false,
+          },
+        ),
+      );
+    },
+    onSuccess: () => {
+      useToastStore
+        .getState()
+        .addToast("Intent accepted — you have exclusive fill rights.", "success");
+    },
+    onError: (message) => {
+      useToastStore.getState().addToast(message, "error");
+    },
+  });
+
+  const { start } = flow;
   const accept = useCallback(
     async (intentId: string) => {
-      setError(null);
-      setAcceptingId(intentId);
+      await start(intentId);
+    },
+    [start],
+  );
 
-      try {
-        let wallet = useWalletStore.getState();
-        if (!wallet.isConnected || !wallet.address) {
-          await wallet.connect();
-          wallet = useWalletStore.getState();
-          if (!wallet.isConnected || !wallet.address) {
-            throw new Error(wallet.error ?? "Connect a wallet to accept an intent.");
-          }
-        }
-      }
-      const solverAddress = wallet.address;
-
-      await mutate<OpenIntent[]>(
-        "/intents/open",
-        async (current) => {
-          await acceptIntent(intentId, solverAddress);
-          return (current ?? []).filter((intent) => intent.id !== intentId);
-        },
-        {
-          optimisticData: (current) => (current ?? []).filter((intent) => intent.id !== intentId),
-          rollbackOnError: true,
-          populateCache: true,
-          revalidate: false,
-        },
-      );
-
-      useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
-    } catch (err) {
-      const message = AcceptErrorMessage(err);
-      setError(message);
-      useToastStore.getState().addToast(message, "error");
-    } finally {
-      setAcceptingId(null);
-    }
-  }, []);
-
-  return { accept, acceptingId, error };
+  return {
+    accept,
+    acceptingId: flow.activeParams,
+    error: flow.error,
+    errorKind: flow.errorKind,
+    status: flow.status,
+    cancel: flow.cancel,
+  };
 }
