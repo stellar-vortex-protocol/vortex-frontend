@@ -59,6 +59,12 @@ jobs:
           retention-days: 30
       - name: Build Storybook
         run: npm run build:storybook
+      - name: Run Storybook accessibility tests
+        run: |
+          npx playwright install --with-deps chromium
+          npx --yes http-server storybook-static --port 6006 --silent &
+          npx --yes wait-on --timeout 60000 tcp:127.0.0.1:6006
+          npm run test:storybook
       - name: Run visual regression tests
         run: npm run test:visual
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
