@@ -3,6 +3,7 @@ import { mutate } from "swr";
 import { acceptIntent, ApiError } from "@/lib/api";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useCooldown } from "@/hooks/useCooldown";
 import type { OpenIntent } from "@/lib/types";
 
 function AcceptErrorMessage(err: unknown): string {
@@ -36,9 +37,15 @@ export function useAcceptIntent() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { withRetry } = useRetry();
+  const cooldown = useCooldown();
 
   const accept = useCallback(
     async (intentId: string) => {
+      // #249: throttle rapid retries after a failure (popup / relay spam).
+      if (cooldown.isCoolingDown()) {
+        useToastStore.getState().addToast("Please wait a moment before trying again.", "info");
+        return;
+      }
       setError(null);
       setAcceptingId(intentId);
 
@@ -68,15 +75,17 @@ export function useAcceptIntent() {
         },
       );
 
+      cooldown.reset();
       useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
     } catch (err) {
+      cooldown.start();
       const message = AcceptErrorMessage(err);
       setError(message);
       useToastStore.getState().addToast(message, "error");
     } finally {
       setAcceptingId(null);
     }
-  }, []);
+  }, [cooldown.isCoolingDown, cooldown.start, cooldown.reset]);
 
-  return { accept, acceptingId, error };
+  return { accept, acceptingId, error, cooldownSeconds: cooldown.remainingSeconds };
 }

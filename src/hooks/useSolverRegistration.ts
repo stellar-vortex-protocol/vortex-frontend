@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api";
 import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { assertExpectedNetwork, useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useCooldown } from "@/hooks/useCooldown";
 import { decodeXdr, validateRegistrationXdr, XdrMismatchError } from "@/lib/xdrReview";
 
 export type SolverRegistrationStatus =
@@ -57,7 +58,14 @@ export function useSolverRegistration() {
     setStatus(next);
   }, []);
 
+  const cooldown = useCooldown();
+
   const register = useCallback(async (address: string, bondUsd: number) => {
+    // #249: throttle rapid retries after a failure (popup / relay spam).
+    if (cooldown.isCoolingDown()) {
+      useToastStore.getState().addToast("Please wait a moment before trying again.", "info");
+      return;
+    }
     setError(null);
     setErrorStep(null);
 
@@ -104,16 +112,18 @@ export function useSolverRegistration() {
       await submitSolverRegistration(registrationId, signedXdr);
       await mutate("/solvers");
 
+      cooldown.reset();
       advance("success");
       useToastStore.getState().addToast("Registered as a solver.", "success");
     } catch (err) {
+      cooldown.start();
       const message = RegistrationErrorMessage(err);
       setErrorStep(stepRef.current);
       advance("error");
       setError(message);
       useToastStore.getState().addToast(message, "error");
     }
-  }, [advance]);
+  }, [advance, cooldown.isCoolingDown, cooldown.start, cooldown.reset]);
 
   const reset = useCallback(() => {
     stepRef.current = "idle";
@@ -122,5 +132,12 @@ export function useSolverRegistration() {
     setErrorStep(null);
   }, []);
 
-  return { status, error, errorStep, register, reset };
+  return {
+    status,
+    error,
+    errorStep,
+    register,
+    reset,
+    cooldownSeconds: cooldown.remainingSeconds,
+  };
 }

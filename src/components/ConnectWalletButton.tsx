@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useCooldown } from "@/hooks/useCooldown";
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
 const NETWORK_CHECK_INTERVAL_MS = 8000;
@@ -23,11 +24,23 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
 
   const displayError = error ?? null;
 
+  // #249: short cooldown after a failed connect so repeated clicks can't spam
+  // Freighter popups. A successful connect clears it.
+  const cooldown = useCooldown();
+  const coolingDown = cooldown.remainingSeconds > 0;
+
   const handleConnect = async () => {
+    if (cooldown.isCoolingDown()) {
+      useToastStore.getState().addToast("Please wait a moment before trying again.", "info");
+      return;
+    }
     await connect();
     const { error: latestError } = useWalletStore.getState();
     if (latestError) {
+      cooldown.start();
       useToastStore.getState().addToast(latestError, "error");
+    } else {
+      cooldown.reset();
     }
   };
 
@@ -86,9 +99,12 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
       <button
         type="button"
         onClick={handleConnect}
+        disabled={coolingDown}
         className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
       >
-        Reconnect {truncateAddress("GABCDEFGHIJKLMNOPQRSTUVWXYZ23456")}
+        {coolingDown
+          ? `Retry in ${cooldown.remainingSeconds}s`
+          : <>Reconnect {truncateAddress("GABCDEFGHIJKLMNOPQRSTUVWXYZ23456")}</>}
       </button>
     );
   }
@@ -140,7 +156,7 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
     <button
       type="button"
       onClick={handleConnect}
-      disabled={isConnecting}
+      disabled={isConnecting || coolingDown}
       title={error ?? undefined}
       className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
     >
@@ -185,7 +201,9 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
               />
             </svg>
           )}
-          {reconnectLabel ?? (error ? "Retry Connection" : "Connect Freighter")}
+          {coolingDown
+            ? `Retry in ${cooldown.remainingSeconds}s`
+            : reconnectLabel ?? (error ? "Retry Connection" : "Connect Freighter")}
         </>
       )}
     </button>

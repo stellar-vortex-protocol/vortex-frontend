@@ -48,9 +48,19 @@ export default function SolvePageClient() {
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
-  const { accept, acceptingId, error: acceptError } = useAcceptIntent();
-  const { register, status: regStatus, error: regError, reset } =
-    useSolverRegistration();
+  const {
+    accept,
+    acceptingId,
+    error: acceptError,
+    cooldownSeconds: acceptCooldown,
+  } = useAcceptIntent();
+  const {
+    register,
+    status: regStatus,
+    error: regError,
+    reset,
+    cooldownSeconds: regCooldown,
+  } = useSolverRegistration();
 
   // Draft persistence — scoped to the currently connected wallet so that
   // switching wallets never silently restores the wrong address.
@@ -529,12 +539,14 @@ export default function SolvePageClient() {
                     <button
                       type="button"
                       onClick={() => accept(intent.id)}
-                      disabled={acceptingId === intent.id}
+                      disabled={acceptingId === intent.id || acceptCooldown > 0}
                       aria-busy={acceptingId === intent.id}
                       className="px-3 sm:px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0 w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
                     >
                       {acceptingId === intent.id
                         ? t("solve.intents.accepting")
+                        : acceptCooldown > 0
+                        ? `Retry in ${acceptCooldown}s`
                         : t("solve.intents.accept")}
                     </button>
                   </div>
@@ -697,11 +709,13 @@ export default function SolvePageClient() {
               <button
                 type="button"
                 onClick={handleRegisterSubmit}
-                disabled={(!canSubmit && regStatus !== "success") || isBusy}
+                disabled={(!canSubmit && regStatus !== "success") || isBusy || regCooldown > 0}
                 aria-busy={isBusy}
                 className="w-full py-2.5 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {isRegistering
+                {regCooldown > 0
+                  ? `Retry in ${regCooldown}s`
+                  : isRegistering
                   ? t(REGISTRATION_LABEL_KEY[registration.status]!)
                   : registration.status === "success"
                   ? t("solve.register.button.registered")
