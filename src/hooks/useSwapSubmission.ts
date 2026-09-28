@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { walletAdapter } from "@/lib/wallet";
 import { createIntent, submitIntent } from "@/lib/api";
 import { verifySignedXdrMatches } from "@/lib/xdrReview";
-import { useWalletStore } from "@/store/wallet";
+import { assertExpectedNetwork, useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { decodeXdr, validateSwapXdr, XdrMismatchError } from "@/lib/xdrReview";
 import type { QuoteRequest } from "@/lib/types";
@@ -136,9 +136,13 @@ export function useSwapSubmission() {
       });
       // ──────────────────────────────────────────────────────────────────────
 
+      // #248: re-validate the network right before signing, independent of
+      // the UI guard, and pass the validated name explicitly to Freighter.
+      const network = assertExpectedNetwork(useWalletStore.getState().network);
+
       setStatus("awaiting-signature");
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
-        network: wallet.network ?? undefined,
+        network,
       });
 
       // Defense-in-depth: verify signed XDR matches unsigned (Issue #308)

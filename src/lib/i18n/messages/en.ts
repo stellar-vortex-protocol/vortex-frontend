@@ -76,6 +76,9 @@ export const en = {
   "swap.submit.enterAmount": "Enter an amount",
   "swap.submit.cta": "Swap {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta": "Retry: Swap {amount} {srcToken} → {dstToken}",
+  "swap.submit.wrongNetwork": "Wrong network",
+  "wallet.networkMismatch.blocked":
+    "Submission blocked: your wallet is on the wrong network. Switch Freighter to {network} to continue.",
 
   "swap.destination.label": "Destination address",
   "swap.destination.placeholder": "G...",

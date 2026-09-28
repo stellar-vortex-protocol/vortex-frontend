@@ -6,6 +6,7 @@ import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useRecentChains } from "@/hooks/useRecentChains";
 import { useToastStore } from "@/store/toast";
+import { EXPECTED_NETWORK, useWalletStore } from "@/store/wallet";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { formatTokenAmount } from "@/lib/format";
@@ -214,12 +215,17 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
   const isSubmitting = submission.status in SUBMISSION_LABEL_KEY;
+  // #248: hard guard — never allow submission while the connected wallet is on
+  // the wrong network. `networkMismatch` is false before any wallet connects,
+  // so this doesn't block users who haven't connected yet.
+  const networkMismatch = useWalletStore((s) => s.networkMismatch);
   const canSwap =
     Boolean(srcAmount) &&
     parseFloat(srcAmount) > 0 &&
     !quoting &&
     !isSubmitting &&
-    !dstAddressError;
+    !dstAddressError &&
+    !networkMismatch;
 
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
@@ -667,6 +673,16 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           </p>
         )}
 
+        {networkMismatch && (
+          <p
+            role="alert"
+            data-testid="swap-network-mismatch"
+            className="text-center text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded-lg px-3 py-2"
+          >
+            {t("wallet.networkMismatch.blocked", { network: EXPECTED_NETWORK })}
+          </p>
+        )}
+
         {submission.status === "error" && (
           <p role="alert" className="text-center text-[11px] text-red-400 px-1">
             {submission.error}
@@ -722,6 +738,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
               </svg>
               {t("swap.submit.findingRoute")}
             </span>
+          ) : networkMismatch ? (
+            t("swap.submit.wrongNetwork")
           ) : canSwap ? (
             t(submission.status === "error" ? "swap.submit.retryCta" : "swap.submit.cta", {
               amount: srcAmount,
@@ -797,6 +815,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             </span>
           ) : quoteIsStale ? (
             t("swap.quote.expired")
+          ) : networkMismatch ? (
+            t("swap.submit.wrongNetwork")
           ) : canSwap ? (
             t(
               submission.status === "error"

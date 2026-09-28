@@ -16,9 +16,24 @@ export type PersistedWalletState = {
 export const PERSIST_KEY = "vortex-wallet";
 
 /** The network name the app expects, normalised to upper-case for comparison. */
-const EXPECTED_NETWORK = (
+export const EXPECTED_NETWORK = (
   process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet"
 ).toUpperCase();
+
+/**
+ * Defense-in-depth guard run immediately before handing an XDR to Freighter.
+ * Throws unless the wallet's reported network matches `EXPECTED_NETWORK`, so a
+ * stale closure or bypassed UI guard can never sign on the wrong network.
+ * Returns the validated (normalised) network name to pass to the signer.
+ */
+export function assertExpectedNetwork(network: string | null | undefined): string {
+  if (!network || network.toUpperCase() !== EXPECTED_NETWORK) {
+    throw new Error(
+      `Wrong network: Freighter is on ${network ?? "an unknown network"}, but this app expects ${EXPECTED_NETWORK}. Switch networks in Freighter and try again.`,
+    );
+  }
+  return EXPECTED_NETWORK;
+}
 
 function isValidPersistedState(state: unknown): state is {
   address: string | null;

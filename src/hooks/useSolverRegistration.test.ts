@@ -308,4 +308,19 @@ describe("useSolverRegistration", () => {
       "error",
     );
   });
+
+  it("refuses to call Freighter when the wallet network does not match the expected network", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "PUBLIC" });
+    registerSolverMock.mockResolvedValue({ registrationId: "reg-net", unsignedXdr: "unsigned-xdr" });
+
+    const { result } = renderHook(() => useSolverRegistration());
+    await act(async () => {
+      await result.current.register("GXYZ999", 50);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/wrong network/i);
+    expect(signTransactionMock).not.toHaveBeenCalled();
+    expect(submitSolverRegistrationMock).not.toHaveBeenCalled();
+  });
 });

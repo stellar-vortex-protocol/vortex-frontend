@@ -294,4 +294,19 @@ describe("useSwapSubmission", () => {
     expect(submitIntentMock).not.toHaveBeenCalled();
     expect(addToastMock).toHaveBeenCalledWith(expect.stringMatching(/verification failed/i), "error");
   });
+
+  it("refuses to call Freighter when the wallet network does not match the expected network", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "PUBLIC" });
+    createIntentMock.mockResolvedValue({ intentId: "intent-net", unsignedXdr: "unsigned-xdr" });
+
+    const { result } = renderHook(() => useSwapSubmission());
+    await act(async () => {
+      await result.current.submit(params);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/wrong network/i);
+    expect(signTransactionMock).not.toHaveBeenCalled();
+    expect(submitIntentMock).not.toHaveBeenCalled();
+  });
 });

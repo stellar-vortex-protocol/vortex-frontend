@@ -9,7 +9,7 @@ import { useOpenIntents } from "@/hooks/useOpenIntents";
 import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
 import { useLocalStorageDraft } from "@/hooks/useLocalStorageDraft";
-import { useWalletStore } from "@/store/wallet";
+import { EXPECTED_NETWORK, useWalletStore } from "@/store/wallet";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
@@ -190,7 +190,7 @@ export default function SolvePageClient() {
     return null;
   }, [bond, submitted]);
 
-  const canSubmit = Boolean(address && bond && !addressError && !bondError);
+  const canSubmit = Boolean(address && bond && !addressError && !bondError && !networkMismatch);
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -676,6 +676,16 @@ export default function SolvePageClient() {
 
               {registration.status !== "idle" && registration.status !== "success" && (
                 <SubmissionStepper status={registration.status} errorStep={registration.errorStep} />
+              )}
+
+              {networkMismatch && (
+                <p
+                  role="alert"
+                  data-testid="register-network-mismatch"
+                  className="text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded-lg px-3 py-2"
+                >
+                  {t("wallet.networkMismatch.blocked", { network: EXPECTED_NETWORK })}
+                </p>
               )}
 
               {registration.status === "error" && (

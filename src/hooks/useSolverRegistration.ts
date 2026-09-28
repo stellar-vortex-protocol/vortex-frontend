@@ -4,7 +4,7 @@ import { walletAdapter } from "@/lib/wallet";
 import { registerSolver, submitSolverRegistration } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { verifySignedXdrMatches } from "@/lib/xdrReview";
-import { useWalletStore } from "@/store/wallet";
+import { assertExpectedNetwork, useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { decodeXdr, validateRegistrationXdr, XdrMismatchError } from "@/lib/xdrReview";
 
@@ -85,9 +85,13 @@ export function useSolverRegistration() {
       validateRegistrationXdr(decoded, { bondUsd, solverAddress: address });
       // ──────────────────────────────────────────────────────────────────────
 
+      // #248: re-validate the network right before signing, independent of
+      // the UI guard, and pass the validated name explicitly to Freighter.
+      const network = assertExpectedNetwork(useWalletStore.getState().network);
+
       setStatus("awaiting-signature");
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
-        network: wallet.network ?? undefined,
+        network,
       });
 
       // Defense-in-depth: verify signed XDR matches unsigned (Issue #308)

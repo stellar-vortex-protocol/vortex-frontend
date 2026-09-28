@@ -76,6 +76,9 @@ export const es = {
   "swap.submit.cta": "Intercambiar {amount} {srcToken} → {dstToken}",
   "swap.submit.retryCta":
     "Reintentar: Intercambiar {amount} {srcToken} → {dstToken}",
+  "swap.submit.wrongNetwork": "Red incorrecta",
+  "wallet.networkMismatch.blocked":
+    "Envío bloqueado: tu billetera está en la red incorrecta. Cambia Freighter a {network} para continuar.",
 
   "swap.destination.label": "Dirección de destino",
   "swap.destination.placeholder": "G...",
