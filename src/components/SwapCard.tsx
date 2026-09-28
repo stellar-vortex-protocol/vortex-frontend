@@ -9,10 +9,13 @@ import { useToastStore } from "@/store/toast";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { formatTokenAmount } from "@/lib/format";
+import { computeMinOut } from "@/lib/slippage";
+import { useSwapSettingsStore } from "@/store/swapSettings";
+import { SwapSettings } from "@/components/SwapSettings";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
 
-export const DEFAULT_SLIPPAGE_PCT = 0.5;
+export { DEFAULT_SLIPPAGE_PCT } from "@/lib/slippage";
 export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
 export const STALE_QUOTE_THRESHOLD_MS = 60_000;
 
@@ -84,7 +87,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   const [dstToken, setDstToken] = useState(DST_TOKENS[0]!);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
   const [dstAddress, setDstAddress] = useState("");
-  const [slippagePct, setSlippagePct] = useState(String(DEFAULT_SLIPPAGE_PCT));
+  const slippagePct = useSwapSettingsStore(s => s.slippagePct);
   const [showChainPicker, setShowChainPicker] = useState(false);
   const [showTokenPicker, setShowTokenPicker] = useState(false);
 
@@ -195,8 +198,12 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       : 0;
 
   const srcValueUSD = srcAmount ? parseFloat(srcAmount) * srcToken.priceUsd : 0;
-  const parsedSlippagePct = Math.max(0, Math.min(50, parseFloat(slippagePct) || 0));
-  const minOut = dstAmount > 0 ? (dstAmount * (1 - parsedSlippagePct / 100)).toFixed(dstToken.symbol === "XLM" ? 2 : 4) : "0";
+  // Precision-safe and rounded down; uses the quote's exact string when present.
+  const minOut = computeMinOut(
+    quote ? quote.dstAmount : dstAmount > 0 ? dstAmount.toFixed(dstToken.decimals) : "0",
+    slippagePct,
+    dstToken.decimals,
+  );
   const hasHighPriceImpact = quote ? quote.priceImpactPct > HIGH_PRICE_IMPACT_THRESHOLD_PCT : false;
 
   const quoteErrorType = (() => {
@@ -264,6 +271,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         srcToken: srcToken.symbol,
         srcAmount,
         dstToken: dstToken.symbol,
+        minOut,
       });
       return;
     }
@@ -578,19 +586,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         <div className="bg-vx-surface/50 rounded-xl p-4 space-y-2">
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t("swap.slippage.label")}</span>
-            <span className="num text-[10px] text-vx-muted">{t("swap.slippage.minOut", { amount: minOut, token: dstToken.symbol })}</span>
+            <SwapSettings />
           </div>
-          <label htmlFor="slippage-pct" className="sr-only">{t("swap.slippage.inputLabel")}</label>
-          <input
-            id="slippage-pct"
-            type="number"
-            min="0"
-            max="50"
-            step="0.1"
-            value={slippagePct}
-            onChange={e => setSlippagePct(e.target.value)}
-            className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
-          />
+          <p className="num text-xs text-vx-muted">{t("swap.slippage.minOut", { amount: minOut, token: dstToken.symbol })}</p>
         </div>
 
         <div className="bg-vx-surface/50 rounded-xl p-4 space-y-2">

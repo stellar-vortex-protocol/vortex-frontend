@@ -19,6 +19,7 @@ vi.mock("@stellar/freighter-api", () => ({
 }));
 
 import { useWalletStore } from "@/store/wallet";
+import { useSwapSettingsStore } from "@/store/swapSettings";
 import { SwapCard } from "./SwapCard";
 
 function renderSwapCard() {
@@ -35,6 +36,7 @@ describe("SwapCard", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
     useWalletStore.setState(initialWalletState, true);
+    useSwapSettingsStore.getState().resetToDefaults();
   });
 
   afterEach(() => {
@@ -268,10 +270,12 @@ describe("SwapCard", () => {
       { timeout: 2000 },
     );
 
-    await user.clear(screen.getByLabelText("Slippage tolerance percent"));
+    await user.click(screen.getByRole("button", { name: "Swap settings" }));
     await user.type(screen.getByLabelText("Slippage tolerance percent"), "1");
+    await user.keyboard("{Escape}");
 
-    expect(screen.getByText("Min out: 492.1522 USDC")).toBeInTheDocument();
+    // 497.1234 * 0.99, rounded down at USDC's 7 decimals.
+    expect(screen.getByText("Min out: 492.152166 USDC")).toBeInTheDocument();
 
     await user.click(screen.getByText(`Swap 500 USDC → USDC`));
 
@@ -285,7 +289,7 @@ describe("SwapCard", () => {
       expect.stringContaining("/intents"),
       expect.objectContaining({
         method: "POST",
-        body: expect.stringContaining('"minOut":"492.1522"'),
+        body: expect.stringContaining('"minOut":"492.152166"'),
       }),
     );
   });
