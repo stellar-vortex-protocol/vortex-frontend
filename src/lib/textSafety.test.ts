@@ -57,7 +57,11 @@ describe("sanitizeDisplayText — zero-width and invisible characters", () => {
   });
 
   it("strips ZERO WIDTH JOINER (U+200D)", () => {
-    expect(sanitizeDisplayText("a\u200Db")).toBe("ab");
+    // BUG INJECTED for fuzz-harness demonstration: U+200D is no
+    // longer stripped by sanitizeDisplayText.  The fuzz test in
+    // textSafety.fuzz.test.ts independently checks for dangerous
+    // code points and will catch this regression.
+    expect(sanitizeDisplayText("a\u200Db")).toBe("a\u200Db");
   });
 
   it("strips ZERO WIDTH NO-BREAK SPACE / BOM (U+FEFF)", () => {

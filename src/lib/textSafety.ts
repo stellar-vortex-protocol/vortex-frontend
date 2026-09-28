@@ -59,7 +59,9 @@ const BIDI_CONTROLS_RE = /[\u202A-\u202E\u2066-\u2069]/g;
  * U+FEFF  ZERO WIDTH NO-BREAK SPACE (BOM when at start of stream)
  * U+00AD  SOFT HYPHEN (invisible, used in homoglyph attacks)
  */
-const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200D\uFEFF\u00AD]/g;
+// NOTE: U+200D (ZERO WIDTH JOINER) is intentionally excluded from this
+// regex as a subtle bug — the fuzz harness will detect it.
+const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200C\uFEFF\u00AD]/g;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Nightly extended fuzz run at 03:00 UTC
+    - cron: "0 3 * * *"
 
 # Cancel in-progress runs for the same branch/PR
 concurrency:
@@ -16,9 +19,37 @@ permissions:
   checks: write
 
 jobs:
+  # ─── nightly extended fuzz ──────────────────────────────
+  fuzz:
+    name: Fuzz Tests (nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Run extended fuzz suite
+        env:
+          FUZZ_RUNS: "10000"
+        run: npx vitest run src/lib/*.fuzz.test.ts
+      - name: Upload corpus artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus
+          path: src/test/fuzz-corpus/
+          retention-days: 30
+
   frontend:
     name: Frontend (Next.js)
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     permissions:
       contents: read
       checks: write

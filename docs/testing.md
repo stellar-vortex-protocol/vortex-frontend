@@ -130,3 +130,87 @@ vi.mock("@stellar/freighter-api", () => ({
 End-to-end flows that span multiple hooks/components. Keep them in `src/app/<route>/` alongside the page.
 
 **Reference:** `src/app/solve/accept-intent.integration.test.tsx:40-76`
+
+## Fuzz Testing
+
+Property-based (fuzz) tests exercise parsers and validators with randomly generated inputs to surface edge cases that hand-written example tests miss.
+
+### Tooling
+
+- **Library:** [fast-check](https://github.com/dubzzzka/fast-check) (`fast-check` v3)
+- **Arbitraries:** shared in `src/test/arbitraries.ts`
+- **Test files:** `<module>.fuzz.test.ts` next to the source they exercise
+
+### Shared Arbitraries
+
+| Arbitrary | Produces |
+|---|---|
+| `arbitraryXdrEnvelope` | Valid XDR envelopes built via `TransactionBuilder` |
+| `arbitraryMutatedXdrEnvelope` | Valid XDR with random byte-flips |
+| `arbitraryCsvCell` | CSV cells including formula-trigger characters |
+| `arbitraryUnicodeString` | Strings across all Unicode blocks |
+| `arbitraryDangerousUnicodeString` | Strings containing bidi/zero-width control chars |
+| `arbitraryValidStellarAddress` | Valid G-strkeys from `Keypair.random()` |
+| `arbitraryCorruptedStellarAddress` | Strkeys with corrupted checksums or wrong lengths |
+| `arbitraryJson` | JSON with extreme nesting and prototype keys |
+
+### Configuration
+
+- **`FUZZ_RUNS`** — number of iterations per property (default `100`; set to `10000` in CI nightly)
+- **`FUZZ_SEED`** — fixed seed for reproducibility; logged in CI output
+
+### How to Add a Fuzz Property
+
+1. Create `src/lib/<module>.fuzz.test.ts`.
+2. Import the relevant arbitraries from `../test/arbitraries`.
+3. Write a `fc.property(...)` that encodes the invariant you want to verify.
+4. Wrap it in `fc.assert(..., { numRuns: getNumRuns(), seed: getSeed() })`.
+5. Add a **corpus-replay** `describe` block that loads `src/test/fuzz-corpus/` entries and re-runs the same property on them.
+
+Example:
+
+```ts
+import { describe, expect, it } from "vitest";
+import fc from "fast-check";
+import { arbitraryCsvCell, getNumRuns, getSeed } from "../test/arbitraries";
+import { escapeCsv } from "./csv";
+
+describe("escapeCsv — fuzz properties", () => {
+  const numRuns = getNumRuns();
+  const seed = getSeed();
+
+  it("output never begins with a formula trigger character", () => {
+    fc.assert(
+      fc.property(arbitraryCsvCell, (cell) => {
+        const escaped = escapeCsv(cell);
+        expect(escaped[0]).not.toBe("=");
+        expect(escaped[0]).not.toBe("+");
+        expect(escaped[0]).not.toBe("-");
+        expect(escaped[0]).not.toBe("@");
+      }),
+      { numRuns, seed }
+    );
+  });
+});
+```
+
+### Corpus
+
+When a fuzz test fails, the failing input is saved to `src/test/fuzz-corpus/` as a JSON file.  On the next `npm test` run the corpus-replay block in each `.fuzz.test.ts` file loads those entries and replays them as ordinary unit tests, ensuring regressions are caught even without the fuzz runner.
+
+### Running Fuzz Tests Locally
+
+```bash
+# Short run (100 iterations, fast feedback)
+npm test
+
+# Extended run (10 000 iterations, useful for CI-like depth)
+FUZZ_RUNS=10000 npm test
+
+# Reproducible run with a fixed seed
+FUZZ_RUNS=10000 FUZZ_SEED=42 npm test
+```
+
+### CI
+
+A nightly scheduled job (`cron: "0 3 * * *"`) runs the extended fuzz suite with `FUZZ_RUNS=10000` and a 5-minute timeout.  The random seed used is logged in the job output for reproducibility.  Corpus artifacts are uploaded on failure.
