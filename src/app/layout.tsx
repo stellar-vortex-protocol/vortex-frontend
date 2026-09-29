@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { WalletHydrator } from "@/components/WalletHydrator";
 import { ToastViewport } from "@/components/ToastViewport";
 import { IntentStatusWatcher } from "@/components/IntentStatusWatcher";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
-import { DEFAULT_LOCALE } from "@/lib/i18n";
+import { DEFAULT_LOCALE, LOCALE_HEADER, isLocale, type Locale } from "@/lib/i18n";
 
 const TITLE = "Vortex | Cross-chain Swaps via Stellar";
 const DESCRIPTION =
@@ -30,6 +31,25 @@ const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var k=${JSON.stringify(
   THEME_STORAGE_KEY,
 )};var p=null;try{p=localStorage.getItem(k);}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system"){p="system";}var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var t=d?"dark":"light";var r=document.documentElement;r.setAttribute("data-theme",t);r.style.colorScheme=t;}catch(e){}})();`;
 
+// Locales that render right-to-left. Kept local so adding an RTL locale only
+// requires extending this set (no new locales are added by this issue).
+const RTL_LOCALES = new Set<string>(["ar", "he", "fa", "ur"]);
+
+// Resolve the request locale server-side. Middleware sets the `x-vortex-locale`
+// header after applying the resolution order (URL prefix / ?lang= → cookie →
+// Accept-Language → default). Reading it here means <html lang>/<dir> and the
+// I18nProvider are correct during SSR, so there is no flash of English.
+async function resolveRequestLocale(): Promise<Locale> {
+  try {
+    const headerList = await headers();
+    const value = headerList.get(LOCALE_HEADER);
+    if (value && isLocale(value)) return value;
+  } catch {
+    // headers() is unavailable in some static contexts — fall back safely.
+  }
+  return DEFAULT_LOCALE;
+}
+
 export const metadata: Metadata = {
   title: { default: TITLE, template: "%s | Vortex" },
   description: DESCRIPTION,
@@ -42,6 +62,18 @@ export const metadata: Metadata = {
     "defi",
     "soroban",
   ],
+
+  // ── Canonical + hreflang alternates ──────────────────────────────────────────
+  // Locale is resolved per-request (cookie/header/prefix), so the canonical URL
+  // is the clean path and each supported locale is advertised as an alternate.
+  alternates: {
+    canonical: "/",
+    languages: {
+      en: "/",
+      es: "/?lang=es",
+      "x-default": "/",
+    },
+  },
 
   // ── Favicon set ──────────────────────────────────────────────────────────────
   // Two SVG variants: dark background for dark browser chrome (prefers dark),
@@ -105,13 +137,16 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await resolveRequestLocale();
+  const dir = RTL_LOCALES.has(locale) ? "rtl" : "ltr";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} dir={dir} suppressHydrationWarning>
       <head>
         <script
           // Blocking, before-paint theme resolution to avoid FOUC.
@@ -125,7 +160,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <I18nProvider locale={DEFAULT_LOCALE}>
+        <I18nProvider locale={locale}>
           <GlobalErrorCapture />
           <WalletHydrator />
           <IntentStatusWatcher />
