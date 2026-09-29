@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuote } from "@/hooks/useQuote";
 import { useSwapSubmission } from "@/hooks/useSwapSubmission";
@@ -8,6 +8,10 @@ import { useRecentChains } from "@/hooks/useRecentChains";
 import { useToastStore } from "@/store/toast";
 import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { assessAddress } from "@/lib/addressRisk";
+import { getKnownAddresses, recordKnownAddress } from "@/lib/knownAddresses";
+import { useWalletStore } from "@/store/wallet";
+import { AddressRiskWarning } from "@/components/AddressDiff";
 import { formatTokenAmount } from "@/lib/format";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
@@ -187,6 +191,19 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   const dstAddressError = dstAddress && !isValidStellarPublicKey(dstAddress) ? t("swap.destination.invalidAddress") : null;
 
+  // ── Address-poisoning defence (#483) ───────────────────────────────────────
+  const walletAddress = useWalletStore((s) => s.address);
+  useEffect(() => {
+    if (walletAddress) recordKnownAddress(walletAddress, "wallet");
+  }, [walletAddress]);
+  const [knownAddresses] = useState<string[]>(() => getKnownAddresses());
+  const addressRisk = useMemo(
+    () => (dstAddress && !dstAddressError ? assessAddress(dstAddress, knownAddresses) : null),
+    [dstAddress, dstAddressError, knownAddresses],
+  );
+  const [dismissedRiskFor, setDismissedRiskFor] = useState<string | null>(null);
+  const addressRiskBlocking = addressRisk?.risk === "high" && dismissedRiskFor !== dstAddress;
+
   // ── Derived display values ─────────────────────────────────────────────────
   const dstAmount = quote
     ? parseFloat(quote.dstAmount)
@@ -219,7 +236,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     parseFloat(srcAmount) > 0 &&
     !quoting &&
     !isSubmitting &&
-    !dstAddressError;
+    !dstAddressError &&
+    !addressRiskBlocking;
 
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
@@ -278,6 +296,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
       useToastStore.getState().addToast(t("swap.quote.staleWarning"), "error");
       return;
     }
+
+    if (dstAddress && !dstAddressError) recordKnownAddress(dstAddress, "destination");
 
     submission.submit({
       srcChain,
@@ -614,6 +634,13 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
           />
           {dstAddressError && <p id="dst-address-error" role="alert" className="text-[11px] text-red-400">{dstAddressError}</p>}
+          {addressRisk && addressRiskBlocking && (
+            <AddressRiskWarning
+              candidate={dstAddress}
+              assessment={addressRisk}
+              onDismiss={() => setDismissedRiskFor(dstAddress)}
+            />
+          )}
         </div>
 
         {quote && srcAmount && (

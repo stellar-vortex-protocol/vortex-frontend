@@ -77,7 +77,7 @@ Error: Failed to submit intent
 When logging data in this application:
 
 1. **Never log raw sensitive data** to console without redaction
-2. **Always use `secureLogger`** instead of `console` for any data that might contain:
+2. **Always use `secureLogger`** instead of `console` — `no-console` is an ESLint error in `src/**` (only `src/lib/secureLogging.ts` and tests are exempt), so CI fails on stray `console.*` calls. This especially covers data that might contain:
    - User wallet addresses
    - Transaction details
    - API responses with sensitive fields
@@ -291,3 +291,41 @@ No unsafe rendering sinks were found. The codebase does not use `dangerouslySetI
 - **Stellar address note:** Stellar public keys are fixed-format 56-character base32 G-strkeys validated structurally by `isValidStellarPublicKey` before any display or form submission. Confusable-character risk is inherently limited there. No address-adjacent free-text field (such as a future memo field) currently bypasses validation, but any future memo or label field must route through `sanitizeDisplayText` before display — this is the expected pattern established by this change.
 
 **Tests:** `src/lib/textSafety.test.ts` — real Unicode attack fixtures for every bidi control (U+202A–U+202E, U+2066–U+2069), every zero-width character (U+200B–U+200D, U+FEFF, U+00AD), combined payloads, safe ASCII/non-Latin strings asserted unchanged.
+
+---
+
+## Security Mitigations (Issues #479, #482, #483, #486)
+
+### #479 — Contributors page under a strict CSP
+
+- The browser no longer calls `api.github.com`. `/contributors` fetches the same-origin `/api/contributors` route (`src/app/api/contributors/route.ts`), which calls GitHub server-side via `src/lib/contributors.ts`.
+- The fetcher has a 5 s timeout, a 1 MB body cap and schema validation. Logins must match GitHub's login rules, bots are dropped, and the avatar and profile URLs are rebuilt from the login instead of trusted from upstream. It never takes user-controlled URLs.
+- Caching: `revalidate = 3600` plus `Cache-Control: s-maxage=3600, stale-while-revalidate=86400, stale-if-error=86400`. When GitHub fails (rate limit, 5xx, malformed body), the route serves the last good in-memory response, then a bundled snapshot (`src/lib/contributors.fallback.json`). The page shows a "cached list" notice instead of an error.
+- `GITHUB_TOKEN` is optional and server-only. It is not `NEXT_PUBLIC_*`, so `envValidation` never inlines or flags it.
+- Avatars render through `next/image`, with `images.remotePatterns` restricted to `https://avatars.githubusercontent.com/*`. The optimizer fetches them server-side and serves them from `/_next/image`, so CSP `img-src` and `connect-src` are **unchanged** (see the note in `next.config.mjs`).
+- Verified by `e2e/contributors-csp.spec.ts`, which asserts no CSP violations and no browser requests to GitHub hosts.
+
+### #482 — `secureLogger` everywhere, hardened redaction
+
+- ESLint `no-console: error` applies across `src/**`, with an override only for `src/lib/secureLogging.ts` and tests/stories. Existing call sites (route error boundaries, `useGlobalErrorCapture`) were migrated.
+- The redactor is a pluggable rule list (`DEFAULT_RULES`: `{name, pattern, test?, replace?}`). It covers:
+  - SEP-0023 strkeys `G/S/M/C/T/X/P`, checksum-validated. `S…` seeds are redacted on shape alone, so truncated or mistyped seeds are still caught. A 56-char uppercase string that fails the checksum is left alone.
+  - XDR blobs and generic base64 blobs, checked by length, charset and a mixed-character-class plausibility test.
+  - `Bearer` tokens (the scheme is kept) and JWTs.
+  - Hex strings of 40+ characters.
+  - 12–24-word mnemonics. A prose stop-word heuristic avoids redacting ordinary sentences.
+- Allowlist: `createRedactor({ allowlist: [/…/] })` exempts known-benign ids such as intent ids.
+- Redaction is deep: objects, arrays, `Error` (`message`, `stack`, `cause`), circular refs and sensitive key names (`password`, `seed`, `signedXdr`, …). It is bounded (depth 8, 200 keys, 64 KB per string, then truncated) and never throws. A 10 MB payload is handled in under 100 ms.
+- Tests (`src/lib/secureLogging.test.ts`) include 200 seeded fuzz runs over every sensitive format, 500 benign-string runs, and a performance check.
+
+### #483 — Confusable-address (address-poisoning) detection
+
+- `src/lib/addressRisk.ts` → `assessAddress(candidate, known)` returns `{risk: none|low|high, reasons[], lookalike?}`. It uses a memoised prefix/suffix index (no O(n²) scans; bucket scans capped at 64) and takes under 5 ms against 2,000 known addresses.
+- **False-positive policy:** identical addresses (including the user's own) never flag. `high` (blocking, dismissible) means the same first 4 **and** last 4 characters, or a Hamming distance of 4 or less. `low` means only the prefix or only the suffix matches; it is informational only because random collisions are expected. Comparison is case-insensitive.
+- Known set (`src/lib/knownAddresses.ts`, local only, max 2,000, 90-day retention): the connected wallet, destinations used in SwapCard, and solver addresses viewed.
+- Labels: `assessLabel` compares homoglyph skeletons (`confusableSkeleton` in `textSafety.ts`: NFKC, invisible-char stripping, Cyrillic/Greek lookalike mapping) and flags mixed scripts.
+- UI: the SwapCard destination field shows a blocking-but-dismissible `role="alert"` warning. `AddressDiff` compares the addresses side by side, highlights differing characters and gives a screen-reader text alternative listing the positions. The app has no delegation flow yet; any future one must call `assessAddress` in the same way.
+
+### #486 — Privacy & local-data center
+
+See [`docs/privacy-and-local-data.md`](./privacy-and-local-data.md).

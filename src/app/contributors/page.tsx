@@ -1,26 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
+import Image from "next/image";
 import useSWR from "swr";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
+import type { Contributor, ContributorsResponse } from "@/lib/contributors";
 
-interface GitHubContributor {
-  login: string;
-  avatar_url: string;
-  html_url: string;
-  contributions: number;
-}
-
-const REPO_OWNER = "stellar-vortex-protocol";
-const REPO_NAME = "vortex-frontend";
-const GITHUB_API = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contributors?per_page=100`;
+// Same-origin route: GitHub is called server-side (see src/app/api/contributors).
+const CONTRIBUTORS_ENDPOINT = "/api/contributors";
 
 const fetcher = (url: string) =>
   fetch(url).then((res) => {
     if (!res.ok) throw new Error("Failed to load contributors");
-    return res.json() as Promise<GitHubContributor[]>;
+    return res.json() as Promise<ContributorsResponse>;
   });
 
 function ContributorSkeleton() {
@@ -33,20 +28,20 @@ function ContributorSkeleton() {
   );
 }
 
-function ContributorCard({ contributor }: { contributor: GitHubContributor }) {
+function ContributorCard({ contributor }: { contributor: Contributor }) {
   return (
     <a
-      href={contributor.html_url}
+      href={contributor.profileUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="card p-5 flex flex-col items-center gap-3 hover:border-vx-sage/40 active:bg-vx-surface/60 transition-colors group"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={contributor.avatar_url}
+      <Image
+        src={contributor.avatarUrl}
         alt={`${contributor.login}'s avatar`}
+        width={80}
+        height={80}
         className="w-20 h-20 rounded-full border-2 border-vx-border group-hover:border-vx-sage/40 transition-colors"
-        loading="lazy"
       />
       <div className="text-center">
         <div className="text-sm font-semibold text-vx-text group-hover:text-vx-sage transition-colors">
@@ -61,16 +56,17 @@ function ContributorCard({ contributor }: { contributor: GitHubContributor }) {
 }
 
 export default function ContributorsPage() {
-  const { data: contributors, isLoading, error } = useSWR<GitHubContributor[]>(GITHUB_API, fetcher, {
+  const { t } = useTranslation();
+  const { data, isLoading, error } = useSWR<ContributorsResponse>(CONTRIBUTORS_ENDPOINT, fetcher, {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
     dedupingInterval: 60_000,
   });
 
   const sorted = useMemo(() => {
-    if (!contributors) return [];
-    return [...contributors].sort((a, b) => a.login.localeCompare(b.login));
-  }, [contributors]);
+    if (!data?.contributors) return [];
+    return [...data.contributors].sort((a, b) => a.login.localeCompare(b.login));
+  }, [data]);
 
   return (
     <div className="min-h-screen">
@@ -107,6 +103,11 @@ export default function ContributorsPage() {
           </div>
         ) : (
           <>
+            {data?.source !== "live" && (
+              <p role="status" className="text-xs text-vx-amber mb-2">
+                {t("contributors.staleNotice")}
+              </p>
+            )}
             <div className="text-xs text-vx-muted mb-4">
               {sorted.length} contributor{sorted.length === 1 ? "" : "s"} — listed alphabetically
             </div>

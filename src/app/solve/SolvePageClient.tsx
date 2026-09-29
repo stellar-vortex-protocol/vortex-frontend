@@ -16,13 +16,14 @@ import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/format";
 import { sanitizeDisplayText } from "@/lib/textSafety";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 import Link from "next/link";
 
 const TABS = ["leaderboard", "intents", "register"] as const;
 type Tab = (typeof TABS)[number];
 
 const MIN_BOND_USD = 50;
-const ONBOARDING_DISMISSED_KEY = "vortex_solver_onboarding_dismissed";
+const ONBOARDING_DISMISSED_KEY = STORAGE_KEYS.solverOnboardingDismissed.key;
 
 /** Shape of the persisted registration draft. */
 type RegistrationDraft = {
@@ -56,7 +57,7 @@ export default function SolvePageClient() {
   // switching wallets never silently restores the wrong address.
   const connectedAddress = useWalletStore((s) => s.address);
   const [draft, setDraft, clearDraft] = useLocalStorageDraft<RegistrationDraft>(
-    "vortex:solver-registration-draft",
+    STORAGE_KEYS.solverRegistrationDraft.key,
     connectedAddress ?? null,
   );
 
@@ -85,7 +86,7 @@ export default function SolvePageClient() {
 
   const [onboardingDismissed, setOnboardingDismissed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+      return storage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
     }
     return false;
   });
@@ -99,7 +100,7 @@ export default function SolvePageClient() {
     const nextState = !onboardingDismissed;
     setOnboardingDismissed(nextState);
     if (typeof window !== "undefined") {
-      localStorage.setItem(ONBOARDING_DISMISSED_KEY, String(nextState));
+      storage.setItem(ONBOARDING_DISMISSED_KEY, String(nextState));
     }
   };
 

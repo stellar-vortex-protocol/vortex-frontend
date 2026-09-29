@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 
 type MotionPreference = "system" | "reduce" | "allow";
 
@@ -12,7 +13,7 @@ const LOCALE_LABELS: Record<Locale, string> = {
   es: "Español",
 };
 
-const STORAGE_KEY = "vortex-motion-preference";
+const STORAGE_KEY = STORAGE_KEYS.motionPreference.key;
 
 function applyMotionPreference(preference: MotionPreference) {
   document.documentElement.dataset["motion"] = preference;
@@ -36,7 +37,7 @@ export function SettingsPanel() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = storage.getItem(STORAGE_KEY);
     const preference =
       stored === "reduce" || stored === "allow" ? stored : "system";
     setMotionPreference(preference);
@@ -84,9 +85,9 @@ export function SettingsPanel() {
     setMotionPreference(preference);
     applyMotionPreference(preference);
     if (preference === "system") {
-      localStorage.removeItem(STORAGE_KEY);
+      storage.removeItem(STORAGE_KEY);
     } else {
-      localStorage.setItem(STORAGE_KEY, preference);
+      storage.setItem(STORAGE_KEY, preference);
     }
   };
 

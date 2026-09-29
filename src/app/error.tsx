@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { secureLogger } from "@/lib/secureLogging";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
@@ -13,7 +14,7 @@ interface ErrorPageProps {
 export default function Error({ error, reset }: ErrorPageProps) {
   useEffect(() => {
     // Log to an error reporting service in production.
-    console.error(error);
+    secureLogger.error("Route error boundary caught an error", error);
   }, [error]);
 
   return (

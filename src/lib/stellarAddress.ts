@@ -72,3 +72,40 @@ export function isValidStellarPublicKey(address: string): boolean {
     checksum[1] === expectedChecksum >>> 8
   );
 }
+
+/** Strkey prefixes from the SEP-0023 version-byte table. */
+export type StrKeyPrefix = "G" | "S" | "M" | "C" | "T" | "X" | "P";
+
+// Decoded byte lengths (version + payload + 2-byte CRC) per prefix. Signed
+// payloads ("P") carry a variable-length payload, so any length is accepted.
+const STRKEY_DECODED_LENGTHS: Record<StrKeyPrefix, readonly number[] | null> = {
+  G: [35],
+  S: [35],
+  C: [35],
+  T: [35],
+  X: [35],
+  M: [43],
+  P: null,
+};
+
+/**
+ * Checksum-validates any SEP-0023 strkey (account, seed, muxed, contract,
+ * pre-auth tx, hash-x or signed payload). Never throws.
+ */
+export function isValidStrKey(value: string): boolean {
+  const prefix = value[0] as StrKeyPrefix | undefined;
+  if (!prefix || !(prefix in STRKEY_DECODED_LENGTHS)) return false;
+
+  const decoded = base32Decode(value);
+  if (!decoded || decoded.length < 3) return false;
+
+  const lengths = STRKEY_DECODED_LENGTHS[prefix];
+  if (lengths && !lengths.includes(decoded.length)) return false;
+  if (decoded[0]! >>> 3 !== BASE32_ALPHABET.indexOf(prefix)) return false;
+
+  const expectedChecksum = crc16xmodem(decoded.slice(0, -2));
+  return (
+    decoded[decoded.length - 2] === (expectedChecksum & 0xff) &&
+    decoded[decoded.length - 1] === expectedChecksum >>> 8
+  );
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 export function Footer() {
@@ -10,6 +11,9 @@ export function Footer() {
       <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-vx-muted">
         <span>{t("footer.copyright")}</span>
         <div className="flex gap-5">
+          <Link href="/privacy" className="hover:text-vx-text transition-colors">
+            {t("footer.privacy")}
+          </Link>
           <a href="https://github.com/vortex-protocol" className="hover:text-vx-text transition-colors">
             {t("footer.github")}
           </a>

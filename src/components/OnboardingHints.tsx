@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 
-const STORAGE_KEY = "vortex-onboarding-seen";
+const STORAGE_KEY = STORAGE_KEYS.onboardingSeen.key;
 
 type Step = {
   targetId: string;
@@ -30,7 +31,7 @@ const STEPS: Step[] = [
 
 function hasSeenOnboarding(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "1";
+    return storage.getItem(STORAGE_KEY) === "1";
   } catch {
     // Private mode / storage disabled - treat as seen so we never nag.
     return true;
@@ -39,7 +40,7 @@ function hasSeenOnboarding(): boolean {
 
 function markSeen() {
   try {
-    localStorage.setItem(STORAGE_KEY, "1");
+    storage.setItem(STORAGE_KEY, "1");
   } catch {
     // Ignore - the sequence just won't be suppressed next load.
   }

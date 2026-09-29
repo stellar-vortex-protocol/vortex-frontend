@@ -1,3 +1,30 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-console": "error",
+    "no-restricted-globals": [
+      "error",
+      { "name": "localStorage", "message": "Use the storage facade in src/lib/storage.ts (see STORAGE_KEYS)." },
+      { "name": "sessionStorage", "message": "Use the storage facade in src/lib/storage.ts (see STORAGE_KEYS)." }
+    ],
+    "no-restricted-properties": [
+      "error",
+      { "object": "window", "property": "localStorage", "message": "Use the storage facade in src/lib/storage.ts." },
+      { "object": "window", "property": "sessionStorage", "message": "Use the storage facade in src/lib/storage.ts." }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["src/lib/secureLogging.ts"],
+      "rules": { "no-console": "off" }
+    },
+    {
+      "files": ["src/lib/storage.ts"],
+      "rules": { "no-restricted-globals": "off", "no-restricted-properties": "off" }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "e2e/**", "scripts/**", "*.config.*", "vitest.setup.ts"],
+      "rules": { "no-console": "off", "no-restricted-globals": "off", "no-restricted-properties": "off" }
+    }
+  ]
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
@@ -7,6 +8,7 @@ import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { CopyButton } from "@/components/CopyButton";
 import { SkeletonCard } from "@/components/Skeleton";
 import { useSolver } from "@/hooks/useSolver";
+import { recordKnownAddress } from "@/lib/knownAddresses";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
@@ -24,6 +26,10 @@ export default function SolverDetailPage({ params }: { params: { address: string
   const { t } = useTranslation();
   const isValidAddress = isValidStellarPublicKey(params.address);
   const { solver, isLoading, error } = useSolver(isValidAddress ? params.address : null);
+
+  useEffect(() => {
+    if (solver && isValidAddress) recordKnownAddress(params.address, "solver");
+  }, [solver, isValidAddress, params.address]);
   const { items: fillHistory, isLoading: historyLoading, error: historyError } = useIntentFeed();
 
   return (

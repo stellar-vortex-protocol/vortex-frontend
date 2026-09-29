@@ -28,6 +28,8 @@ registrations. Part of the multi-repo Vortex stack — see also
 | `/governance` | `src/app/governance/page.tsx` | Governance proposals list and voting overview |
 | `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread |
 | `/contributors` | `src/app/contributors/page.tsx` | Drips Wave contribution transparency dashboard parsing repository issue metrics |
+| `/privacy` | `src/app/privacy/page.tsx` | Privacy & local-data center: inventory, export, clear, private mode |
+| `/api/contributors` | `src/app/api/contributors/route.ts` | Cached server-side proxy for GitHub contributors (1 h revalidate, stale-while-error) |
 
 ---
 
@@ -82,6 +84,12 @@ npm run dev    # http://localhost:3000
 | `NEXT_PUBLIC_NETWORK`                  | Stellar network: `testnet`, `futurenet`, or `mainnet`         |
 | `NEXT_PUBLIC_SETTLEMENT_CONTRACT`      | Settlement contract ID from `vortex-contract` deployment      |
 | `NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT` | Solver registry contract ID from `vortex-contract` deployment |
+
+Optional, **server-only** (never prefix with `NEXT_PUBLIC_`):
+
+| Variable       | Purpose |
+| -------------- | ------- |
+| `GITHUB_TOKEN` | Raises the GitHub API rate limit for `/api/contributors` (read-only, no scopes needed). Without it the route still works, and falls back to the last good response or a bundled snapshot when rate-limited. |
 
 ---
 

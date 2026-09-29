@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { storage } from "@/lib/storage";
 
 const DEFAULT_DEBOUNCE_MS = 500;
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -32,7 +33,7 @@ type StoredEntry<T> = {
 
 function readEntry<T>(key: string): StoredEntry<T> | null {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw) as StoredEntry<T>;
   } catch {
@@ -43,7 +44,7 @@ function readEntry<T>(key: string): StoredEntry<T> | null {
 function writeEntry<T>(key: string, value: T, walletAddress: string | null): void {
   try {
     const entry: StoredEntry<T> = { value, savedAt: Date.now(), walletAddress };
-    localStorage.setItem(key, JSON.stringify(entry));
+    storage.setItem(key, JSON.stringify(entry));
   } catch {
     // Silently ignore quota errors — draft persistence is best-effort.
   }
@@ -51,7 +52,7 @@ function writeEntry<T>(key: string, value: T, walletAddress: string | null): voi
 
 function removeEntry(key: string): void {
   try {
-    localStorage.removeItem(key);
+    storage.removeItem(key);
   } catch {
     // ignore
   }

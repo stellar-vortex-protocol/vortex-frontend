@@ -81,3 +81,36 @@ export function sanitizeDisplayText(value: string): string {
 export function containsDangerousUnicode(value: string): boolean {
   return BIDI_CONTROLS_RE.test(value) || ZERO_WIDTH_INVIS_RE.test(value);
 }
+
+// ─── Homoglyph normalisation ─────────────────────────────────────────────────
+
+/**
+ * Common Cyrillic / Greek / fullwidth lookalikes mapped to their Latin
+ * skeleton. Not exhaustive (see Unicode TR39 confusables.txt) but covers the
+ * characters seen in practice in label-spoofing attacks.
+ */
+const CONFUSABLES: Record<string, string> = {
+  "а": "a", "в": "b", "с": "c", "е": "e", "һ": "h", "і": "i", "ј": "j", "к": "k",
+  "м": "m", "н": "h", "о": "o", "р": "p", "ѕ": "s", "т": "t", "у": "y", "х": "x",
+  "ԁ": "d", "ԛ": "q", "ԝ": "w", "ɡ": "g",
+  "α": "a", "β": "b", "ε": "e", "η": "n", "ι": "i", "κ": "k", "ν": "v", "ο": "o",
+  "ρ": "p", "τ": "t", "υ": "u", "χ": "x",
+  "0": "o", "1": "l", "5": "s",
+};
+
+/**
+ * Reduces a label to a "skeleton" for confusable comparison: strips invisible
+ * characters, applies NFKC (folds fullwidth forms), lowercases and maps
+ * homoglyphs. Two labels with the same skeleton look alike to a human.
+ */
+export function confusableSkeleton(value: string): string {
+  const folded = sanitizeDisplayText(value).normalize("NFKC").toLowerCase();
+  let out = "";
+  for (const ch of folded) out += CONFUSABLES[ch] ?? ch;
+  return out.replace(/l/g, "i").replace(/rn/g, "m");
+}
+
+/** True when the string mixes Latin letters with letters from another script. */
+export function hasMixedScripts(value: string): boolean {
+  return /\p{Script=Latin}/u.test(value) && /[\p{Script=Cyrillic}\p{Script=Greek}]/u.test(value);
+}
