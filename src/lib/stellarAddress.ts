@@ -72,3 +72,76 @@ export function isValidStellarPublicKey(address: string): boolean {
     checksum[1] === expectedChecksum >>> 8
   );
 }
+
+/**
+ * Normalises a Stellar address for comparison: trims surrounding whitespace and
+ * upper-cases it. Stellar strkeys are case-insensitive base32, so two addresses
+ * that differ only in case refer to the same account. Used by the delegation
+ * flow to detect self-delegation and to compare a pasted address against the
+ * current delegate without false negatives.
+ */
+export function normalizeStellarAddress(address: string): string {
+  return address.trim().toUpperCase();
+}
+
+/**
+ * Returns true when two Stellar addresses refer to the same account, ignoring
+ * surrounding whitespace and case. Returns false if either input is empty so
+ * that an unset delegate never compares equal to a real address.
+ */
+export function isSameStellarAddress(a: string, b: string): boolean {
+  const left = normalizeStellarAddress(a);
+  const right = normalizeStellarAddress(b);
+  if (!left || !right) return false;
+  return left === right;
+}
+
+/**
+ * Detects visually confusable Stellar addresses — the address-poisoning vector
+ * where an attacker crafts an address that shares a long prefix/suffix with a
+ * legitimate one so a truncated display looks identical.
+ *
+ * Returns the number of leading and trailing characters the two addresses have
+ * in common (case-insensitive). Callers decide the threshold at which to warn;
+ * this helper only measures the overlap so the policy stays in the UI layer.
+ */
+export function addressConfusableOverlap(
+  a: string,
+  b: string
+): { prefix: number; suffix: number } {
+  const left = normalizeStellarAddress(a);
+  const right = normalizeStellarAddress(b);
+  if (!left || !right) return { prefix: 0, suffix: 0 };
+
+  const max = Math.min(left.length, right.length);
+
+  let prefix = 0;
+  while (prefix < max && left[prefix] === right[prefix]) prefix++;
+
+  let suffix = 0;
+  while (
+    suffix < max - prefix &&
+    left[left.length - 1 - suffix] === right[right.length - 1 - suffix]
+  ) {
+    suffix++;
+  }
+
+  return { prefix, suffix };
+}
+
+/**
+ * Convenience predicate for the delegation confirmation step: flags a candidate
+ * address as confusable with a reference address when it shares at least
+ * `minOverlap` leading or trailing characters. Defaults to 4, matching the
+ * default `truncateAddress` prefix/suffix so anything that would render
+ * identically when truncated is caught.
+ */
+export function isConfusableAddress(
+  candidate: string,
+  reference: string,
+  minOverlap = 4
+): boolean {
+  if (isSameStellarAddress(candidate, reference)) return false;
+  const { prefix, suffix } = addressConfusableOverlap(candidate, reference);
+  return prefix >= minOverlap || suffix >= minOverlap;
+}
