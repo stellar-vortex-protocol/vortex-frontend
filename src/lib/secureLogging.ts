@@ -14,6 +14,24 @@ const SENSITIVE_PATTERNS = [
   /\b([a-z]+\s+){11}[a-z]+\b/gi,
 ];
 
+/**
+ * Returns true when the value still contains anything that looks like a
+ * Stellar address, secret key, XDR blob or seed phrase. Used by telemetry to
+ * reject payloads that were not fully scrubbed before leaving the client.
+ */
+export function containsSensitiveData(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+
+  const str = typeof value === "string" ? value : JSON.stringify(value);
+  if (!str) return false;
+
+  return SENSITIVE_PATTERNS.some((pattern) => {
+    // Patterns are global; reset lastIndex so repeated calls stay correct.
+    pattern.lastIndex = 0;
+    return pattern.test(str);
+  });
+}
+
 export function redactSensitiveData(value: unknown): string {
   if (value === null || value === undefined) return String(value);
 
@@ -21,6 +39,7 @@ export function redactSensitiveData(value: unknown): string {
 
   // Redact all sensitive patterns
   SENSITIVE_PATTERNS.forEach((pattern) => {
+    pattern.lastIndex = 0;
     str = str.replace(pattern, "[REDACTED]");
   });
 
