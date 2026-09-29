@@ -5,6 +5,12 @@
  *   <SkeletonBlock className="h-6 w-1/2" />
  *   <SkeletonText lines={3} />
  *   <SkeletonCard rows={4} rowHeight="h-14" />
+ *
+ * Motion: the pulse animation is gated by the global reduced-motion rules
+ * (`[data-motion="reduce"]` and `@media (prefers-reduced-motion: reduce)`),
+ * which collapse animation durations to 0.01ms. The `motion-safe:animate-pulse`
+ * utility additionally disables the pulse entirely when the OS requests
+ * reduced motion, so the placeholder renders as a static indicator.
  */
 
 import { clsx } from "clsx";
@@ -20,7 +26,10 @@ export function SkeletonBlock({ className }: SkeletonBlockProps) {
   return (
     <div
       aria-hidden="true"
-      className={clsx("bg-vx-surface/40 rounded-lg animate-pulse", className)}
+      className={clsx(
+        "bg-vx-surface/40 rounded-lg motion-safe:animate-pulse",
+        className,
+      )}
     />
   );
 }
@@ -42,7 +51,7 @@ export function SkeletonText({ lines = 2, className }: SkeletonTextProps) {
           // eslint-disable-next-line react/no-array-index-key
           key={i}
           className={clsx(
-            "h-4 bg-vx-surface/40 rounded animate-pulse",
+            "h-4 bg-vx-surface/40 rounded motion-safe:animate-pulse",
             widths[i % widths.length],
           )}
         />
@@ -80,20 +89,15 @@ export function SkeletonCard({
   );
 }
 
-export function IntentListSkeleton({ count = 5 }: { count?: number }) {
-  return <SkeletonCard rows={count} rowHeight="h-16" />;
-}
-
-export function FeedSkeleton({ count = 3 }: { count?: number }) {
-  return <SkeletonCard rows={count} rowHeight="h-12" />;
-}
-
 // ─── SkeletonDetailCard ────────────────────────────────────────────────────────
 // Skeleton for a detail card (e.g. intent detail, solver detail header).
 
 export function SkeletonDetailCard() {
   return (
-    <div aria-hidden="true" className="card p-6 space-y-4 animate-pulse">
+    <div
+      aria-hidden="true"
+      className="card p-6 space-y-4 motion-safe:animate-pulse"
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2 flex-1">
           <SkeletonBlock className="h-4 w-16" />
@@ -114,8 +118,8 @@ export function SkeletonDetailCard() {
   );
 }
 
-export function IntentListSkeleton({ count = 4 }: { count?: number }) {
-  return <SkeletonCard rows={count} rowHeight="h-14" />;
+export function IntentListSkeleton({ count = 5 }: { count?: number }) {
+  return <SkeletonCard rows={count} rowHeight="h-16" />;
 }
 
 export function FeedSkeleton({ count = 3 }: { count?: number }) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
@@ -32,9 +32,6 @@ export function SettingsPanel() {
     triggerRef: toggleRef,
   });
 
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     const preference =
@@ -50,7 +47,7 @@ export function SettingsPanel() {
       "select, button, input, [tabindex]:not([tabindex='-1'])"
     );
     firstFocusable?.focus();
-  }, [open]);
+  }, [open, panelRef]);
 
   const closePanel = () => {
     setOpen(false);

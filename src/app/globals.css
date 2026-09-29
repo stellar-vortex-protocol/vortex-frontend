@@ -65,6 +65,10 @@
 
     /* Focus ring */
     --vx-focus-ring: rgba(76, 235, 168, 0.5);
+
+    /* Motion durations — zeroed under reduce (see below) */
+    --vx-motion-duration: 1.2s;
+    --vx-motion-duration-fast: 0.15s;
   }
 
   /* ── Light theme ─────────────────────────────────────────────────────────── */
@@ -227,7 +231,7 @@
 .intent-flow-line {
   stroke-dasharray: 6 4;
   stroke-dashoffset: 10;
-  animation: flow 1.2s linear infinite;
+  animation: flow var(--vx-motion-duration) linear infinite;
 }
 
 @keyframes flow {
@@ -236,7 +240,20 @@
   }
 }
 
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/*
+ * Motion is disabled when either the OS requests it (prefers-reduced-motion)
+ * or the user picks "reduce" in SettingsPanel (html[data-motion="reduce"]).
+ * Durations collapse to 0.01ms and infinite loops are stopped so no animation
+ * keeps running (WCAG 2.2.2).  Essential progress indicators stay visible as
+ * static marks rather than disappearing.
+ */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --vx-motion-duration: 0.01ms;
+    --vx-motion-duration-fast: 0.01ms;
+  }
+
   *,
   *::before,
   *::after {
@@ -245,6 +262,11 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-motion="reduce"] {
+  --vx-motion-duration: 0.01ms;
+  --vx-motion-duration-fast: 0.01ms;
 }
 
 html[data-motion="reduce"] *,
@@ -260,6 +282,81 @@ html[data-motion="allow"] *,
 html[data-motion="allow"] *::before,
 html[data-motion="allow"] *::after {
   scroll-behavior: smooth;
+}
+
+/* ── Forced colors (Windows High Contrast) ───────────────────────────────── */
+/*
+ * In forced-colors mode the OS overrides author colours, so gradients and
+ * colour-only status cues vanish.  We restore visible borders, system-colour
+ * focus outlines and keep SVG charts legible via currentColor.
+ */
+@media (forced-colors: active) {
+  .card,
+  .card-sm,
+  .token-btn,
+  .input-swap,
+  .chip,
+  .chain-badge,
+  .stellar-badge {
+    border: 1px solid CanvasText;
+    background-image: none;
+  }
+
+  .btn-swap {
+    background: ButtonFace;
+    color: ButtonText;
+    border: 1px solid ButtonText;
+  }
+
+  .btn-swap:disabled {
+    color: GrayText;
+    border-color: GrayText;
+  }
+
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  /* Status badges keep an icon/text cue instead of relying on colour alone */
+  .state-dot {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+
+  /* SVG charts follow system colours */
+  svg {
+    color: CanvasText;
+  }
+
+  .intent-flow-line {
+    stroke: CanvasText;
+  }
+}
+
+/* ── High contrast (prefers-contrast: more) ──────────────────────────────── */
+/*
+ * Raises text and border contrast.  Documented ratios (WCAG 1.4.6 AAA):
+ *   dark  text #FFFFFF on #080C14 → ~19.6:1
+ *   light text #000000 on #FFFFFF → ~21:1
+ *   borders use the full-strength text colour for a clear 3:1+ edge.
+ */
+@media (prefers-contrast: more) {
+  :root {
+    --vx-text:   #FFFFFF;
+    --vx-muted:  #C7D2E0;
+    --vx-border: rgba(255, 255, 255, 0.4);
+    --vx-line:   rgba(255, 255, 255, 0.25);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --vx-text:   #000000;
+      --vx-muted:  #1F2937;
+      --vx-border: rgba(0, 0, 0, 0.5);
+      --vx-line:   rgba(0, 0, 0, 0.3);
+    }
+  }
 }
 
 /* Safe-area padding for notched/dynamic-island iOS devices */

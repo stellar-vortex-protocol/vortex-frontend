@@ -1,71 +1,92 @@
-import type { IntentStatus } from "@/lib/types";
+'use client';
+
+import { useMemo } from 'react';
+import { useMotionPreference } from '@/lib/useMotionPreference';
+
+export type IntentStatus =
+  | 'pending'
+  | 'processing'
+  | 'success'
+  | 'error'
+  | 'cancelled';
+
+interface IntentStatusBadgeProps {
+  status: IntentStatus;
+  label?: string;
+  className?: string;
+}
 
 const STATUS_STYLES: Record<IntentStatus, string> = {
-  pending: "bg-vx-lav-bg text-vx-lav border-vx-lav/60",
-  accepted: "bg-blue-500/10 text-blue-300 border-blue-500/80",
-  filled: "bg-vx-sage-bg text-vx-sage border-vx-sage/50",
-  failed: "bg-red-500/10 text-red-300 border-red-500/80",
+  pending:
+    'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  processing:
+    'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  success:
+    'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  error:
+    'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300',
+  cancelled:
+    'border-slate-500/40 bg-slate-500/10 text-slate-700 dark:text-slate-300',
 };
 
-// Distinct icon shapes per status so the badge doesn't rely on color/background
-// alone to differentiate — helps colorblind users tell statuses apart at a glance.
-const STATUS_ICONS: Record<IntentStatus, JSX.Element> = {
-  pending: (
-    <circle
-      cx="6"
-      cy="6"
-      r="4.25"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeDasharray="2 2"
-      fill="none"
-    />
-  ),
-  accepted: (
-    <path
-      d="M2.5 6l2.5 2.5L9.5 3.5"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill="none"
-    />
-  ),
-  filled: (
-    <path
-      d="M2 6.5l2.5 2.5L10 3"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      fill="none"
-    />
-  ),
-  failed: (
-    <path
-      d="M3 3l6 6M9 3l-6 6"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      fill="none"
-    />
-  ),
+const STATUS_ICONS: Record<IntentStatus, string> = {
+  pending: '\u25CB',
+  processing: '\u25D4',
+  success: '\u2713',
+  error: '\u2715',
+  cancelled: '\u2298',
 };
 
-export function IntentStatusBadge({ status }: { status: IntentStatus }) {
+const STATUS_LABELS: Record<IntentStatus, string> = {
+  pending: 'Pending',
+  processing: 'Processing',
+  success: 'Success',
+  error: 'Error',
+  cancelled: 'Cancelled',
+};
+
+/**
+ * Status badge that conveys state through an icon and text label in addition
+ * to colour, so it remains legible in forced-colors / high-contrast modes.
+ * The processing indicator is only animated when motion is allowed.
+ */
+export function IntentStatusBadge({
+  status,
+  label,
+  className = '',
+}: IntentStatusBadgeProps) {
+  const { prefersReducedMotion } = useMotionPreference();
+
+  const text = label ?? STATUS_LABELS[status];
+  const icon = STATUS_ICONS[status];
+
+  const iconClassName = useMemo(() => {
+    if (status !== 'processing' || prefersReducedMotion) {
+      return 'inline-block';
+    }
+    return 'inline-block motion-safe:animate-spin';
+  }, [status, prefersReducedMotion]);
+
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${STATUS_STYLES[status]}`}
+      role="status"
+      aria-label={text}
+      data-status={status}
+      className={[
+        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+        'forced-colors:border-[CanvasText] forced-colors:text-[CanvasText]',
+        STATUS_STYLES[status],
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
-      <svg
-        aria-hidden="true"
-        className="w-2.5 h-2.5 flex-shrink-0"
-        viewBox="0 0 12 12"
-        fill="none"
-      >
-        {STATUS_ICONS[status]}
-      </svg>
-      {status}
+      <span aria-hidden="true" className={iconClassName}>
+        {icon}
+      </span>
+      <span>{text}</span>
     </span>
   );
 }
+
+export default IntentStatusBadge;
