@@ -13,6 +13,18 @@ export type Translator = (key: MessageKey, values?: MessageValues) => string;
 
 export const LOCALES = Object.keys(CATALOGS) as Locale[];
 
+/** Locales written right-to-left. Used to set `dir` on <html> and to mirror UI. */
+export const RTL_LOCALES: readonly Locale[] = [];
+
+export function isRtlLocale(locale: Locale): boolean {
+  return RTL_LOCALES.includes(locale);
+}
+
+/** Returns the writing direction for a locale, for use on <html dir="...">. */
+export function getDirection(locale: Locale): "ltr" | "rtl" {
+  return isRtlLocale(locale) ? "rtl" : "ltr";
+}
+
 export function isLocale(value: string): value is Locale {
   return value in CATALOGS;
 }

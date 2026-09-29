@@ -145,6 +145,30 @@
     outline: 1.5px solid var(--vx-focus-ring);
     outline-offset: 2px;
   }
+
+  /* ── RTL / bidi isolation ────────────────────────────────────────────────── */
+  /*
+   * Mixed-direction content (addresses, hashes, amounts, code) must stay LTR
+   * even inside an RTL document.  `unicode-bidi: isolate` prevents the
+   * surrounding RTL context from reordering the embedded run, and
+   * `text-align: start` keeps the block aligned to the logical start edge.
+   */
+  [dir="ltr"],
+  bdi,
+  .bidi-isolate {
+    unicode-bidi: isolate;
+  }
+
+  /*
+   * When the document is RTL, keep numeric/address/code runs LTR and aligned
+   * to the logical start so they read correctly without breaking the layout.
+   */
+  [dir="rtl"] [dir="ltr"],
+  [dir="rtl"] bdi,
+  [dir="rtl"] .bidi-isolate {
+    direction: ltr;
+    text-align: start;
+  }
 }
 
 @layer components {
@@ -266,5 +290,17 @@ html[data-motion="allow"] *::after {
 @layer utilities {
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /*
+   * Logical safe-area padding: in RTL the notch/inset sits on the opposite
+   * physical edge, so expose a logical-start variant that mirrors correctly.
+   */
+  .ps-safe {
+    padding-inline-start: env(safe-area-inset-left, 0px);
+  }
+
+  .pe-safe {
+    padding-inline-end: env(safe-area-inset-right, 0px);
   }
 }

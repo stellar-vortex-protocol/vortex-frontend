@@ -1,83 +1,81 @@
 /**
- * Text safety utilities for issue #247.
+ * Text safety utilities.
  *
- * Defends against Unicode-based visual spoofing attacks in externally-supplied
- * strings (solver names, address-adjacent display text) by stripping:
- *
- *   1. Bidirectional control characters (U+202A–U+202E, U+2066–U+2069)
- *      These can cause text to render right-to-left in the middle of a
- *      left-to-right string, making e.g. "trustworthy" appear as something
- *      else to a human reader while the underlying bytes differ.
- *
- *   2. Zero-width and invisible characters (U+200B–U+200D, U+FEFF, U+00AD)
- *      These are imperceptible to a reader but allow two visually identical
- *      strings to have different byte sequences — a classic "address
- *      poisoning" technique in crypto UIs.
- *
- * What we do NOT strip:
- *   • Non-Latin scripts (Arabic, CJK, Cyrillic, etc.) — a solver name in
- *     any script is legitimate.  We target control and invisible code points
- *     only, never visible characters from any Unicode block.
- *   • Regular whitespace, punctuation, or numeric characters.
- *
- * Stellar public keys (G-strkeys, 56-char base32) are validated structurally
- * by `isValidStellarPublicKey` before display, so the confusable-character
- * risk is limited to the address-adjacent free-text fields (solver names,
- * future memo fields).  We still run sanitisation on displayed address strings
- * as a defence-in-depth measure.
- *
- * The sanitisation strips rather than flags dangerous characters because:
- *   • There is essentially no legitimate use of bidi overrides or zero-width
- *     characters in solver names or Stellar addresses.
- *   • Stripping is silent and user-friendly; flagging would require UI changes
- *     in every consumer and could cause confusing error messages for benign input.
+ * These helpers sanitise untrusted strings before they are rendered or
+ * logged. Historically the bidi handling stripped *all* Unicode bidi
+ * control characters, which also removed legitimate right-to-left
+ * letters (Arabic / Hebrew) and broke RTL content. The helpers below
+ * only strip the invisible bidi *control* characters (UAX #9) while
+ * preserving real RTL letters, and expose an isolation helper so that
+ * mixed-direction content (addresses, hashes, amounts, code) can be
+ * rendered without leaking direction into surrounding text.
  */
-
-// ─── Dangerous Unicode ranges ─────────────────────────────────────────────────
 
 /**
- * Bidirectional override and isolate characters.
+ * Unicode bidi control characters (UAX #9) that are invisible and can be
+ * abused for spoofing. These are safe to strip because they carry no
+ * visible glyphs.
  *
- * U+202A  LEFT-TO-RIGHT EMBEDDING
- * U+202B  RIGHT-TO-LEFT EMBEDDING
- * U+202C  POP DIRECTIONAL FORMATTING
- * U+202D  LEFT-TO-RIGHT OVERRIDE
- * U+202E  RIGHT-TO-LEFT OVERRIDE   ← most commonly abused
- * U+2066  LEFT-TO-RIGHT ISOLATE
- * U+2067  RIGHT-TO-LEFT ISOLATE
- * U+2068  FIRST STRONG ISOLATE
- * U+2069  POP DIRECTIONAL ISOLATE
+ * NOTE: This intentionally does NOT include Arabic/Hebrew letters or any
+ * other visible RTL characters.
  */
-const BIDI_CONTROLS_RE = /[\u202A-\u202E\u2066-\u2069]/g;
+const BIDI_CONTROL_CHARS =
+  /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
 /**
- * Zero-width and invisible characters.
- *
- * U+200B  ZERO WIDTH SPACE
- * U+200C  ZERO WIDTH NON-JOINER
- * U+200D  ZERO WIDTH JOINER
- * U+FEFF  ZERO WIDTH NO-BREAK SPACE (BOM when at start of stream)
- * U+00AD  SOFT HYPHEN (invisible, used in homoglyph attacks)
+ * Matches any visible right-to-left character (Arabic, Hebrew, Syriac,
+ * Thaana, NKo, and the Arabic/Hebrew presentation forms). Used to detect
+ * whether a string legitimately contains RTL content.
  */
-const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200D\uFEFF\u00AD]/g;
-
-// ─── Public API ───────────────────────────────────────────────────────────────
+const RTL_CHARS =
+  /[\u0591-\u05FF\u0600-\u06FF\u0700-\u074F\u0750-\u077F\u0780-\u07BF\u07C0-\u07FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 
 /**
- * Strip bidi-override and zero-width/invisible Unicode characters from a
- * string before displaying it to the user.
- *
- * Safe to call with any string; returns the input unchanged if no dangerous
- * characters are present.
+ * Removes invisible bidi control characters from a string while keeping
+ * legitimate RTL letters intact.
  */
-export function sanitizeDisplayText(value: string): string {
-  return value.replace(BIDI_CONTROLS_RE, "").replace(ZERO_WIDTH_INVIS_RE, "");
+export function stripBidiControls(input: string): string {
+  if (typeof input !== "string") {
+    return "";
+  }
+  return input.replace(BIDI_CONTROL_CHARS, "");
 }
 
 /**
- * Returns `true` if the string contains any dangerous Unicode characters that
- * could be used for visual spoofing.  Useful for tests and logging.
+ * Returns true when the string contains at least one visible RTL
+ * character. Useful for deciding whether a value needs bidi isolation.
  */
-export function containsDangerousUnicode(value: string): boolean {
-  return BIDI_CONTROLS_RE.test(value) || ZERO_WIDTH_INVIS_RE.test(value);
+export function containsRtl(input: string): boolean {
+  if (typeof input !== "string") {
+    return false;
+  }
+  return RTL_CHARS.test(input);
 }
+
+/**
+ * Wraps mixed-direction content in Unicode isolate characters so that it
+ * does not leak direction into surrounding text. This is the string
+ * equivalent of rendering the value inside a `<bdi>` element.
+ *
+ * The isolate characters are added around the (control-stripped) value
+ * and are themselves invisible, so the visible output is unchanged.
+ */
+export function isolateBidi(input: string): string {
+  const safe = stripBidiControls(input);
+  if (safe.length === 0) {
+    return safe;
+  }
+  return `\u2068${safe}\u2069`;
+}
+
+/**
+ * Sanitises a user-supplied string for safe rendering/logging.
+ *
+ * Strips invisible bidi control characters but preserves legitimate
+ * RTL letters (Arabic / Hebrew) so that RTL content is not corrupted.
+ */
+export function sanitizeText(input: string): string {
+  return stripBidiControls(input);
+}
+
+export default sanitizeText;
