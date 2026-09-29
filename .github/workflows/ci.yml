@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
 
 # Cancel in-progress runs for the same branch/PR
 concurrency:
@@ -13,15 +15,13 @@ concurrency:
 
 permissions:
   contents: read
-  checks: write
 
 jobs:
-  frontend:
-    name: Frontend (Next.js)
+  static:
+    name: Static checks
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      checks: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,29 +30,57 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
-      - name: Check dependencies for supply-chain security (Issue #311)
-        run: node scripts/check-dependencies.mjs
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-          GITHUB_ACTOR: ${{ github.actor }}
       - run: npm ci
       - run: npm run check:env
       - run: npm run check:i18n
+      - run: npm run check:editorconfig
       - run: npm run lint
+      - run: npm run typecheck
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
       - run: npm test
       - run: npm run test:coverage
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
           name: coverage-report
           path: coverage/
-      - run: npx playwright install --with-deps
-      - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
           retention-days: 30
+
+  build:
+    name: Build & bundle size
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('**/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-next-${{ hashFiles('**/package-lock.json') }}-
+      - run: npm ci
       - run: npm run build
       - run: node scripts/check-bundle-size.mjs
       - name: Build with bundle analysis
@@ -65,6 +93,76 @@ jobs:
           name: bundle-analysis-report
           path: .next-analyze/
           retention-days: 30
+
+  e2e:
+    name: E2E (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    needs: [build]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: ${{ github.event_name == 'pull_request' && fromJSON('["chromium"]') || fromJSON('["chromium","firefox","webkit"]') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Run Playwright tests
+        run: npx playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          PLAYWRIGHT_RETRIES: '2'
+      - name: Report flaky tests
+        if: always()
+        run: |
+          if [ -f playwright-report/flaky.json ]; then
+            echo '### Flaky tests' >> $GITHUB_STEP_SUMMARY
+            cat playwright-report/flaky.json >> $GITHUB_STEP_SUMMARY
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+
+  storybook-visual:
+    name: Storybook visual tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - name: Build Storybook
         run: npm run build:storybook
       - name: Run visual regression tests
@@ -75,3 +173,52 @@ jobs:
           name: visual-regression-report
           path: blob-report/
           retention-days: 30
+
+  security:
+    name: Security & supply chain
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - name: Check dependencies for supply-chain security (Issue #311)
+        run: node scripts/check-dependencies.mjs
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          GITHUB_ACTOR: ${{ github.actor }}
+      - name: Lint lockfile
+        run: npm ls --all > /dev/null
+      - name: Generate SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 30
+
+  ci-success:
+    name: ci-success
+    if: always()
+    needs: [static, unit, build, e2e, storybook-visual, security]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all required jobs succeeded
+        run: |
+          echo "static=${{ needs.static.result }}"
+          echo "unit=${{ needs.unit.result }}"
+          echo "build=${{ needs.build.result }}"
+          echo "e2e=${{ needs.e2e.result }}"
+          echo "storybook-visual=${{ needs.storybook-visual.result }}"
+          echo "security=${{ needs.security.result }}"
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo 'One or more required jobs failed.'
+            exit 1
+          fi
