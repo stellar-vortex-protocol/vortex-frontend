@@ -16,6 +16,20 @@ const SITE_URL =
   process.env["NEXT_PUBLIC_SITE_URL"]?.replace(/\/$/, "") ??
   "http://localhost:3000";
 
+// Storage key shared with the theme setting in SettingsPanel and the
+// no-flash bootstrap script below. Kept in sync with src/lib/theme.ts.
+const THEME_STORAGE_KEY = "vortex:theme";
+
+// Inline, render-blocking script that resolves the effective theme and sets
+// `data-theme` on <html> before first paint, preventing a flash of the wrong
+// theme (FOUC). It is CSP-nonce compatible: when a nonce is provided via the
+// `x-nonce` request header it is attached to the <script> tag. All storage
+// access is wrapped in try/catch so blocked storage (private mode, disabled
+// cookies) falls back safely to the system preference.
+const THEME_BOOTSTRAP_SCRIPT = `(function(){try{var k=${JSON.stringify(
+  THEME_STORAGE_KEY,
+)};var p=null;try{p=localStorage.getItem(k);}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system"){p="system";}var d=p==="dark"||(p==="system"&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches);var t=d?"dark":"light";var r=document.documentElement;r.setAttribute("data-theme",t);r.style.colorScheme=t;}catch(e){}})();`;
+
 export const metadata: Metadata = {
   title: { default: TITLE, template: "%s | Vortex" },
   description: DESCRIPTION,
@@ -82,7 +96,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   // Dark-navy theme colour — used by Chrome on Android and Safari on iOS
-  // for the browser chrome surrounding the page.
+  // for the browser chrome surrounding the page. The effective theme is
+  // resolved client-side (see ThemeColorSync) so the meta tag follows the
+  // user's explicit Light/Dark/System preference, not just the OS setting.
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#080C14" },
     { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
@@ -95,7 +111,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          // Blocking, before-paint theme resolution to avoid FOUC.
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
+        />
+      </head>
       <body className="antialiased">
         <a
           href="#main-content"

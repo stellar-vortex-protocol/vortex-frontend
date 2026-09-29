@@ -23,8 +23,18 @@
    * below flip every variable to its light counterpart.  Because Tailwind
    * resolves all vx-* color tokens to var(--vx-*), every component in the
    * tree automatically adapts without any className changes.
+   *
+   * The effective theme is driven by the `data-theme` attribute on <html>,
+   * which is set before paint by the inline blocking script in layout.tsx
+   * (see src/lib/theme.ts).  `data-theme="light"` selects the light palette;
+   * `data-theme="dark"` (or no attribute) selects the dark palette.  The
+   * light palette is defined exactly once below — it is NOT duplicated inside
+   * a prefers-color-scheme media query, so a user override always wins.
    */
-  :root {
+  :root,
+  html[data-theme="dark"] {
+    color-scheme: dark;
+
     /* Surfaces */
     --vx-ink:     #080C14;
     --vx-base:    #0C1120;
@@ -76,50 +86,54 @@
    * All surfaces invert: ink → near-white, card → white, surface → light grey.
    * Text colour inverts similarly.  The sage/lavender hues stay saturated but
    * their backgrounds and dims shift so they read well on white.
+   *
+   * Selected only when the user (or the pre-paint script) sets
+   * data-theme="light" on <html>.  Defined once here — never inside a
+   * prefers-color-scheme media query — so an explicit user choice is honoured.
    */
-  @media (prefers-color-scheme: light) {
-    :root {
-      /* Surfaces */
-      --vx-ink:     #FFFFFF;
-      --vx-base:    #F5F7FA;
-      --vx-surface: #EFF1F5;
-      --vx-card:    #FFFFFF;
-      --vx-border:  rgba(0, 0, 0, 0.08);
-      --vx-line:    rgba(0, 0, 0, 0.05);
+  html[data-theme="light"] {
+    color-scheme: light;
 
-      /* Primary: sage green (slightly deeper for contrast on white) */
-      --vx-sage:     #0FA871;
-      --vx-sage-dim: #0A6849;
-      --vx-sage-bg:  rgba(15, 168, 113, 0.08);
+    /* Surfaces */
+    --vx-ink:     #FFFFFF;
+    --vx-base:    #F5F7FA;
+    --vx-surface: #EFF1F5;
+    --vx-card:    #FFFFFF;
+    --vx-border:  rgba(0, 0, 0, 0.08);
+    --vx-line:    rgba(0, 0, 0, 0.05);
 
-      /* Accent: lavender */
-      --vx-lav:     #7C3AED;
-      --vx-lav-dim: #4C1D95;
-      --vx-lav-bg:  rgba(124, 58, 237, 0.08);
+    /* Primary: sage green (slightly deeper for contrast on white) */
+    --vx-sage:     #0FA871;
+    --vx-sage-dim: #0A6849;
+    --vx-sage-bg:  rgba(15, 168, 113, 0.08);
 
-      /* State */
-      --vx-amber: #D97706;
-      --vx-rose:  #DC2626;
+    /* Accent: lavender */
+    --vx-lav:     #7C3AED;
+    --vx-lav-dim: #4C1D95;
+    --vx-lav-bg:  rgba(124, 58, 237, 0.08);
 
-      /* Text */
-      --vx-text:  #0F172A;
-      --vx-muted: #64748B;
-      --vx-dim:   #CBD5E1;
+    /* State */
+    --vx-amber: #D97706;
+    --vx-rose:  #DC2626;
 
-      /* Body background */
-      --vx-body-bg:      #F5F7FA;
-      --vx-body-radial1: rgba(15, 168, 113, 0.04);
-      --vx-body-radial2: rgba(124, 58, 237, 0.03);
+    /* Text */
+    --vx-text:  #0F172A;
+    --vx-muted: #64748B;
+    --vx-dim:   #CBD5E1;
 
-      /* Scrollbar */
-      --vx-scrollbar-thumb: rgba(0, 0, 0, 0.12);
+    /* Body background */
+    --vx-body-bg:      #F5F7FA;
+    --vx-body-radial1: rgba(15, 168, 113, 0.04);
+    --vx-body-radial2: rgba(124, 58, 237, 0.03);
 
-      /* Selection */
-      --vx-selection-bg: rgba(15, 168, 113, 0.2);
+    /* Scrollbar */
+    --vx-scrollbar-thumb: rgba(0, 0, 0, 0.12);
 
-      /* Focus ring */
-      --vx-focus-ring: rgba(15, 168, 113, 0.5);
-    }
+    /* Selection */
+    --vx-selection-bg: rgba(15, 168, 113, 0.2);
+
+    /* Focus ring */
+    --vx-focus-ring: rgba(15, 168, 113, 0.5);
   }
 
   /* ── Body ────────────────────────────────────────────────────────────────── */
@@ -278,90 +292,49 @@ html[data-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
-html[data-motion="allow"] *,
-html[data-motion="allow"] *::before,
-html[data-motion="allow"] *::after {
-  scroll-behavior: smooth;
-}
-
-/* ── Forced colors (Windows High Contrast) ───────────────────────────────── */
+/* ── Print: force the light palette ──────────────────────────────────────── */
 /*
- * In forced-colors mode the OS overrides author colours, so gradients and
- * colour-only status cues vanish.  We restore visible borders, system-colour
- * focus outlines and keep SVG charts legible via currentColor.
+ * Printing on a dark palette wastes ink and is often unreadable.  When the
+ * user prints, force the light token values regardless of the active theme.
  */
-@media (forced-colors: active) {
-  .card,
-  .card-sm,
-  .token-btn,
-  .input-swap,
-  .chip,
-  .chain-badge,
-  .stellar-badge {
-    border: 1px solid CanvasText;
+@media print {
+  :root,
+  html[data-theme="dark"],
+  html[data-theme="light"] {
+    color-scheme: light;
+
+    --vx-ink:     #FFFFFF;
+    --vx-base:    #FFFFFF;
+    --vx-surface: #FFFFFF;
+    --vx-card:    #FFFFFF;
+    --vx-border:  rgba(0, 0, 0, 0.15);
+    --vx-line:    rgba(0, 0, 0, 0.1);
+
+    --vx-sage:     #0A6849;
+    --vx-sage-dim: #0A6849;
+    --vx-sage-bg:  rgba(15, 168, 113, 0.08);
+
+    --vx-lav:     #4C1D95;
+    --vx-lav-dim: #4C1D95;
+    --vx-lav-bg:  rgba(124, 58, 237, 0.08);
+
+    --vx-amber: #92400E;
+    --vx-rose:  #991B1B;
+
+    --vx-text:  #000000;
+    --vx-muted: #374151;
+    --vx-dim:   #9CA3AF;
+
+    --vx-body-bg:      #FFFFFF;
+    --vx-body-radial1: transparent;
+    --vx-body-radial2: transparent;
+
+    --vx-scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --vx-selection-bg:    rgba(15, 168, 113, 0.2);
+    --vx-focus-ring:      rgba(15, 168, 113, 0.5);
+  }
+
+  body {
     background-image: none;
-  }
-
-  .btn-swap {
-    background: ButtonFace;
-    color: ButtonText;
-    border: 1px solid ButtonText;
-  }
-
-  .btn-swap:disabled {
-    color: GrayText;
-    border-color: GrayText;
-  }
-
-  :focus-visible {
-    outline: 2px solid Highlight;
-    outline-offset: 2px;
-  }
-
-  /* Status badges keep an icon/text cue instead of relying on colour alone */
-  .state-dot {
-    background: CanvasText;
-    forced-color-adjust: none;
-  }
-
-  /* SVG charts follow system colours */
-  svg {
-    color: CanvasText;
-  }
-
-  .intent-flow-line {
-    stroke: CanvasText;
-  }
-}
-
-/* ── High contrast (prefers-contrast: more) ──────────────────────────────── */
-/*
- * Raises text and border contrast.  Documented ratios (WCAG 1.4.6 AAA):
- *   dark  text #FFFFFF on #080C14 → ~19.6:1
- *   light text #000000 on #FFFFFF → ~21:1
- *   borders use the full-strength text colour for a clear 3:1+ edge.
- */
-@media (prefers-contrast: more) {
-  :root {
-    --vx-text:   #FFFFFF;
-    --vx-muted:  #C7D2E0;
-    --vx-border: rgba(255, 255, 255, 0.4);
-    --vx-line:   rgba(255, 255, 255, 0.25);
-  }
-
-  @media (prefers-color-scheme: light) {
-    :root {
-      --vx-text:   #000000;
-      --vx-muted:  #1F2937;
-      --vx-border: rgba(0, 0, 0, 0.5);
-      --vx-line:   rgba(0, 0, 0, 0.3);
-    }
-  }
-}
-
-/* Safe-area padding for notched/dynamic-island iOS devices */
-@layer utilities {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }

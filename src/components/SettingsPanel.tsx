@@ -6,6 +6,7 @@ import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
 
 type MotionPreference = "system" | "reduce" | "allow";
+type ThemePreference = "system" | "light" | "dark";
 
 const LOCALE_LABELS: Record<Locale, string> = {
   en: "English",
@@ -13,15 +14,49 @@ const LOCALE_LABELS: Record<Locale, string> = {
 };
 
 const STORAGE_KEY = "vortex-motion-preference";
+const THEME_STORAGE_KEY = "vortex-theme-preference";
+
+const THEME_COLORS: Record<"light" | "dark", string> = {
+  light: "#f8fafc",
+  dark: "#0b1120",
+};
 
 function applyMotionPreference(preference: MotionPreference) {
   document.documentElement.dataset["motion"] = preference;
+}
+
+function systemPrefersDark(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+}
+
+function resolveTheme(
+  preference: ThemePreference,
+  prefersDark: boolean
+): "light" | "dark" {
+  if (preference === "system") return prefersDark ? "dark" : "light";
+  return preference;
+}
+
+function applyTheme(theme: "light" | "dark") {
+  const root = document.documentElement;
+  root.dataset["theme"] = theme;
+  root.style.colorScheme = theme;
+  const meta = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]'
+  );
+  if (meta) meta.content = THEME_COLORS[theme];
 }
 
 export function SettingsPanel() {
   const [open, setOpen] = useState(false);
   const [motionPreference, setMotionPreference] =
     useState<MotionPreference>("system");
+  const [themePreference, setThemePreference] =
+    useState<ThemePreference>("system");
   const locale = useLocale();
   const setLocale = useSetLocale();
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -39,6 +74,30 @@ export function SettingsPanel() {
     setMotionPreference(preference);
     applyMotionPreference(preference);
   }, []);
+
+  // Sync theme preference from storage and apply the effective theme.
+  useEffect(() => {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    const preference: ThemePreference =
+      stored === "light" || stored === "dark" ? stored : "system";
+    setThemePreference(preference);
+    applyTheme(resolveTheme(preference, systemPrefersDark()));
+  }, []);
+
+  // Follow OS theme changes while the preference is "system".
+  useEffect(() => {
+    if (themePreference !== "system") return;
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyTheme(resolveTheme("system", media.matches));
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", handleChange);
+      return () => media.removeEventListener("change", handleChange);
+    }
+    // Safari < 16 fallback.
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, [themePreference]);
 
   // Move focus into the panel when it opens.
   useEffect(() => {
@@ -87,6 +146,16 @@ export function SettingsPanel() {
     }
   };
 
+  const handleThemeChange = (preference: ThemePreference) => {
+    setThemePreference(preference);
+    applyTheme(resolveTheme(preference, systemPrefersDark()));
+    if (preference === "system") {
+      localStorage.removeItem(THEME_STORAGE_KEY);
+    } else {
+      localStorage.setItem(THEME_STORAGE_KEY, preference);
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -132,6 +201,34 @@ export function SettingsPanel() {
                     {LOCALE_LABELS[loc]}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="theme-preference"
+                className="block text-xs font-medium text-vx-muted"
+              >
+                Theme
+              </label>
+              <select
+                id="theme-preference"
+                value={themePreference}
+                onChange={(e) =>
+                  handleThemeChange(e.target.value as ThemePreference)
+                }
+                aria-label="Theme preference"
+                className="mt-1 w-full bg-vx-surface border border-vx-border rounded-md px-2 py-1 text-sm text-vx-text"
+              >
+                <option value="system" className="bg-vx-ink text-vx-text">
+                  Use system setting
+                </option>
+                <option value="light" className="bg-vx-ink text-vx-text">
+                  Light
+                </option>
+                <option value="dark" className="bg-vx-ink text-vx-text">
+                  Dark
+                </option>
               </select>
             </div>
 
