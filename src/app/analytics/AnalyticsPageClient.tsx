@@ -1,11 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Footer } from "@/components/Footer";
 import { Nav } from "@/components/Nav";
 import { useLiveIntents } from "@/hooks/useLiveIntents";
-import { computeAnalytics, getStatusDistributionEntries } from "@/lib/analytics";
+import {
+  computeAnalytics,
+  getStatusDistributionEntries,
+  computeShareSeries,
+  computeConcentration,
+  computeTopMovers,
+  type ShareDimension,
+  type ShareSeriesPoint,
+  type TopMover,
+  type ConcentrationResult,
+} from "@/lib/analytics";
 import { CHAINS } from "@/lib/marketData";
+import { Tooltip } from "@/components/Tooltip";
 
 const formatUsd = (value: number) => new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -106,11 +117,244 @@ function StatusBreakdown({ counts }: { counts: ReturnType<typeof getStatusDistri
   );
 }
 
+// ─── Issue #468 components ────────────────────────────────────────────────────
+
+/**
+ * Stacked area chart for market-share trends.
+ * Supports a "100% normalised" toggle.
+ */
+function StackedAreaChart({
+  seriesData,
+  entities,
+  colors,
+  normalized,
+}: {
+  seriesData: ShareSeriesPoint[];
+  entities: string[];
+  colors: Record<string, string>;
+  normalized: boolean;
+}) {
+  const width = 640;
+  const height = 200;
+  const padX = 24;
+  const padY = 16;
+
+  if (seriesData.length === 0 || entities.length === 0) {
+    return <div className="text-sm text-vx-muted">No share data for this window.</div>;
+  }
+
+  // Build stacked paths: for each entity, compute cumulative baseline
+  const stackedPaths: { entity: string; color: string; path: string }[] = [];
+
+  const n = seriesData.length;
+
+  // For each point, compute the stack
+  const stackTops = seriesData.map((point) => {
+    let cumulative = 0;
+    return entities.map((entity) => {
+      const value = normalized
+        ? (point.shares[entity] ?? 0)
+        : (point.volumes[entity] ?? 0);
+      cumulative += value;
+      return cumulative;
+    });
+  });
+
+  // Max value for scaling
+  const maxValue = Math.max(...stackTops.map((tops) => tops[tops.length - 1] ?? 0), 1);
+
+  const xCoord = (i: number) =>
+    padX + (i / Math.max(n - 1, 1)) * (width - padX * 2);
+
+  const yCoord = (value: number) =>
+    height - padY - (value / maxValue) * (height - padY * 2);
+
+  entities.forEach((entity, entityIdx) => {
+    const topLine = seriesData.map((_, i) => {
+      const top = stackTops[i]?.[entityIdx] ?? 0;
+      return { x: xCoord(i), y: yCoord(top) };
+    });
+
+    const baseLine =
+      entityIdx === 0
+        ? seriesData.map((_, i) => ({ x: xCoord(i), y: yCoord(0) }))
+        : seriesData.map((_, i) => {
+            const base = stackTops[i]?.[entityIdx - 1] ?? 0;
+            return { x: xCoord(i), y: yCoord(base) };
+          });
+
+    const pathD = [
+      `M ${topLine[0]!.x} ${topLine[0]!.y}`,
+      ...topLine.slice(1).map((p) => `L ${p.x} ${p.y}`),
+      ...baseLine.slice().reverse().map((p) => `L ${p.x} ${p.y}`),
+      "Z",
+    ].join(" ");
+
+    stackedPaths.push({ entity, color: colors[entity] ?? "#4CEBA8", path: pathD });
+  });
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-52 w-full"
+        role="img"
+        aria-label="Stacked area market share chart"
+      >
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
+          const y = padY + frac * (height - padY * 2);
+          return (
+            <line
+              key={frac}
+              x1={padX}
+              x2={width - padX}
+              y1={y}
+              y2={y}
+              stroke="rgba(255,255,255,0.06)"
+              strokeWidth="1"
+            />
+          );
+        })}
+
+        {/* Stacked areas (render bottom-to-top) */}
+        {[...stackedPaths].reverse().map(({ entity, color, path }) => (
+          <path
+            key={entity}
+            d={path}
+            fill={color}
+            fillOpacity={0.75}
+            stroke={color}
+            strokeWidth={0.5}
+          />
+        ))}
+      </svg>
+
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap gap-3">
+        {entities.map((entity) => (
+          <div key={entity} className="flex items-center gap-1.5 text-[10px] text-vx-muted">
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-sm inline-block"
+              style={{ background: colors[entity] ?? "#4CEBA8" }}
+            />
+            {entity}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Top movers panel: entities ranked by largest share delta. */
+function TopMoversPanel({ movers }: { movers: TopMover[] }) {
+  if (movers.length === 0) {
+    return <div className="text-sm text-vx-muted">Not enough data to calculate movers.</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {movers.map((mover) => (
+        <div
+          key={mover.label}
+          className="flex items-center justify-between gap-3 text-xs"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 rounded-full flex-shrink-0"
+              style={{ background: mover.color }}
+            />
+            <span className="truncate text-vx-text">{mover.label}</span>
+          </div>
+          <div className="flex items-center gap-2 text-right flex-shrink-0">
+            <span className="text-vx-muted num">{mover.currentSharePct}%</span>
+            <span
+              className={`font-semibold num ${
+                mover.deltaSharePct > 0
+                  ? "text-vx-sage"
+                  : mover.deltaSharePct < 0
+                  ? "text-red-400"
+                  : "text-vx-muted"
+              }`}
+              aria-label={`${mover.deltaSharePct >= 0 ? "Gained" : "Lost"} ${Math.abs(mover.deltaSharePct)} percentage points`}
+            >
+              {mover.deltaSharePct > 0 ? "▲" : mover.deltaSharePct < 0 ? "▼" : "—"}{" "}
+              {Math.abs(mover.deltaSharePct)}pp
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Concentration indicator showing HHI and top-1/top-3 shares. */
+function ConcentrationIndicator({ result }: { result: ConcentrationResult }) {
+  const levelLabel = {
+    competitive: "Competitive",
+    moderate: "Moderately concentrated",
+    concentrated: "Highly concentrated",
+  }[result.level];
+
+  const levelColor = {
+    competitive: "text-vx-sage",
+    moderate: "text-yellow-400",
+    concentrated: "text-red-400",
+  }[result.level];
+
+  const hhiExplanation =
+    "The Herfindahl–Hirschman Index (HHI) measures market concentration. " +
+    "It is calculated as the sum of squared market-share percentages. " +
+    "HHI < 1,500 = competitive; 1,500–2,500 = moderate; > 2,500 = concentrated (max 10,000 = monopoly). " +
+    "High solver concentration is a decentralisation risk signal.";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className={`text-sm font-semibold ${levelColor}`}>{levelLabel}</span>
+        <Tooltip content={hhiExplanation}>
+          <span className="text-xs text-vx-muted border border-vx-border rounded px-2 py-0.5 cursor-help">
+            HHI: {result.hhi.toLocaleString()}
+          </span>
+        </Tooltip>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="bg-vx-surface/40 rounded-lg border border-vx-border p-3">
+          <div className="text-vx-muted mb-0.5">Top-1 share</div>
+          <div className="text-base font-bold text-vx-text num">{result.top1SharePct}%</div>
+        </div>
+        <div className="bg-vx-surface/40 rounded-lg border border-vx-border p-3">
+          <div className="text-vx-muted mb-0.5">Top-3 share</div>
+          <div className="text-base font-bold text-vx-text num">{result.top3SharePct}%</div>
+        </div>
+      </div>
+
+      {/* Top entities mini-list */}
+      <div className="space-y-2">
+        {result.entities.slice(0, 5).map((e) => (
+          <div key={e.label} className="flex items-center justify-between text-xs text-vx-muted">
+            <span className="truncate">{e.label}</span>
+            <span className="num font-semibold text-vx-text">{Math.round(e.sharePct * 10) / 10}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalyticsPageClient() {
   const { intents, isLoading, error } = useLiveIntents();
+  const [dimension, setDimension] = useState<ShareDimension>("srcChain");
+  const [normalized, setNormalized] = useState(false);
 
   const analytics = useMemo(() => computeAnalytics(intents), [intents]);
   const statusEntries = useMemo(() => getStatusDistributionEntries(analytics.statusCounts), [analytics.statusCounts]);
+  const shareSeries = useMemo(() => computeShareSeries(intents, dimension), [intents, dimension]);
+  const concentration = useMemo(() => computeConcentration(intents, "solver"), [intents]);
+  const topMovers = useMemo(() => computeTopMovers(intents, dimension), [intents, dimension]);
 
   if (isLoading && intents.length === 0) {
     return (
@@ -260,6 +504,72 @@ export default function AnalyticsPageClient() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* ── Issue #468: Market-share trends ────────────────────────────── */}
+        <div className="mt-8 card p-5">
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="eyebrow">Market share trends</div>
+              <h2 className="mt-2 text-lg font-semibold text-vx-text">Share over time</h2>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Dimension selector */}
+              {(["srcChain", "dstToken", "solver"] as ShareDimension[]).map((dim) => (
+                <button
+                  key={dim}
+                  type="button"
+                  onClick={() => setDimension(dim)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    dimension === dim
+                      ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
+                      : "bg-vx-surface/50 text-vx-muted border border-vx-border hover:text-vx-text"
+                  }`}
+                  aria-pressed={dimension === dim}
+                >
+                  {dim === "srcChain" ? "Source Chain" : dim === "dstToken" ? "Dest Token" : "Solver"}
+                </button>
+              ))}
+              {/* Normalise toggle */}
+              <button
+                type="button"
+                onClick={() => setNormalized((v) => !v)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                  normalized
+                    ? "bg-vx-sage-bg text-vx-sage border-vx-sage/30"
+                    : "bg-vx-surface/50 text-vx-muted border-vx-border hover:text-vx-text"
+                }`}
+                aria-pressed={normalized}
+              >
+                100% normalised
+              </button>
+            </div>
+          </div>
+          <StackedAreaChart
+            seriesData={shareSeries.series}
+            entities={shareSeries.entities}
+            colors={shareSeries.colors}
+            normalized={normalized}
+          />
+        </div>
+
+        {/* ── Issue #468: Top movers + Concentration ──────────────────────── */}
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <div className="card p-5">
+            <div className="eyebrow">Top movers (7d vs previous 7d)</div>
+            <h2 className="mt-2 text-lg font-semibold text-vx-text">Largest share shifts</h2>
+            <div className="mt-4">
+              <TopMoversPanel movers={topMovers} />
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <div className="eyebrow">Solver concentration</div>
+            <h2 className="mt-2 text-lg font-semibold text-vx-text">HHI & top-1/top-3 share</h2>
+            <div className="mt-4">
+              <ConcentrationIndicator result={concentration} />
+            </div>
           </div>
         </div>
       </main>

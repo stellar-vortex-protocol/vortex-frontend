@@ -81,3 +81,38 @@ export function sanitizeDisplayText(value: string): string {
 export function containsDangerousUnicode(value: string): boolean {
   return BIDI_CONTROLS_RE.test(value) || ZERO_WIDTH_INVIS_RE.test(value);
 }
+
+/**
+ * Sanitise free-text user input (solver names, governance comment text) by
+ * stripping dangerous Unicode characters and trimming leading/trailing
+ * whitespace.  A superset of `sanitizeDisplayText` — safe to use for
+ * text that will be stored or transmitted as well as displayed.
+ */
+export function sanitizeText(value: string): string {
+  return sanitizeDisplayText(value.trim());
+}
+
+export type CommentValidationResult =
+  | { valid: true }
+  | { valid: false; error: string };
+
+/**
+ * Validate governance comment text before posting.
+ * Returns a discriminated union so callers can surface the exact error.
+ */
+export function validateCommentText(
+  text: string,
+  maxLength: number
+): CommentValidationResult {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return { valid: false, error: "Comment cannot be empty." };
+  }
+  if (trimmed.length > maxLength) {
+    return {
+      valid: false,
+      error: `Comment must be ${maxLength} characters or fewer (currently ${trimmed.length}).`,
+    };
+  }
+  return { valid: true };
+}

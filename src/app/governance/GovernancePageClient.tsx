@@ -1,20 +1,24 @@
 "use client";
 
+/**
+ * Governance proposals list page — issue #469.
+ * Migrated from direct governanceStore imports to SWR-backed hooks.
+ */
+
 import { useState } from "react";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
-import { getGovernanceProposals } from "@/lib/governanceStore";
+import { useProposals } from "@/hooks/useGovernance";
+import type { ProposalFilters } from "@/lib/governanceApi";
 import { timeRemaining } from "@/lib/time";
 import { getMessage } from "@/i18n/messages";
 
 export default function GovernancePageClient() {
-  const proposals = getGovernanceProposals();
-  const [filter, setFilter] = useState<"all" | "active" | "passed" | "rejected">("all");
+  const [filter, setFilter] = useState<ProposalFilters["status"]>("all");
 
-  const filteredProposals = proposals.filter((p) => {
-    if (filter === "all") return true;
-    return p.status === filter;
-  });
+  const { proposals, isLoading, error } = useProposals(
+    filter === "all" ? undefined : { status: filter }
+  );
 
   return (
     <div className="min-h-screen">
@@ -49,69 +53,98 @@ export default function GovernancePageClient() {
           ))}
         </div>
 
-        {/* Proposal list */}
-        <div className="space-y-4">
-          {filteredProposals.map((proposal) => (
-            <div
-              key={proposal.id}
-              className="card p-5 sm:p-6 hover:border-vx-sage/40 transition-colors"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-vx-sage font-bold">{proposal.id}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-vx-surface text-vx-muted border border-vx-border">
-                    {proposal.category}
-                  </span>
-                </div>
-                <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium w-fit ${
-                    proposal.status === "active"
-                      ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
-                      : proposal.status === "passed"
-                      ? "bg-blue-500/10 text-blue-400 border border-blue-500/30"
-                      : "bg-red-500/10 text-red-400 border border-red-500/30"
-                  }`}
-                >
-                  {proposal.status}
-                </span>
+        {/* Loading skeleton */}
+        {isLoading && proposals.length === 0 && (
+          <div className="space-y-4" aria-busy="true" aria-label="Loading proposals…">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="card p-5 sm:p-6 space-y-3 animate-pulse">
+                <div className="h-4 w-48 rounded bg-vx-surface/60" />
+                <div className="h-5 w-3/4 rounded bg-vx-surface/50" />
+                <div className="h-4 w-full rounded bg-vx-surface/40" />
               </div>
+            ))}
+          </div>
+        )}
 
-              <h2 className="text-base sm:text-lg font-bold text-vx-text mb-2">
-                <Link
-                  href={`/governance/${proposal.id}`}
-                  className="hover:text-vx-sage transition-colors"
-                >
-                  {proposal.title}
-                </Link>
-              </h2>
+        {/* Error state */}
+        {error && !isLoading && (
+          <div role="alert" className="card p-6 text-sm text-vx-muted">
+            Unable to load proposals: {error.message}
+          </div>
+        )}
 
-              <p className="text-xs sm:text-sm text-vx-muted mb-4 line-clamp-2 leading-relaxed">
-                {proposal.description}
-              </p>
+        {/* Empty state */}
+        {!isLoading && !error && proposals.length === 0 && (
+          <div className="card p-6 text-sm text-vx-muted text-center">
+            No proposals match the selected filter.
+          </div>
+        )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-vx-line text-xs text-vx-muted">
-                <div className="flex gap-4">
-                  <span>
-                    For: <strong className="text-vx-text">{proposal.votesFor.toLocaleString()}</strong>
-                  </span>
-                  <span>
-                    Against: <strong className="text-vx-text">{proposal.votesAgainst.toLocaleString()}</strong>
+        {/* Proposal list */}
+        {proposals.length > 0 && (
+          <div className="space-y-4">
+            {proposals.map((proposal) => (
+              <div
+                key={proposal.id}
+                className="card p-5 sm:p-6 hover:border-vx-sage/40 transition-colors"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-vx-sage font-bold">{proposal.id}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-vx-surface text-vx-muted border border-vx-border">
+                      {proposal.category}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs px-2.5 py-0.5 rounded-full font-medium w-fit ${
+                      proposal.status === "active"
+                        ? "bg-vx-sage-bg text-vx-sage border border-vx-sage/30"
+                        : proposal.status === "passed"
+                        ? "bg-blue-500/10 text-blue-400 border border-blue-500/30"
+                        : "bg-red-500/10 text-red-400 border border-red-500/30"
+                    }`}
+                  >
+                    {proposal.status}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <span>Deadline: {timeRemaining(proposal.deadline)}</span>
+                <h2 className="text-base sm:text-lg font-bold text-vx-text mb-2">
                   <Link
                     href={`/governance/${proposal.id}`}
-                    className="text-vx-sage hover:underline font-semibold"
+                    className="hover:text-vx-sage transition-colors"
                   >
-                    View Proposal & Discussion →
+                    {proposal.title}
                   </Link>
+                </h2>
+
+                <p className="text-xs sm:text-sm text-vx-muted mb-4 line-clamp-2 leading-relaxed">
+                  {proposal.description}
+                </p>
+
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-vx-line text-xs text-vx-muted">
+                  <div className="flex gap-4">
+                    <span>
+                      For: <strong className="text-vx-text">{proposal.votesFor.toLocaleString()}</strong>
+                    </span>
+                    <span>
+                      Against: <strong className="text-vx-text">{proposal.votesAgainst.toLocaleString()}</strong>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <span>Deadline: {timeRemaining(proposal.deadline)}</span>
+                    <Link
+                      href={`/governance/${proposal.id}`}
+                      className="text-vx-sage hover:underline font-semibold"
+                    >
+                      View Proposal & Discussion →
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
