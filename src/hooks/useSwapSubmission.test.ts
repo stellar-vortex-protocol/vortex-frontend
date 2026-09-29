@@ -8,6 +8,7 @@ const {
   addToastMock,
   decodeXdrMock,
   validateSwapXdrMock,
+  assertWalletReadyMock,
 } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   createIntentMock: vi.fn(),
@@ -15,6 +16,7 @@ const {
   addToastMock: vi.fn(),
   decodeXdrMock: vi.fn(),
   validateSwapXdrMock: vi.fn(),
+  assertWalletReadyMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -36,6 +38,16 @@ vi.mock("@/lib/xdrReview", () => ({
 
 vi.mock("@/store/toast", () => ({
   useToastStore: { getState: () => ({ addToast: addToastMock }) },
+}));
+
+vi.mock("@/lib/wallet/assertWalletReady", () => ({
+  assertWalletReady: assertWalletReadyMock,
+  UntrustedOriginError: class UntrustedOriginError extends Error {
+    constructor(hostname: string) {
+      super(`Signing is not allowed on untrusted origin "${hostname}".`);
+      this.name = "UntrustedOriginError";
+    }
+  },
 }));
 
 // Mock xdrReview so unit tests don't need real Stellar SDK XDR fixtures.
@@ -272,6 +284,29 @@ describe("useSwapSubmission", () => {
 
     expect(result.current.status).toBe("idle");
     expect(result.current.intentId).toBeNull();
+  });
+
+  it("blocks signing and surfaces an error when the origin is untrusted", async () => {
+    const { UntrustedOriginError } = await import("@/lib/wallet/assertWalletReady");
+    useWalletStore.setState({ isConnected: true, address: "GXYZ999", network: "TESTNET" });
+    createIntentMock.mockResolvedValue({ intentId: "intent-ut", unsignedXdr: "unsigned-xdr" });
+    assertWalletReadyMock.mockRejectedValue(
+      new UntrustedOriginError("evil-vortex.app"),
+    );
+
+    const { result } = renderHook(() => useSwapSubmission());
+    await act(async () => {
+      await result.current.submit(params);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/untrusted origin/i);
+    expect(signTransactionMock).not.toHaveBeenCalled();
+    expect(submitIntentMock).not.toHaveBeenCalled();
+    expect(addToastMock).toHaveBeenCalledWith(
+      expect.stringMatching(/untrusted origin/i),
+      "error",
+    );
   });
 
   // Issue #308: XDR structural integrity verification

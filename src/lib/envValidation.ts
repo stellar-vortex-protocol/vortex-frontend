@@ -79,6 +79,37 @@ export function enforcePublicEnvValidation(env: NodeJS.ProcessEnv): void {
 }
 
 /**
+ * Validate NEXT_PUBLIC_TRUSTED_ORIGINS format.
+ * Returns an array of errors for invalid entries.
+ */
+export function validateTrustedOrigins(env: NodeJS.ProcessEnv): EnvValidationError[] {
+  const value = env.NEXT_PUBLIC_TRUSTED_ORIGINS;
+  if (!value) return [];
+
+  const errors: EnvValidationError[] = [];
+  const entries = value.split(",").map(s => s.trim()).filter(Boolean);
+
+  for (const entry of entries) {
+    if (entry.includes(" ")) {
+      errors.push({
+        variable: "NEXT_PUBLIC_TRUSTED_ORIGINS",
+        pattern: /\s/,
+        message: `Trusted origin entry "${entry}" contains whitespace. Use comma-separated values without spaces.`,
+      });
+    }
+    if (entry.includes("*") && !entry.startsWith("*.")) {
+      errors.push({
+        variable: "NEXT_PUBLIC_TRUSTED_ORIGINS",
+        pattern: /\*/g,
+        message: `Wildcard "${entry}" must start with "*.", e.g. "*.vercel.app".`,
+      });
+    }
+  }
+
+  return errors;
+}
+
+/**
  * Get a list of all NEXT_PUBLIC_* variables for audit purposes.
  */
 export function getPublicEnvVariables(env: NodeJS.ProcessEnv): string[] {

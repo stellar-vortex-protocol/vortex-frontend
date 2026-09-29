@@ -10,6 +10,7 @@ const {
   apiErrorMock,
   decodeXdrMock,
   validateRegistrationXdrMock,
+  assertWalletReadyMock,
 } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   registerSolverMock: vi.fn(),
@@ -27,6 +28,7 @@ const {
   },
   decodeXdrMock: vi.fn(),
   validateRegistrationXdrMock: vi.fn(),
+  assertWalletReadyMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -61,6 +63,16 @@ vi.mock("@/lib/xdrReview", () => {
     XdrMismatchError,
   };
 });
+
+vi.mock("@/lib/wallet/assertWalletReady", () => ({
+  assertWalletReady: assertWalletReadyMock,
+  UntrustedOriginError: class UntrustedOriginError extends Error {
+    constructor(hostname: string) {
+      super(`Signing is not allowed on untrusted origin "${hostname}".`);
+      this.name = "UntrustedOriginError";
+    }
+  },
+}));
 
 import { useWalletStore } from "@/store/wallet";
 import { useSolverRegistration } from "./useSolverRegistration";

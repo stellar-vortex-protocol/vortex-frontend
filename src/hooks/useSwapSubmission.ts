@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { walletAdapter } from "@/lib/wallet";
+import { assertWalletReady } from "@/lib/wallet/assertWalletReady";
 import { createIntent, submitIntent } from "@/lib/api";
 import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
@@ -137,6 +138,10 @@ export function useSwapSubmission() {
       // ──────────────────────────────────────────────────────────────────────
 
       setStatus("awaiting-signature");
+
+      // Origin-trust guard: refuse to sign on untrusted origins.
+      assertWalletReady();
+
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });

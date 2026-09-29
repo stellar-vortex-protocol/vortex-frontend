@@ -151,4 +151,24 @@ export const es = {
   // solve/[address] — historial de llenados vacío
   "solverDetail.fillHistory.empty.title": "Sin llenados aún",
   "solverDetail.fillHistory.empty.message": "Una vez que este solver empiece a aceptar y llenar intenciones, su historial aparecerá aquí.",
+
+  // ── Origin trust / anti-phishing ──────────────────────────
+
+  "originTrust.banner.title": "Origen no confiable",
+  "originTrust.banner.description":
+    "Este sitio no está en la lista de orígenes confiables. La firma está desactivada para proteger sus fondos.",
+  "originTrust.banner.canonicalUrl": "Visite el sitio canónico: {url}",
+  "originTrust.banner.framed":
+    "Esta página se está cargando dentro de un marco. Verifique la URL en la barra de direcciones del navegador.",
+
+  "originTrust.review.hostname": "Nombre de host: {hostname}",
+  "originTrust.review.network": "Red: {network}",
+  "originTrust.review.untrustedWarning":
+    "Esta solicitud de firma se originó desde un origen no confiable. Cancelar y verificar la URL antes de continuar.",
+
+  "originTrust.error.untrusted":
+    "No se permite firmar en orígenes no confiables. Visite el sitio canónico para continuar.",
+
+  "originTrust.framing.breakout":
+    "Esta página se está cargando dentro de un marco. Esto podría ser un ataque: verifique la URL en la barra de direcciones del navegador.",
 } as const;

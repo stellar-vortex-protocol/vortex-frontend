@@ -193,4 +193,24 @@ export const en = {
   // solve/[address] — fill history empty
   "solverDetail.fillHistory.empty.title": "No fills yet",
   "solverDetail.fillHistory.empty.message": "Once this solver starts accepting and filling intents, their history will appear here.",
+
+  // ── Origin trust / anti-phishing ──────────────────────────────────
+
+  "originTrust.banner.title": "Untrusted origin",
+  "originTrust.banner.description":
+    "This site is not on the trusted origins list. Signing is disabled to protect your funds.",
+  "originTrust.banner.canonicalUrl": "Visit the canonical site: {url}",
+  "originTrust.banner.framed":
+    "This page is being loaded inside a frame. Verify the URL in your browser's address bar.",
+
+  "originTrust.review.hostname": "Hostname: {hostname}",
+  "originTrust.review.network": "Network: {network}",
+  "originTrust.review.untrustedWarning":
+    "This signing request was initiated from an untrusted origin. Cancel and verify the URL before proceeding.",
+
+  "originTrust.error.untrusted":
+    "Signing is not allowed on untrusted origins. Please visit the canonical site to continue.",
+
+  "originTrust.framing.breakout":
+    "This page is being loaded inside a frame. This may be an attack — verify the URL in your browser's address bar.",
 } as const;

@@ -59,6 +59,8 @@ const WS_ORIGIN = (() => {
  * 3. `frame-ancestors 'none'` (and X-Frame-Options: DENY)
  *    Prevents this app from being embedded in a hostile iframe — critical for
  *    a wallet-integrated dApp (clickjacking against Freighter sign flows).
+ *    The JS check `window.top !== window.self` in `useOriginTrust` provides
+ *    a secondary defence that shows a break-out notice to the user.
  *
  * 4. Freighter wallet communication happens via window.postMessage between
  *    the page and the browser extension — this is NOT a network request and
@@ -130,6 +132,7 @@ const nextConfig = {
     NEXT_PUBLIC_NETWORK: process.env.NEXT_PUBLIC_NETWORK ?? "testnet",
     NEXT_PUBLIC_SETTLEMENT_CONTRACT: process.env.NEXT_PUBLIC_SETTLEMENT_CONTRACT ?? "",
     NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT: process.env.NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT ?? "",
+    NEXT_PUBLIC_TRUSTED_ORIGINS: process.env.NEXT_PUBLIC_TRUSTED_ORIGINS ?? "",
   },
   async headers() {
     return [
