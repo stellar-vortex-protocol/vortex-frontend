@@ -1,16 +1,42 @@
 import { sanitizeText } from "./textSafety";
 
+export type GovernanceProposalStatus =
+  | "active"
+  | "passed"
+  | "rejected"
+  | "queued"
+  | "executed"
+  | "expired";
+
 export type GovernanceProposal = {
   id: string;
   title: string;
   description: string;
   proposer: string;
   category: string;
-  status: "active" | "passed" | "rejected";
+  status: GovernanceProposalStatus;
   votesFor: number;
   votesAgainst: number;
+  /** Votes that neither approve nor reject; counted toward quorum when configured. */
+  votesAbstain?: number;
+  /** Total voting power eligible to participate; used for quorum math. */
+  totalSupply?: number;
+  /** Minimum participation (as a fraction of totalSupply) required for quorum. */
+  quorumFraction?: number;
+  /** Minimum approval share (as a fraction of for+against) required to pass. */
+  approvalThreshold?: number;
+  /** Whether abstain votes count toward quorum (Governor-configurable). */
+  abstainCountsTowardQuorum?: boolean;
   createdAt: string;
   deadline: string;
+  /** When the proposal entered the timelock queue. */
+  queuedAt?: string;
+  /** When the timelock ends and execution becomes possible. */
+  timelockEndsAt?: string;
+  /** When the proposal was executed on-chain. */
+  executedAt?: string;
+  /** When the proposal expired without execution. */
+  expiredAt?: string;
 };
 
 export type ProposalComment = {
@@ -40,6 +66,11 @@ const INITIAL_PROPOSALS: GovernanceProposal[] = [
     status: "active",
     votesFor: 125000,
     votesAgainst: 42000,
+    votesAbstain: 8000,
+    totalSupply: 400000,
+    quorumFraction: 0.4,
+    approvalThreshold: 0.66,
+    abstainCountsTowardQuorum: true,
     createdAt: "2026-08-25T10:00:00Z",
     deadline: "2026-09-10T10:00:00Z",
   },
@@ -49,11 +80,18 @@ const INITIAL_PROPOSALS: GovernanceProposal[] = [
     description: "Enable routing for Soroban DEX pools to improve fill execution speed and reduce price impact for Stellar native cross-chain swaps.",
     proposer: "GBBY3456789012345678901234567890123456789012345678901234",
     category: "Routing & Architecture",
-    status: "passed",
+    status: "queued",
     votesFor: 450000,
     votesAgainst: 1200,
+    votesAbstain: 3000,
+    totalSupply: 600000,
+    quorumFraction: 0.4,
+    approvalThreshold: 0.66,
+    abstainCountsTowardQuorum: true,
     createdAt: "2026-08-15T14:30:00Z",
     deadline: "2026-08-28T14:30:00Z",
+    queuedAt: "2026-08-28T15:00:00Z",
+    timelockEndsAt: "2026-09-04T15:00:00Z",
   },
   {
     id: "VIP-3",
@@ -64,6 +102,11 @@ const INITIAL_PROPOSALS: GovernanceProposal[] = [
     status: "active",
     votesFor: 89000,
     votesAgainst: 64000,
+    votesAbstain: 2000,
+    totalSupply: 400000,
+    quorumFraction: 0.4,
+    approvalThreshold: 0.66,
+    abstainCountsTowardQuorum: true,
     createdAt: "2026-08-28T09:00:00Z",
     deadline: "2026-09-12T09:00:00Z",
   },
