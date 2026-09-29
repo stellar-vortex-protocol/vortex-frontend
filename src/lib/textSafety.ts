@@ -31,6 +31,10 @@
  *     characters in solver names or Stellar addresses.
  *   • Stripping is silent and user-friendly; flagging would require UI changes
  *     in every consumer and could cause confusing error messages for benign input.
+ *
+ * Issue #474 (safe Markdown renderer) reuses `sanitizeDisplayText` for link
+ * text and adds `hasMixedScripts` so the renderer can warn on homograph/IDN
+ * URLs whose host mixes writing systems (e.g. Latin + Cyrillic).
  */
 
 // ─── Dangerous Unicode ranges ─────────────────────────────────────────────────
@@ -60,6 +64,49 @@ const BIDI_CONTROLS_RE = /[\u202A-\u202E\u2066-\u2069]/g;
  * U+00AD  SOFT HYPHEN (invisible, used in homoglyph attacks)
  */
 const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200D\uFEFF\u00AD]/g;
+
+// ─── Script detection (issue #474) ────────────────────────────────────────────
+
+/**
+ * Coarse Unicode script buckets used for homograph detection.  We only need
+ * to distinguish writing systems that are commonly mixed to spoof a domain
+ * (Latin vs. Cyrillic vs. Greek), so a small set of ranges is sufficient and
+ * avoids pulling in a full Unicode database.
+ */
+const SCRIPT_RANGES: ReadonlyArray<readonly [string, RegExp]> = [
+  ["latin", /[A-Za-z\u00C0-\u024F\u1E00-\u1EFF]/],
+  ["cyrillic", /[\u0400-\u04FF\u0500-\u052F]/],
+  ["greek", /[\u0370-\u03FF\u1F00-\u1FFF]/],
+  ["arabic", /[\u0600-\u06FF\u0750-\u077F]/],
+  ["hebrew", /[\u0590-\u05FF]/],
+  ["han", /[\u4E00-\u9FFF\u3400-\u4DBF]/],
+  ["hiragana", /[\u3040-\u309F]/],
+  ["katakana", /[\u30A0-\u30FF]/],
+  ["hangul", /[\uAC00-\uD7AF\u1100-\u11FF]/],
+];
+
+/**
+ * Returns the set of writing systems present in `value`.  ASCII digits,
+ * punctuation and whitespace are ignored so that e.g. "example.com" is
+ * reported as `["latin"]` rather than a spurious mix.
+ */
+export function detectScripts(value: string): string[] {
+  const found: string[] = [];
+  for (const [name, re] of SCRIPT_RANGES) {
+    if (re.test(value)) found.push(name);
+  }
+  return found;
+}
+
+/**
+ * Returns `true` when a string mixes more than one writing system — the
+ * classic homograph/IDN spoofing signal (e.g. a Cyrillic "а" inside an
+ * otherwise-Latin domain).  The Markdown renderer surfaces a warning when a
+ * link host trips this check.
+ */
+export function hasMixedScripts(value: string): boolean {
+  return detectScripts(value).length > 1;
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
