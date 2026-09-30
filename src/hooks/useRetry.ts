@@ -7,9 +7,8 @@
  * - Retries up to MAX_RETRIES times on 5xx / network errors with exponential
  *   back-off: 1 s, 2 s, 4 s … (capped by MAX_RETRIES).
  *
- * Integration point: `useAcceptIntent`'s `accept()` call benefits from this
- * hook to handle transient network blips without requiring the solver to
- * manually retry — see useAcceptIntent.ts for the wiring.
+ * Transaction flows built on `useTransactionFlow` (swap, solver registration,
+ * accept-intent) are never auto-retried; retries there are user-initiated.
  *
  * Usage with SWR (hook form):
  *   const { onErrorRetry } = useRetry();

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -11,26 +12,27 @@ interface ErrorPageProps {
 }
 
 export default function SolveError({ error, reset }: ErrorPageProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label="Solver Dashboard — Error" />
+      <Nav variant="breadcrumb" label={t("errorPage.solve.breadcrumb")} />
 
       <main
         id="main-content"
         className="max-w-2xl mx-auto px-5 py-24 text-center"
       >
-        <div className="eyebrow mb-3">Solver Dashboard</div>
+        <div className="eyebrow mb-3">{t("errorPage.solve.eyebrow")}</div>
         <h1 className="text-3xl font-bold text-vx-text mb-3">
-          Couldn&apos;t load the solver dashboard
+          {t("errorPage.solve.title")}
         </h1>
         <p className="text-vx-muted text-sm mb-8">
           {error.message
             ? error.message
-            : "There was a problem loading the solver dashboard. Please try again."}
+            : t("errorPage.solve.message")}
         </p>
 
         <div className="flex items-center justify-center gap-4">
@@ -40,10 +42,10 @@ export default function SolveError({ error, reset }: ErrorPageProps) {
             className="text-sm px-4 py-2 rounded-lg bg-vx-sage text-vx-ink font-semibold
                        hover:brightness-110 transition-all"
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
           <Link href="/" className="text-sm text-vx-sage hover:underline">
-            ← Back to Vortex
+            {t("errorPage.solve.back")}
           </Link>
         </div>
       </main>

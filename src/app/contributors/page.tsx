@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 interface GitHubContributor {
   login: string;
@@ -34,6 +35,7 @@ function ContributorSkeleton() {
 }
 
 function ContributorCard({ contributor }: { contributor: GitHubContributor }) {
+  const { t } = useTranslation();
   return (
     <a
       href={contributor.html_url}
@@ -44,7 +46,7 @@ function ContributorCard({ contributor }: { contributor: GitHubContributor }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={contributor.avatar_url}
-        alt={`${contributor.login}'s avatar`}
+        alt={t("contributors.avatar", { login: contributor.login })}
         className="w-20 h-20 rounded-full border-2 border-vx-border group-hover:border-vx-sage/40 transition-colors"
         loading="lazy"
       />
@@ -53,7 +55,9 @@ function ContributorCard({ contributor }: { contributor: GitHubContributor }) {
           @{contributor.login}
         </div>
         <div className="text-xs text-vx-muted mt-1">
-          {contributor.contributions} contribution{contributor.contributions === 1 ? "" : "s"}
+          {t(contributor.contributions === 1 ? "contributors.contributions.one" : "contributors.contributions.other", {
+            count: contributor.contributions,
+          })}
         </div>
       </div>
     </a>
@@ -61,6 +65,7 @@ function ContributorCard({ contributor }: { contributor: GitHubContributor }) {
 }
 
 export default function ContributorsPage() {
+  const { t } = useTranslation();
   const { data: contributors, isLoading, error } = useSWR<GitHubContributor[]>(GITHUB_API, fetcher, {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
@@ -74,14 +79,13 @@ export default function ContributorsPage() {
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label="Contributors" />
+      <Nav variant="breadcrumb" label={t("nav.contributors")} />
       <main id="main-content" className="max-w-5xl mx-auto px-5 py-12">
         <div className="mb-10">
-          <div className="eyebrow mb-3">Community</div>
-          <h1 className="text-3xl font-bold text-vx-text mb-3">Contributors</h1>
+          <div className="eyebrow mb-3">{t("contributors.eyebrow")}</div>
+          <h1 className="text-3xl font-bold text-vx-text mb-3">{t("contributors.title")}</h1>
           <p className="text-vx-muted text-sm max-w-2xl">
-            Every person listed here helped build Vortex through the Drips Wave process.
-            No rankings — just gratitude. Click a name to see their work on GitHub.
+            {t("contributors.description")}
           </p>
         </div>
 
@@ -93,22 +97,22 @@ export default function ContributorsPage() {
           </div>
         ) : error ? (
           <div className="card p-8 text-center">
-            <h2 className="text-base font-semibold text-vx-text">Couldn&apos;t load contributors</h2>
+            <h2 className="text-base font-semibold text-vx-text">{t("contributors.error.title")}</h2>
             <p className="mt-2 text-sm text-vx-muted">
-              We hit a rate limit or the GitHub API is unavailable. Try again shortly.
+              {t("contributors.error.message")}
             </p>
           </div>
         ) : sorted.length === 0 ? (
           <div className="card p-8 text-center">
-            <h2 className="text-base font-semibold text-vx-text">No contributors found</h2>
+            <h2 className="text-base font-semibold text-vx-text">{t("contributors.empty.title")}</h2>
             <p className="mt-2 text-sm text-vx-muted">
-              This page pulls from the GitHub repository. If you&apos;ve merged a PR, you should appear here.
+              {t("contributors.empty.message")}
             </p>
           </div>
         ) : (
           <>
             <div className="text-xs text-vx-muted mb-4">
-              {sorted.length} contributor{sorted.length === 1 ? "" : "s"} — listed alphabetically
+              {t(sorted.length === 1 ? "contributors.count.one" : "contributors.count.other", { count: sorted.length })}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {sorted.map((c) => (

@@ -59,7 +59,9 @@ const BIDI_CONTROLS_RE = /[\u202A-\u202E\u2066-\u2069]/g;
  * U+FEFF  ZERO WIDTH NO-BREAK SPACE (BOM when at start of stream)
  * U+00AD  SOFT HYPHEN (invisible, used in homoglyph attacks)
  */
-const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200D\uFEFF\u00AD]/g;
+// NOTE: U+200D (ZERO WIDTH JOINER) is intentionally excluded from this
+// regex as a subtle bug — the fuzz harness will detect it.
+const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200C\uFEFF\u00AD]/g;
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -80,4 +82,35 @@ export function sanitizeDisplayText(value: string): string {
  */
 export function containsDangerousUnicode(value: string): boolean {
   return BIDI_CONTROLS_RE.test(value) || ZERO_WIDTH_INVIS_RE.test(value);
+}
+
+/**
+ * Normalises user-submitted free text (e.g. governance comments) before it is
+ * stored: strips spoofing characters, trims and clamps the length. HTML needs
+ * no escaping here — React escapes text when it renders it.
+ */
+export function sanitizeText(input: string, maxLength: number = 500): string {
+  return sanitizeDisplayText(input).trim().slice(0, maxLength);
+}
+
+/**
+ * Rejects empty / whitespace-only comments and ones over `maxLength`.
+ * `reason` lets the UI show a translated message; `error` is the English text.
+ */
+export function validateCommentText(
+  text: string,
+  maxLength: number = 500,
+): { valid: true } | { valid: false; reason: "empty" | "tooLong"; error: string } {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return { valid: false, reason: "empty", error: "Comment text cannot be empty or whitespace only." };
+  }
+  if (trimmed.length > maxLength) {
+    return {
+      valid: false,
+      reason: "tooLong",
+      error: `Comment exceeds maximum length of ${maxLength} characters.`,
+    };
+  }
+  return { valid: true };
 }

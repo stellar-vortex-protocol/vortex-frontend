@@ -14,7 +14,7 @@ const wrapper = ({ children }: { children: ReactNode }) =>
 
 const mockSolver: Solver = {
   name: "AlphaMax",
-  address: "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING",
+  address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
   bondUsd: 5000,
   fills: 150,
   failed: 3,
@@ -44,7 +44,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () =>
-        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"),
       { wrapper },
     );
 
@@ -62,7 +62,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () =>
-        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"),
       { wrapper },
     );
 
@@ -71,7 +71,7 @@ describe("useSolver", () => {
     expect(result.current.error).toBeUndefined();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining(
-        "/solvers/GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING",
+        "/solvers/GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
       ),
       expect.anything(),
     );
@@ -123,7 +123,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () =>
-        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"),
       { wrapper },
     );
 
@@ -139,7 +139,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () =>
-        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"),
       { wrapper },
     );
 
@@ -161,7 +161,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () =>
-        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"),
       { wrapper },
     );
 
@@ -189,7 +189,7 @@ describe("useSolver", () => {
 
     const { result } = renderHook(
       () =>
-        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING"),
+        useSolver("GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323"),
       { wrapper },
     );
 
@@ -207,7 +207,7 @@ describe("useSolver", () => {
 
     const { result, rerender } = renderHook(
       ({ address }: { address: string | null }) => useSolver(address),
-      { wrapper, initialProps: { address: "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING" as string | null } }
+      { wrapper, initialProps: { address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323" as string | null } }
     );
 
     await waitFor(() => expect(result.current.solver).toBeDefined());
