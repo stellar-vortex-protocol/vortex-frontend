@@ -1,22 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/CopyButton";
 import { Footer } from "@/components/Footer";
-import { CopyButton } from "@/components/CopyButton";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { Nav } from "@/components/Nav";
-import { SkeletonDetailCard } from "@/components/Skeleton";
-import { CopyButton } from "@/components/CopyButton";
-import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useIntent } from "@/hooks/useIntent";
 import { timeAgo } from "@/lib/time";
 import { truncateAddress } from "@/lib/stellarAddress";
+import { sanitizeDisplayText } from "@/lib/textSafety";
 
 const NETWORK = process.env["NEXT_PUBLIC_NETWORK"] ?? "testnet";
 
-// This screen shows 6-and-6 truncation for full-width identifiers.
 const truncate = (value: string) => truncateAddress(value, { prefix: 6, suffix: 6 });
 
 function deadlineLabel(deadline: string) {
@@ -34,15 +29,8 @@ export default function IntentDetailPage({
 }: {
   params: { id: string };
 }) {
-  const { intent, isLoading, error } = useIntent(params.id);
-  const { copy } = useCopyToClipboard();
-  const [txHashCopied, setTxHashCopied] = useState(false);
+  const { intent, isLoading, error, isLive } = useIntent(params.id);
 
-  const isExpired = useMemo(() => {
-    if (!intent || intent.status !== "pending" || !intent.deadline)
-      return false;
-    return new Date(intent.deadline).getTime() <= Date.now();
-  }, [intent]);
   const isSettled = intent?.status === "filled";
 
   return (
@@ -54,16 +42,27 @@ export default function IntentDetailPage({
           <Link href="/explore" className="text-xs text-vx-sage hover:underline print:hidden">
             ← Back to explorer
           </Link>
-          {intent && (
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="print:hidden text-xs px-3 py-1.5 rounded-lg border border-vx-border text-vx-muted
-                         hover:text-vx-text hover:border-vx-sage/40 transition-colors"
-            >
-              Print / Save as PDF
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {isLive && (
+              <span
+                aria-label="Live updates active"
+                className="print:hidden flex items-center gap-1.5 text-[10px] text-vx-sage"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-vx-sage animate-pulse" aria-hidden="true" />
+                Live
+              </span>
+            )}
+            {intent && (
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="print:hidden text-xs px-3 py-1.5 rounded-lg border border-vx-border text-vx-muted
+                           hover:text-vx-text hover:border-vx-sage/40 transition-colors"
+              >
+                Print / Save as PDF
+              </button>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -72,7 +71,7 @@ export default function IntentDetailPage({
             <div className="h-4 w-1/3 bg-vx-surface rounded animate-pulse" />
           </div>
         ) : error ? (
-          <div className="card p-8 text-center text-sm text-vx-muted">
+          <div role="alert" className="card p-8 text-center text-sm text-vx-muted">
             Couldn&apos;t find that intent. It may not exist, or the relay is
             unreachable.
           </div>
@@ -82,7 +81,7 @@ export default function IntentDetailPage({
           </div>
         ) : (
           <div id="intent-record" className="card p-6 space-y-6 print:border print:border-black/20 print:shadow-none">
-            {/* Print-only header - the on-screen Nav/Footer are stripped when printing. */}
+            {/* Print-only header */}
             <div className="hidden print:block border-b border-black/20 pb-3">
               <div className="text-sm font-semibold">Vortex - swap intent record</div>
               <div className="text-xs text-black/60">
@@ -119,7 +118,6 @@ export default function IntentDetailPage({
                 ["Minimum out", `${intent.minOut} ${intent.dstToken}`],
                 ["Submitted", `${new Date(intent.createdAt).toLocaleString()} (${timeAgo(intent.createdAt)})`],
                 ["Deadline", deadlineLabel(intent.deadline)],
-                ["Destination address", truncateAddress(intent.dstAddress)],
               ].map(([k, v]) => (
                 <div key={k} className="bg-vx-surface/40 rounded-lg p-3">
                   <div className="eyebrow mb-1">{k}</div>
@@ -145,20 +143,10 @@ export default function IntentDetailPage({
                 <div className="eyebrow mb-1">Settlement transaction</div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-xs text-vx-muted num">{truncate(intent.txHash)}</span>
-                  <button
-                    onClick={async () => {
-                      const txHash = intent.txHash;
-                      if (!txHash) return;
-                      const didCopy = await copy(txHash);
-                      setTxHashCopied(didCopy);
-                      if (didCopy) {
-                        window.setTimeout(() => setTxHashCopied(false), 1200);
-                      }
-                    }}
-                    className="text-xs text-vx-sage hover:underline"
-                  >
-                    {txHashCopied ? "Copied" : "Copy"}
-                  </button>
+                  <CopyButton
+                    value={intent.txHash}
+                    label="Copy transaction hash"
+                  />
                   <a
                     href={`https://stellar.expert/explorer/${NETWORK}/tx/${intent.txHash}`}
                     target="_blank"

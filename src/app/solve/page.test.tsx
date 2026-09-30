@@ -35,6 +35,7 @@ vi.mock("@/components/Footer", () => ({ Footer: () => <footer /> }));
 
 import SolvePage from "./SolvePageClient";
 import { messages } from "@/i18n/messages";
+import { useWalletStore } from "@/store/wallet";
 
 const solvers: Solver[] = [
   {
@@ -508,6 +509,138 @@ describe("SolvePage", () => {
       await registerTab();
 
       expect(screen.getByText("Bond deposit failed")).toBeInTheDocument();
+    });
+
+    it("shows a profile link after successful registration", async () => {
+      useSolverRegistrationMock.mockReturnValue({
+        status: "success",
+        error: null,
+        register: registerMock,
+        reset: resetMock,
+      });
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      // Pre-fill the address field so the link has a target
+      await user.type(screen.getByLabelText("Stellar Address"), VALID_ADDRESS);
+
+      const profileLink = screen.getByTestId("solver-profile-link");
+      expect(profileLink).toBeInTheDocument();
+      expect(profileLink).toHaveAttribute("href", `/solve/${VALID_ADDRESS}`);
+      expect(profileLink).toHaveTextContent(/view your solver profile/i);
+    });
+  });
+
+  // ── Registered-solver banner ──────────────────────────────────────────────
+
+  describe("registered solver banner", () => {
+    const REGISTERED_ADDRESS =
+      "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
+
+    const registeredSolver: Solver = {
+      name: "My Solver",
+      address: REGISTERED_ADDRESS,
+      bondUsd: 1000,
+      fills: 10,
+      failed: 0,
+      volumeUsd: 50_000,
+      avgFillTimeSeconds: 8,
+      successRatePct: 100,
+      chains: ["ethereum"],
+      status: "active",
+    };
+
+    beforeEach(() => {
+      useOpenIntentsMock.mockReturnValue({
+        intents: [],
+        isLoading: false,
+        error: undefined,
+      });
+      useSolverRegistrationMock.mockReturnValue({
+        status: "idle",
+        error: null,
+        register: registerMock,
+        reset: resetMock,
+      });
+    });
+
+    it("shows the banner when the connected wallet is a registered solver", () => {
+      useWalletStore.setState({ address: REGISTERED_ADDRESS } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.getByRole("status", { name: /you are a registered solver/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/My Solver/)).toBeInTheDocument();
+    });
+
+    it("banner links to the solver detail page", () => {
+      useWalletStore.setState({ address: REGISTERED_ADDRESS } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      const link = screen.getByRole("link", { name: /view your profile/i });
+      expect(link).toHaveAttribute("href", `/solve/${REGISTERED_ADDRESS}`);
+    });
+
+    it("hides the banner when the connected wallet is not a registered solver", () => {
+      useWalletStore.setState({ address: "GDIFFERENT000000000000000000000000000000000000000000000000" } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.queryByRole("status", { name: /you are a registered solver/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides the banner when no wallet is connected", () => {
+      useWalletStore.setState({ address: null } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.queryByRole("status", { name: /you are a registered solver/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("matches solver address case-insensitively", () => {
+      // Wallet address is lowercase — solver list has uppercase
+      useWalletStore.setState(
+        { address: REGISTERED_ADDRESS.toLowerCase() } as any,
+        false,
+      );
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.getByRole("status", { name: /you are a registered solver/i }),
+      ).toBeInTheDocument();
     });
   });
 });

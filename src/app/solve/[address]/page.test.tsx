@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { Solver } from "@/lib/types";
 import { useToastStore } from "@/store/toast";
 import SolverDetailPage from "./page";
 
@@ -609,4 +610,29 @@ describe("SolverDetailPage", () => {
     const skeletons = screen.queryAllByTestId("skeleton");
     expect(skeletons.length).toBe(0);
   });
+  it("renders the extracted SolverHeaderCard and SolverFillHistory components with real solver data", () => {
+    useSolverMock.mockReturnValue({
+      solver: solverData,
+      isLoading: false,
+      error: undefined,
+    });
+
+    render(
+      <SolverDetailPage
+        params={{
+          address: "GBRPYHIL2CI3WHZDTOOQFC6EB4CGQOFN4QO5JTJVSXBLEDSOMETHING",
+        }}
+      />
+    );
+
+    // Verifies SolverHeaderCard rendered
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("AlphaMax");
+    expect(screen.getByLabelText(/Solver status:/)).toHaveTextContent("Active");
+    expect(screen.getByText("Fills")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+
+    // Verifies SolverFillHistory rendered
+    expect(screen.getByText("Recent Fills by Solver")).toBeInTheDocument();
+  });
 });
+

@@ -104,4 +104,39 @@ describe("solve page solver-registration flow (integration)", () => {
       expect(screen.getByText("Registered as a solver.")).toBeInTheDocument();
     });
   });
+
+  it("shows a link to the solver profile page after successful registration", async () => {
+    fetcherMock.mockImplementation(async (path: string) => {
+      if (path === "/solvers") return [];
+      if (path === "/intents/open") return [];
+      throw new Error(`Unexpected fetch: ${path}`);
+    });
+    registerSolverMock.mockResolvedValue({
+      registrationId: "reg-1",
+      unsignedXdr: "unsigned-xdr",
+    });
+    signTransactionMock.mockResolvedValue("signed-xdr");
+    submitSolverRegistrationMock.mockResolvedValue({
+      registrationId: "reg-1",
+      status: "pending",
+    });
+
+    const user = userEvent.setup();
+    renderSolvePage();
+
+    await user.click(screen.getByRole("tab", { name: "register" }));
+    await user.type(screen.getByLabelText(/stellar address/i), SOLVER_ADDRESS);
+    await user.type(screen.getByLabelText(/bond amount/i), "100");
+    await user.click(
+      screen.getByRole("button", { name: "Connect Freighter to Register" }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("solver-profile-link")).toBeInTheDocument();
+    });
+
+    const profileLink = screen.getByTestId("solver-profile-link");
+    expect(profileLink).toHaveAttribute("href", `/solve/${SOLVER_ADDRESS}`);
+    expect(profileLink).toHaveTextContent(/view your solver profile/i);
+  });
 });
