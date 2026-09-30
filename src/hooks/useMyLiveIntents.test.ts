@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi , beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { FeedItem } from "@/lib/types";
 
@@ -24,6 +24,11 @@ vi.mock("./useMyIntents", () => ({ useMyIntents: useMyIntentsMock }));
 vi.mock("./useWebSocket", () => ({ useWebSocket: useWebSocketMock }));
 
 import { useMyLiveIntents } from "./useMyLiveIntents";
+import { useIntentStore } from "@/store/intents";
+
+beforeEach(() => {
+  useIntentStore.setState({ byId: {}, meta: {}, views: { feed: [], explore: [], mine: [] } });
+});
 
 describe("useMyLiveIntents", () => {
   const address = "GABC123";
@@ -79,7 +84,7 @@ describe("useMyLiveIntents", () => {
 
     renderHook(() => useMyLiveIntents(null));
 
-    expect(useWebSocketMock).toHaveBeenCalledWith(null);
+    expect(useWebSocketMock).toHaveBeenCalledWith(null, expect.anything());
   });
 
   it("updates status when a live message arrives", () => {

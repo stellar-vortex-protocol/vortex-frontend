@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FeedItem } from "@/lib/types";
 import { computeAnalytics } from "./analytics";
+import { SRC_TOKENS } from "./marketData";
 
 const baseItems: FeedItem[] = [
   {
@@ -75,5 +76,30 @@ describe("computeAnalytics", () => {
     expect(analytics.routeBreakdown[0]!.destinationToken).toBe("XLM");
     expect(analytics.volumeOverTime.length).toBeGreaterThan(0);
     expect(analytics.volumeOverTime[0]!.totalVolumeUsd).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// Regression: getTokenPriceUsd read `priceUSD` while Token defines `priceUsd`,
+// so every volume silently fell back to $1 per token (#401).
+describe("computeAnalytics USD pricing", () => {
+  const cases = Object.entries(SRC_TOKENS).flatMap(([chain, tokens]) =>
+    tokens.map((token) => ({ chain, token })),
+  );
+
+  it.each(cases)("prices $token.symbol on $chain from the market data", ({ chain, token }) => {
+    const summary = computeAnalytics([
+      {
+        id: `${chain}-${token.symbol}`,
+        srcChain: chain,
+        srcToken: token.symbol,
+        srcAmount: "2",
+        dstToken: "USDC",
+        solver: "solver-a",
+        status: "filled",
+        createdAt: "2025-01-01T00:00:00Z",
+      },
+    ]);
+    expect(summary.totalVolumeUsd).toBeGreaterThan(0);
+    expect(summary.totalVolumeUsd).toBeCloseTo(2 * token.priceUsd);
   });
 });

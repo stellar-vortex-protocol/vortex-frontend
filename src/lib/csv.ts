@@ -57,3 +57,19 @@ export function downloadCsv(filename: string, csv: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Generic, injection-safe CSV builder for arbitrary tables (e.g. the solver
+ * leaderboard export). Every cell goes through `escapeCsv`, so numeric cells
+ * should be pre-formatted by the caller if they could start with "-".
+ */
+export function buildCsv(
+  headers: readonly string[],
+  rows: ReadonlyArray<ReadonlyArray<string | number>>,
+): string {
+  const lines = [headers.map((h) => escapeCsv(h)).join(",")];
+  for (const row of rows) {
+    lines.push(row.map((cell) => escapeCsv(String(cell))).join(","));
+  }
+  return lines.join("\n");
+}
