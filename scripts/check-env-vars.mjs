@@ -2,186 +2,157 @@
 /**
  * check-env-vars.mjs
  *
- * Scans all TypeScript/JavaScript source files under src/ for
- * process.env.<VAR_NAME> references and verifies that every variable found
- * is documented in .env.example.
+ * Build-time environment check, driven by the same schema as the runtime
+ * config (src/lib/env-schema.mjs → src/lib/config.ts). Fails when:
+ *
+ * - source under src/ reads a process.env variable the schema doesn't define
+ * - .env.example repeats a variable, or doesn't list exactly the schema's
+ *   variables
+ * - the README "Required Environment Variables" table doesn't list exactly
+ *   the schema's variables
+ * - a set variable is malformed (e.g. unknown network, bad contract ID, or
+ *   http:// / ws:// to a non-local host when NODE_ENV=production)
+ * - a NEXT_PUBLIC_* variable's name suggests a secret (it would be inlined
+ *   into the browser bundle)
  *
  * Usage:
  *   node scripts/check-env-vars.mjs
- *
- * Exit codes:
- *   0 — all env vars are documented
- *   1 — one or more env vars are missing from .env.example
  */
 
-import { readFileSync, readdirSync, statSync } from "fs";
-import { join, relative } from "path";
-import { fileURLToPath } from "url";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ENV_SCHEMA, SUSPICIOUS_PATTERNS, parseEnv } from "../src/lib/env-schema.mjs";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const ROOT = join(__dirname, "..");
+const SCHEMA_NAMES = ENV_SCHEMA.map((v) => v.name);
+// Set by Node/Next tooling rather than by the app's own configuration.
+const TOOLING_VARS = new Set(["NODE_ENV"]);
 
-// ── 1. Parse .env.example to collect documented variable names ──────────────
-
-const envExamplePath = join(ROOT, ".env.example");
-let envExampleContent;
-try {
-  envExampleContent = readFileSync(envExamplePath, "utf8");
-} catch {
-  console.error(`ERROR: Could not read ${envExamplePath}`);
-  process.exit(1);
-}
-
-/** @type {Set<string>} */
-const documentedVars = new Set();
-for (const line of envExampleContent.split("\n")) {
-  const trimmed = line.trim();
-  // Skip blank lines and comments
-  if (!trimmed || trimmed.startsWith("#")) continue;
-  const eqIndex = trimmed.indexOf("=");
-  if (eqIndex !== -1) {
-    documentedVars.add(trimmed.slice(0, eqIndex).trim());
+/** Variable names assigned in a dotenv file, in order (duplicates kept). */
+export function parseDotenvNames(text) {
+  const names = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq !== -1) names.push(trimmed.slice(0, eq).trim());
   }
+  return names;
 }
 
-// ── 2. Walk src/ and collect all process.env.<VAR> references ───────────────
+/** Variable names in the first column of the README env table. */
+export function parseReadmeEnvTable(readme) {
+  const start = readme.indexOf("### Required Environment Variables");
+  if (start === -1) return null;
+  const names = [];
+  for (const line of readme.slice(start).split("\n").slice(1)) {
+    if (line.startsWith("#")) break;
+    const match = line.match(/^\|\s*`([A-Z0-9_]+)`\s*\|/);
+    if (match) names.push(match[1]);
+  }
+  return names;
+}
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs"]);
-// Matches process.env.VAR_NAME or process.env["VAR_NAME"] / process.env['VAR_NAME']
-const ENV_REF_RE = /process\.env(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
+/** `process.env` variable names referenced in a source file. */
+export function findEnvReferences(source) {
+  const re = /process\.env(?:\.([A-Z0-9_]+)|\[['"]([A-Z0-9_]+)['"]\])/g;
+  return [...source.matchAll(re)].map((m) => m[1] ?? m[2]);
+}
 
-/** @type {Map<string, string[]>} varName → list of "file:line" locations */
-const usedVars = new Map();
+function compareToSchema(label, names) {
+  const errors = [];
+  const seen = new Set();
+  for (const name of names) {
+    if (seen.has(name)) errors.push(`${label} lists ${name} more than once`);
+    seen.add(name);
+  }
+  for (const name of SCHEMA_NAMES) {
+    if (!seen.has(name)) errors.push(`${label} is missing ${name}`);
+  }
+  for (const name of seen) {
+    if (!SCHEMA_NAMES.includes(name)) {
+      errors.push(`${label} lists ${name}, which src/lib/env-schema.mjs doesn't define`);
+    }
+  }
+  return errors;
+}
 
 /**
- * Recursively walk a directory, calling `cb` for every matching file.
- * @param {string} dir
- * @param {(filePath: string) => void} cb
+ * Runs every check. `inputs` holds the file contents and environment so the
+ * checks can be tested without touching disk.
  */
-function walk(dir, cb) {
+export function checkEnv({ envExample, readme, sources, env, production }) {
+  const errors = [];
+
+  for (const { file, text } of sources) {
+    for (const name of findEnvReferences(text)) {
+      if (!SCHEMA_NAMES.includes(name) && !TOOLING_VARS.has(name)) {
+        errors.push(`${file} reads process.env.${name}, which src/lib/env-schema.mjs doesn't define`);
+      }
+    }
+  }
+
+  errors.push(...compareToSchema(".env.example", parseDotenvNames(envExample)));
+
+  const readmeNames = parseReadmeEnvTable(readme);
+  if (readmeNames === null) {
+    errors.push('README.md has no "### Required Environment Variables" table');
+  } else {
+    errors.push(...compareToSchema("README env table", readmeNames));
+  }
+
+  errors.push(...parseEnv(env, { production }).errors);
+
+  for (const name of Object.keys(env)) {
+    if (!name.startsWith("NEXT_PUBLIC_")) continue;
+    const pattern = SUSPICIOUS_PATTERNS.find((p) => p.test(name));
+    if (pattern) {
+      errors.push(
+        `${name} contains "${pattern.source}", which suggests a secret; NEXT_PUBLIC_* variables are exposed in the browser`,
+      );
+    }
+  }
+
+  return errors;
+}
+
+function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
-    // Skip hidden directories (e.g. .next, .git) and node_modules
     if (entry.startsWith(".") || entry === "node_modules") continue;
     const full = join(dir, entry);
-    const stat = statSync(full);
-    if (stat.isDirectory()) {
-      walk(full, cb);
-    } else if (SOURCE_EXTENSIONS.has(full.slice(full.lastIndexOf(".")))) {
-      cb(full);
-    }
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.(ts|tsx|js|jsx|mjs)$/.test(entry) && !/\.test\./.test(entry)) out.push(full);
   }
+  return out;
 }
 
-walk(join(ROOT, "src"), (filePath) => {
-  const content = readFileSync(filePath, "utf8");
-  const lines = content.split("\n");
-  for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-    let match;
-    ENV_REF_RE.lastIndex = 0;
-    while ((match = ENV_REF_RE.exec(lines[lineNo])) !== null) {
-      const varName = match[1] ?? match[2];
-      if (!varName) continue;
-      const location = `${relative(ROOT, filePath)}:${lineNo + 1}`;
-      if (!usedVars.has(varName)) usedVars.set(varName, []);
-      usedVars.get(varName).push(location);
-    }
+function main() {
+  const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+  const production = process.env.NODE_ENV === "production";
+  const errors = checkEnv({
+    envExample: readFileSync(join(ROOT, ".env.example"), "utf8"),
+    readme: readFileSync(join(ROOT, "README.md"), "utf8"),
+    sources: walk(join(ROOT, "src")).map((file) => ({
+      file: relative(ROOT, file),
+      text: readFileSync(file, "utf8"),
+    })),
+    env: process.env,
+    production,
+  });
+
+  if (errors.length > 0) {
+    console.error(`❌  Environment check failed (${errors.length} problem(s)):\n`);
+    for (const error of errors) console.error(`  - ${error}`);
+    console.error("\nSee docs/configuration.md for the variables and how to add one.");
+    process.exit(1);
   }
-});
-
-// ── 3. Check for insecure schemes in production ──────────────────────────────
-
-const IS_PRODUCTION_BUILD = process.env.NODE_ENV === "production";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "";
-
-const insecureSchemes = [];
-
-if (IS_PRODUCTION_BUILD) {
-  const isLocalhost = (url) => {
-    try {
-      const parsed = new URL(url);
-      return (
-        parsed.hostname === "localhost" ||
-        parsed.hostname === "127.0.0.1" ||
-        parsed.hostname === "[::1]"
-      );
-    } catch {
-      return false;
-    }
-  };
-
-  if (API_URL && !isLocalhost(API_URL)) {
-    if (API_URL.startsWith("http://")) {
-      insecureSchemes.push({
-        var: "NEXT_PUBLIC_API_URL",
-        url: API_URL,
-        issue: 'uses "http://" instead of "https://"',
-      });
-    }
-  }
-
-  if (WS_URL && !isLocalhost(WS_URL)) {
-    if (WS_URL.startsWith("ws://")) {
-      insecureSchemes.push({
-        var: "NEXT_PUBLIC_WS_URL",
-        url: WS_URL,
-        issue: 'uses "ws://" instead of "wss://"',
-      });
-    }
-  }
-}
-
-// ── 4. Report ────────────────────────────────────────────────────────────────
-
-/** @type {Array<{varName: string, locations: string[]}>} */
-const undocumented = [];
-for (const [varName, locations] of usedVars) {
-  if (!documentedVars.has(varName)) {
-    undocumented.push({ varName, locations });
-  }
-}
-
-let hasErrors = false;
-
-if (undocumented.length > 0) {
-  hasErrors = true;
-  console.error(
-    `❌  ${undocumented.length} env var(s) used in source are NOT documented in .env.example:\n`
-  );
-  for (const { varName, locations } of undocumented) {
-    console.error(`  ${varName}`);
-    for (const loc of locations) {
-      console.error(`    → ${loc}`);
-    }
-  }
-  console.error(
-    "\nAdd the missing variable(s) to .env.example (with an inline comment explaining their purpose) and re-run this check."
+  console.log(
+    `✅  ${SCHEMA_NAMES.length} environment variables: .env.example, README and source agree with the schema${
+      production ? "; values are valid for production" : ""
+    }.`,
   );
 }
 
-if (insecureSchemes.length > 0) {
-  hasErrors = true;
-  console.error(
-    `❌  ${insecureSchemes.length} security issue(s) detected in production build:\n`
-  );
-  for (const { var: varName, url, issue } of insecureSchemes) {
-    console.error(`  ${varName}: ${issue}`);
-    console.error(`    Current value: ${url}`);
-  }
-  console.error(
-    "\nIn production, all remote URLs must use secure schemes (https:// for API, wss:// for WebSocket)."
-  );
-  console.error("Localhost (127.0.0.1, localhost, [::1]) is exempt for testing.");
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main();
 }
-
-if (hasErrors) {
-  process.exit(1);
-}
-
-console.log(
-  `✅  All ${usedVars.size} env var(s) used in source are documented in .env.example.`
-);
-if (IS_PRODUCTION_BUILD) {
-  console.log("✅  No insecure schemes detected in production build.");
-}
-process.exit(0);

@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CopyButton } from "@/components/CopyButton";
 import { Footer } from "@/components/Footer";
-import { CopyButton } from "@/components/CopyButton";
 import { IntentStatusBadge } from "@/components/IntentStatusBadge";
 import { Nav } from "@/components/Nav";
 import { SkeletonDetailCard } from "@/components/Skeleton";
-import { CopyButton } from "@/components/CopyButton";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import { useIntent } from "@/hooks/useIntent";
+import { parseIntentId } from "@/lib/inputs";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
 import { truncateAddress } from "@/lib/stellarAddress";
 
@@ -34,9 +34,26 @@ export default function IntentDetailPage({
 }: {
   params: { id: string };
 }) {
-  const { intent, isLoading, error } = useIntent(params.id);
+  const { t } = useTranslation();
+  const intentId = parseIntentId(params.id);
+  const { intent, isLoading, error } = useIntent(intentId);
   const { copy } = useCopyToClipboard();
   const [txHashCopied, setTxHashCopied] = useState(false);
+
+  // Reject invalid intent IDs early — they could be path-injection attempts.
+  if (!intentId) {
+    return (
+      <div className="min-h-screen">
+        <Nav variant="breadcrumb" label={t("intent.invalidId")} />
+        <main id="main-content" className="max-w-3xl mx-auto px-5 py-12">
+          <div className="card p-8 text-center text-sm text-vx-muted">
+            {t("intent.invalidId")}
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   const isExpired = useMemo(() => {
     if (!intent || intent.status !== "pending" || !intent.deadline)
@@ -47,7 +64,7 @@ export default function IntentDetailPage({
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label={`Intent ${params.id.slice(0, 8)}`} />
+      <Nav variant="breadcrumb" label={`Intent ${intentId.slice(0, 8)}`} />
 
       <main id="main-content" className="max-w-3xl mx-auto px-5 py-12">
         <div className="mb-6 flex items-center justify-between gap-4">
@@ -86,7 +103,7 @@ export default function IntentDetailPage({
             <div className="hidden print:block border-b border-black/20 pb-3">
               <div className="text-sm font-semibold">Vortex - swap intent record</div>
               <div className="text-xs text-black/60">
-                Intent {params.id} · generated {new Date().toLocaleString()}
+                Intent {intentId} · generated {new Date().toLocaleString()}
               </div>
             </div>
 

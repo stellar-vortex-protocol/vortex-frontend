@@ -1,0 +1,35 @@
+{
+  "lockfileVersion": 3,
+  "packages": {
+    "": {
+      "name": "vortex-frontend",
+      "version": "0.1.0"
+    },
+    "node_modules/react": {
+      "version": "18.2.0",
+      "resolved": "https://registry.npmjs.org/react/-/react-18.2.0.tgz",
+      "integrity": "sha512-abc123react",
+      "license": "MIT"
+    },
+    "node_modules/tampered-pkg": {
+      "version": "1.0.0",
+      "resolved": "https://evil-registry.example.com/tampered-pkg/-/tampered-pkg-1.0.0.tgz",
+      "integrity": "sha512-evil"
+    },
+    "node_modules/missing-integrity": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/missing-integrity/-/missing-integrity-2.0.0.tgz",
+      "integrity": ""
+    },
+    "node_modules/git-dep": {
+      "version": "1.0.0",
+      "resolved": "git+https://github.com/attacker/malicious.git#commit123",
+      "integrity": ""
+    },
+    "node_modules/tarball-dep": {
+      "version": "1.0.0",
+      "resolved": "https://evil.example.com/pkg.tar.gz",
+      "integrity": ""
+    }
+  }
+}

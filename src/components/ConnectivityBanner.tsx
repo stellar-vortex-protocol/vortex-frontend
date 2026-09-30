@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useConnectivity } from "@/hooks/useConnectivity";
+import { useAnnounce } from "@/components/Announcer";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 /**
  * App-wide offline/connectivity-loss banner.
@@ -11,14 +13,40 @@ import { useConnectivity } from "@/hooks/useConnectivity";
  * persistent, accessible banner while the user is offline and automatically
  * dismisses it a moment after connectivity is restored.
  *
+ * When offline, the banner also surfaces the timestamp of the last successful
+ * data refresh (published by the service worker / data layer via the
+ * `vx:last-updated` window event) so users know how stale the cached feed is.
+ * Submissions are blocked while offline — the banner makes that explicit.
+ *
  * The banner is dismissed automatically on reconnect (after a brief grace
  * period) and does NOT need a manual close button in the offline state — the
  * act of coming back online is the dismissal signal.
+ *
+ * Connectivity changes are also routed through the central Announcer so screen
+ * readers hear a single, deduplicated, polite announcement per transition
+ * (see docs/accessibility.md for the live-region policy).
  */
 export function ConnectivityBanner() {
+  const { t } = useTranslation();
   const { connectivity } = useConnectivity();
   const [visible, setVisible] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const announce = useAnnounce();
+
+  // Track the last successful data refresh so the offline banner can show
+  // "offline — last updated X". The service worker / data layer dispatches
+  // `vx:last-updated` with a `detail.timestamp` (ms since epoch).
+  useEffect(() => {
+    const onLastUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ timestamp?: number }>).detail;
+      if (detail && typeof detail.timestamp === "number") {
+        setLastUpdated(detail.timestamp);
+      }
+    };
+    window.addEventListener("vx:last-updated", onLastUpdated);
+    return () => window.removeEventListener("vx:last-updated", onLastUpdated);
+  }, []);
 
   useEffect(() => {
     if (connectivity === "offline") {
@@ -28,12 +56,22 @@ export function ConnectivityBanner() {
         dismissTimerRef.current = null;
       }
       setVisible(true);
+      announce("You appear to be offline — reconnecting", {
+        politeness: "polite",
+        key: "connectivity",
+        coalesceMs: 1000,
+      });
     } else {
       // Give the user a moment to see the "back online" state before hiding.
       dismissTimerRef.current = setTimeout(() => {
         setVisible(false);
         dismissTimerRef.current = null;
       }, 2500);
+      announce("Back online — refreshing data", {
+        politeness: "polite",
+        key: "connectivity",
+        coalesceMs: 1000,
+      });
     }
 
     return () => {
@@ -42,11 +80,19 @@ export function ConnectivityBanner() {
         dismissTimerRef.current = null;
       }
     };
-  }, [connectivity]);
+  }, [connectivity, announce]);
 
   if (!visible) return null;
 
   const isOffline = connectivity === "offline";
+
+  const lastUpdatedLabel =
+    lastUpdated !== null
+      ? new Date(lastUpdated).toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
 
   return (
     <div
@@ -79,7 +125,11 @@ export function ConnectivityBanner() {
               strokeLinejoin="round"
             />
           </svg>
-          <span>You appear to be offline — reconnecting&hellip;</span>
+          <span>
+            {lastUpdatedLabel
+              ? t("connectivity.offlineWithTimestamp", { timestamp: lastUpdatedLabel })
+              : t("connectivity.offline")}
+          </span>
         </>
       ) : (
         <>
@@ -98,7 +148,7 @@ export function ConnectivityBanner() {
               strokeLinejoin="round"
             />
           </svg>
-          <span>Back online — refreshing data&hellip;</span>
+          <span>{t("connectivity.online")}</span>
         </>
       )}
     </div>
