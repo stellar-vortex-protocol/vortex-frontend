@@ -120,22 +120,22 @@ export function Tooltip({ content, children, placement = "top" }: TooltipProps) 
     onMouseEnter: (...args: unknown[]) => {
       show();
       // Forward original handler if present.
-      const orig = (children.props as Record<string, unknown>).onMouseEnter;
+      const orig = (children.props as Record<string, unknown>)["onMouseEnter"];
       if (typeof orig === "function") orig(...args);
     },
     onMouseLeave: (...args: unknown[]) => {
       hide();
-      const orig = (children.props as Record<string, unknown>).onMouseLeave;
+      const orig = (children.props as Record<string, unknown>)["onMouseLeave"];
       if (typeof orig === "function") orig(...args);
     },
     onFocus: (...args: unknown[]) => {
       show();
-      const orig = (children.props as Record<string, unknown>).onFocus;
+      const orig = (children.props as Record<string, unknown>)["onFocus"];
       if (typeof orig === "function") orig(...args);
     },
     onBlur: (...args: unknown[]) => {
       hide();
-      const orig = (children.props as Record<string, unknown>).onBlur;
+      const orig = (children.props as Record<string, unknown>)["onBlur"];
       if (typeof orig === "function") orig(...args);
     },
     onTouchEnd: handleTouchEnd,

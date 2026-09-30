@@ -127,7 +127,7 @@ describe("buildIntentsCsv", () => {
     // The solver field should be prefixed with apostrophe.
     expect(dataRow).toContain("'=HYPERLINK");
     // The raw '=' must not appear as the first character of the cell.
-    const solverField = dataRow.split(",")[5];
+    const solverField = dataRow?.split(",")[5];
     expect(solverField).not.toMatch(/^=/);
   });
 

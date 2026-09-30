@@ -1,10 +1,14 @@
 import useSWR from "swr";
-import { fetcher } from "@/lib/api";
+import { endpoint } from "@/lib/api";
+import { solverSchema } from "@/lib/schemas";
+
+const fetcher = endpoint(solverSchema);
 import type { Solver } from "@/lib/types";
 
 export function useSolver(address: string | null) {
+  const encodedAddress = address ? encodeURIComponent(address) : null;
   const { data, error, isLoading } = useSWR<Solver>(
-    address ? `/solvers/${address}` : null,
+    encodedAddress ? `/solvers/${encodedAddress}` : null,
     fetcher,
   );
 

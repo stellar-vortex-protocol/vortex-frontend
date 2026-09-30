@@ -15,6 +15,12 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
+      thresholds: {
+        "src/lib/**": { lines: 90, functions: 90, branches: 85, statements: 90 },
+        "src/hooks/**": { lines: 85, functions: 85, branches: 80, statements: 85 },
+        "src/store/**": { lines: 90, functions: 90, branches: 85, statements: 90 },
+        "src/components/**": { lines: 75, functions: 75, branches: 70, statements: 75 },
+      },
     },
   },
   resolve: {

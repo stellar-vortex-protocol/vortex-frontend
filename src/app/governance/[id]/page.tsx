@@ -1,4 +1,5 @@
 import ProposalDetailClient from "./ProposalDetailClient";
+import { parseIntentId } from "@/lib/inputs";
 
 export const metadata = {
   title: "Governance Proposal | Vortex Protocol",
@@ -6,5 +7,6 @@ export const metadata = {
 };
 
 export default function ProposalDetailPage({ params }: { params: { id: string } }) {
-  return <ProposalDetailClient proposalId={params.id} />;
+  const proposalId = parseIntentId(params.id);
+  return <ProposalDetailClient proposalId={proposalId ?? ""} />;
 }

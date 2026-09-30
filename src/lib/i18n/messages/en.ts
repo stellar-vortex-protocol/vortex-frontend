@@ -1,5 +1,13 @@
 // Source-of-truth message catalog. Keys are dot-namespaced by feature; values
 // may contain {placeholder} tokens that are filled in at render time.
+//
+// Values may also use a subset of ICU MessageFormat for pluralisation and
+// selection, resolved at render time via Intl.PluralRules(locale):
+//   "{count, plural, one {# contribution} other {# contributions}}"
+//   "{gender, select, male {He} female {She} other {They}} replied"
+// Inside a plural branch, `#` is replaced with the formatted count. Nested
+// placeholders such as {name} are supported inside branches, and literal
+// braces can be escaped as ''{'' / ''}''.
 export const en = {
   "nav.branding": "Vortex",
   "nav.explore": "Explore",
@@ -63,9 +71,7 @@ export const en = {
   "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
   "swap.quote.unavailable": "Live quote unavailable — showing an estimated rate.",
   "swap.quote.noSolver": "No solver is available for this route right now.",
-  "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
   "swap.quote.staleWarning": "Quote is stale. Please wait for a refresh before submitting.",
-  "swap.quote.highPriceImpactWarning": "High price impact above {threshold}% — review before swapping.",
 
   "swap.submit.connecting": "Connecting wallet…",
   "swap.submit.building": "Preparing swap…",
@@ -81,10 +87,6 @@ export const en = {
   "swap.destination.placeholder": "G...",
   "swap.destination.invalidAddress":
     "Enter a valid Stellar address (starts with G).",
-
-  "swap.destination.label": "Destination address",
-  "swap.destination.placeholder": "G...",
-  "swap.destination.invalidAddress": "Enter a valid Stellar address (starts with G).",
 
   "swap.disclaimer": "Swap settles directly on Stellar · No wrapped tokens · Protected by solver bonds",
 
@@ -170,27 +172,13 @@ export const en = {
   "explore.error.title": "Couldn't load intents",
   "explore.error.message": "Something went wrong fetching intents. Check your connection and try again.",
 
-  // /my-intents — wallet connected but no intents yet
-  "myIntents.empty.title": "No swaps yet",
-  "myIntents.empty.message": "You haven't submitted any swaps from this wallet. Make your first swap to get started.",
-  "myIntents.empty.cta": "Make your first swap →",
+  // /contributors — pluralised counts (ICU subset, resolved via Intl.PluralRules)
+  "contributors.count": "{count, plural, one {# contribution} other {# contributions}}",
+  "contributors.repositories": "{count, plural, one {# repository} other {# repositories}}",
+  "contributors.mergedPrs": "{count, plural, one {# merged PR} other {# merged PRs}}",
+  "contributors.rank": "{rank, select, gold {Gold} silver {Silver} bronze {Bronze} other {Contributor}}",
+  "contributors.totalVolume": "{n, number} XLM contributed",
+};
 
-  // /my-intents — filter combination matches nothing
-  "myIntents.filterEmpty.title": "No intents match your filters",
-  "myIntents.filterEmpty.message": "Try a different status or chain filter, or clear all filters to see everything.",
-  "myIntents.filterEmpty.clearFilters": "Clear filters",
-
-  // ActivityFeed — empty on a fresh/quiet deployment
-  "activityFeed.empty.title": "No activity yet",
-  "activityFeed.empty.message": "Waiting for the first swap intents to arrive. Submit a swap to kick things off.",
-  "activityFeed.empty.cta": "Swap now →",
-
-  "activityFeed.status.live": "Live",
-  "activityFeed.status.polling": "Polling",
-  "activityFeed.error.unavailable": "Live feed unavailable right now.",
-  "activityFeed.item.route": "{chain} · via {solver}",
-
-  // solve/[address] — fill history empty
-  "solverDetail.fillHistory.empty.title": "No fills yet",
-  "solverDetail.fillHistory.empty.message": "Once this solver starts accepting and filling intents, their history will appear here.",
-} as const;
+export type Messages = typeof en;
+export type MessageKey = keyof Messages;

@@ -17,6 +17,9 @@
  * - Writes are debounced (default 500 ms) to avoid thrashing localStorage on
  *   every keystroke.
  * - `clearDraft()` removes the entry immediately (no debounce).
+ * - When the wallet address changes mid-draft, the previous wallet's entry is
+ *   flushed synchronously and the hook re-reads for the new wallet, so drafts
+ *   are never lost or leaked across wallets.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -57,6 +60,21 @@ function removeEntry(key: string): void {
   }
 }
 
+function loadDraft<T>(key: string, walletAddress: string | null, ttlMs: number): T | null {
+  if (typeof window === "undefined") return null;
+  const entry = readEntry<T>(key);
+  if (!entry) return null;
+  if (Date.now() - entry.savedAt > ttlMs) {
+    removeEntry(key);
+    return null;
+  }
+  if (entry.walletAddress !== walletAddress) {
+    removeEntry(key);
+    return null;
+  }
+  return entry.value;
+}
+
 export function useLocalStorageDraft<T>(
   key: string,
   walletAddress: string | null,
@@ -66,29 +84,39 @@ export function useLocalStorageDraft<T>(
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
 
   // Read on mount — return null for absent, expired, or wrong-wallet entries.
-  const [draft, setDraftState] = useState<T | null>(() => {
-    if (typeof window === "undefined") return null;
-    const entry = readEntry<T>(key);
-    if (!entry) return null;
-    if (Date.now() - entry.savedAt > ttlMs) {
-      removeEntry(key);
-      return null;
-    }
-    if (entry.walletAddress !== walletAddress) {
-      removeEntry(key);
-      return null;
-    }
-    return entry.value;
-  });
+  const [draft, setDraftState] = useState<T | null>(() =>
+    loadDraft<T>(key, walletAddress, ttlMs),
+  );
 
   // Keep a stable ref to the latest wallet address so the debounced write
   // always uses the current value (avoids stale closure issues).
   const walletRef = useRef(walletAddress);
-  useEffect(() => {
-    walletRef.current = walletAddress;
-  }, [walletAddress]);
-
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftRef = useRef<T | null>(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  // Flush any pending debounced write immediately (used on wallet switch and
+  // unmount so in-flight edits are not dropped).
+  const flush = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+      if (draftRef.current !== null) {
+        writeEntry(key, draftRef.current, walletRef.current);
+      }
+    }
+  }, [key]);
+
+  // Handle wallet switching mid-draft: persist the outgoing wallet's draft,
+  // then re-read the entry for the incoming wallet.
+  useEffect(() => {
+    if (walletRef.current === walletAddress) return;
+    flush();
+    walletRef.current = walletAddress;
+    setDraftState(loadDraft<T>(key, walletAddress, ttlMs));
+  }, [walletAddress, key, ttlMs, flush]);
 
   const setDraft = useCallback(
     (value: T) => {
@@ -111,12 +139,12 @@ export function useLocalStorageDraft<T>(
     removeEntry(key);
   }, [key]);
 
-  // Clean up any pending debounced write on unmount.
+  // Flush any pending debounced write on unmount.
   useEffect(() => {
     return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      flush();
     };
-  }, []);
+  }, [flush]);
 
   return [draft, setDraft, clearDraft];
 }

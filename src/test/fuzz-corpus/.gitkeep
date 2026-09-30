@@ -1,0 +1,10 @@
+# Seed-corpus regression folder for fuzz-testing failures.
+#
+# Each JSON file in this directory is a failing input that was
+# discovered by a fuzz test.  The corpus-replay test in the
+# corresponding `.fuzz.test.ts` file reads these entries and
+# replays them as ordinary unit tests so they are caught on
+# every `npm test` run.
+#
+# To add a new entry manually, create a JSON file with the
+# shape:  { "testName": "...", "input": <value>, "timestamp": <epoch> }
