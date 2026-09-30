@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Account, Keypair, Networks, Operation, TransactionBuilder } from "@stellar/stellar-sdk";
 import {
   verifyContractAddresses,
   ContractVerificationError,
@@ -18,7 +19,6 @@ describe("Transaction Contract Verification", () => {
     });
 
     it("should throw error with clear configuration guidance", () => {
-      const xdr = "AAAAAgAAAAB+Aut...";
       const error = new ContractVerificationError(
         "No contract addresses configured. Set NEXT_PUBLIC_SETTLEMENT_CONTRACT and/or NEXT_PUBLIC_SOLVER_REGISTRY_CONTRACT environment variables."
       );
@@ -150,6 +150,32 @@ describe("Transaction Contract Verification", () => {
       expect(error.message).toContain(expected[0]);
       expect(error.message).toContain(expected[1]);
       expect(error.message).toContain(actual);
+    });
+  });
+
+  describe("with a real contract invocation", () => {
+    const CONTRACT = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
+    const invokeXdr = () =>
+      new TransactionBuilder(new Account(Keypair.random().publicKey(), "0"), {
+        fee: "100",
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(Operation.invokeContractFunction({ contract: CONTRACT, function: "deposit", args: [] }))
+        .setTimeout(300)
+        .build()
+        .toXDR();
+
+    it("decodes the invoked contract ID", () => {
+      expect(decodeContractIdFromXdr(invokeXdr())).toBe(CONTRACT);
+    });
+
+    it("accepts a transaction targeting a configured contract", () => {
+      expect(() => verifyContractAddresses(invokeXdr(), [CONTRACT])).not.toThrow();
+    });
+
+    it("rejects a transaction targeting another contract", () => {
+      const other = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
+      expect(() => verifyContractAddresses(invokeXdr(), [other])).toThrow(/Transaction targets contract/);
     });
   });
 });

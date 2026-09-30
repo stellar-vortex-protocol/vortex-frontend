@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Nightly extended fuzz run at 03:00 UTC
+    - cron: "0 3 * * *"
 
 # Cancel in-progress runs for the same branch/PR
 concurrency:
@@ -16,17 +19,45 @@ permissions:
   checks: write
 
 jobs:
-  frontend:
-    name: Frontend (Next.js)
+  # ─── nightly extended fuzz ──────────────────────────────
+  fuzz:
+    name: Fuzz Tests (nightly)
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      checks: write
+    if: github.event_name == 'schedule'
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Run extended fuzz suite
+        env:
+          FUZZ_RUNS: "10000"
+        run: npx vitest run src/lib/*.fuzz.test.ts
+      - name: Upload corpus artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus
+          path: src/test/fuzz-corpus/
+          retention-days: 30
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -35,19 +66,63 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_ACTOR: ${{ github.actor }}
+      - name: Lint lockfile for integrity issues (Issue #480)
+        run: node scripts/lint-lockfile.mjs
+      - name: Verify dependency provenance (Issue #480)
+        run: node scripts/verify-provenance.mjs
+      - name: Generate dependency diff report (Issue #480)
+        run: node scripts/dependency-diff-report.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Post dependency diff report as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '';
+            try {
+              report = fs.readFileSync('dependency-diff-report.md', 'utf8');
+            } catch {
+              report = '⚠️ Dependency diff report could not be generated.';
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report,
+            });
       - run: npm ci
+      - run: npm run check:manifest
       - run: npm run check:env
       - run: npm run check:i18n
+      - run: npm run check:orphan-tests
+      - run: npm run check:docs
+      - run: npm run check:dead-code
+      - name: Typecheck (strict tsconfig, must be zero errors)
+        run: npm run typecheck
       - run: npm run lint
       - run: npm test
       - run: npm run test:coverage
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - name: Coverage ratchet (max 0.5 point decrease)
+        run: |
+          if git show origin/main:coverage/coverage-summary.json > /tmp/base-coverage.json 2>/dev/null; then
+            node scripts/coverage-ratchet.mjs /tmp/base-coverage.json coverage/coverage-summary.json
+          else
+            echo "No base coverage artifact is committed; establishing the baseline."
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: coverage/
         with:
           name: coverage-report
           path: coverage/
       - run: npx playwright install --with-deps
+      - name: Check the e2e suite resolves
+        run: npm run test:e2e -- --list
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -59,19 +134,68 @@ jobs:
         run: npm run build
         env:
           ANALYZE: true
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: bundle-analysis-report
           path: .next-analyze/
           retention-days: 30
+      - name: Generate CycloneDX SBOM (Issue #480)
+        run: node scripts/generate-sbom.mjs sbom.json
+      - name: Upload SBOM artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
       - name: Build Storybook
         run: npm run build:storybook
+      - name: Run Storybook accessibility tests
+        run: |
+          npx playwright install --with-deps chromium
+          npx --yes http-server storybook-static --port 6006 --silent &
+          npx --yes wait-on --timeout 60000 tcp:127.0.0.1:6006
+          npm run test:storybook
       - name: Run visual regression tests
         run: npm run test:visual
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: visual-regression-report
           path: blob-report/
+          retention-days: 30
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+      - run: npm ci
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-chromium
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - name: Run Playwright tests
+        run: npm run test:e2e -- --project=chromium
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
           retention-days: 30

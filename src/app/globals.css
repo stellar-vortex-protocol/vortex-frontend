@@ -23,8 +23,18 @@
    * below flip every variable to its light counterpart.  Because Tailwind
    * resolves all vx-* color tokens to var(--vx-*), every component in the
    * tree automatically adapts without any className changes.
+   *
+   * The effective theme is driven by the `data-theme` attribute on <html>,
+   * which is set before paint by the inline blocking script in layout.tsx
+   * (see src/lib/theme.ts).  `data-theme="light"` selects the light palette;
+   * `data-theme="dark"` (or no attribute) selects the dark palette.  The
+   * light palette is defined exactly once below — it is NOT duplicated inside
+   * a prefers-color-scheme media query, so a user override always wins.
    */
-  :root {
+  :root,
+  html[data-theme="dark"] {
+    color-scheme: dark;
+
     /* Surfaces */
     --vx-ink:     #080C14;
     --vx-base:    #0C1120;
@@ -65,6 +75,10 @@
 
     /* Focus ring */
     --vx-focus-ring: rgba(76, 235, 168, 0.5);
+
+    /* Motion durations — zeroed under reduce (see below) */
+    --vx-motion-duration: 1.2s;
+    --vx-motion-duration-fast: 0.15s;
   }
 
   /* ── Light theme ─────────────────────────────────────────────────────────── */
@@ -72,50 +86,54 @@
    * All surfaces invert: ink → near-white, card → white, surface → light grey.
    * Text colour inverts similarly.  The sage/lavender hues stay saturated but
    * their backgrounds and dims shift so they read well on white.
+   *
+   * Selected only when the user (or the pre-paint script) sets
+   * data-theme="light" on <html>.  Defined once here — never inside a
+   * prefers-color-scheme media query — so an explicit user choice is honoured.
    */
-  @media (prefers-color-scheme: light) {
-    :root {
-      /* Surfaces */
-      --vx-ink:     #FFFFFF;
-      --vx-base:    #F5F7FA;
-      --vx-surface: #EFF1F5;
-      --vx-card:    #FFFFFF;
-      --vx-border:  rgba(0, 0, 0, 0.08);
-      --vx-line:    rgba(0, 0, 0, 0.05);
+  html[data-theme="light"] {
+    color-scheme: light;
 
-      /* Primary: sage green (slightly deeper for contrast on white) */
-      --vx-sage:     #0FA871;
-      --vx-sage-dim: #0A6849;
-      --vx-sage-bg:  rgba(15, 168, 113, 0.08);
+    /* Surfaces */
+    --vx-ink:     #FFFFFF;
+    --vx-base:    #F5F7FA;
+    --vx-surface: #EFF1F5;
+    --vx-card:    #FFFFFF;
+    --vx-border:  rgba(0, 0, 0, 0.08);
+    --vx-line:    rgba(0, 0, 0, 0.05);
 
-      /* Accent: lavender */
-      --vx-lav:     #7C3AED;
-      --vx-lav-dim: #4C1D95;
-      --vx-lav-bg:  rgba(124, 58, 237, 0.08);
+    /* Primary: sage green (slightly deeper for contrast on white) */
+    --vx-sage:     #0FA871;
+    --vx-sage-dim: #0A6849;
+    --vx-sage-bg:  rgba(15, 168, 113, 0.08);
 
-      /* State */
-      --vx-amber: #D97706;
-      --vx-rose:  #DC2626;
+    /* Accent: lavender */
+    --vx-lav:     #7C3AED;
+    --vx-lav-dim: #4C1D95;
+    --vx-lav-bg:  rgba(124, 58, 237, 0.08);
 
-      /* Text */
-      --vx-text:  #0F172A;
-      --vx-muted: #64748B;
-      --vx-dim:   #CBD5E1;
+    /* State */
+    --vx-amber: #D97706;
+    --vx-rose:  #DC2626;
 
-      /* Body background */
-      --vx-body-bg:      #F5F7FA;
-      --vx-body-radial1: rgba(15, 168, 113, 0.04);
-      --vx-body-radial2: rgba(124, 58, 237, 0.03);
+    /* Text */
+    --vx-text:  #0F172A;
+    --vx-muted: #64748B;
+    --vx-dim:   #CBD5E1;
 
-      /* Scrollbar */
-      --vx-scrollbar-thumb: rgba(0, 0, 0, 0.12);
+    /* Body background */
+    --vx-body-bg:      #F5F7FA;
+    --vx-body-radial1: rgba(15, 168, 113, 0.04);
+    --vx-body-radial2: rgba(124, 58, 237, 0.03);
 
-      /* Selection */
-      --vx-selection-bg: rgba(15, 168, 113, 0.2);
+    /* Scrollbar */
+    --vx-scrollbar-thumb: rgba(0, 0, 0, 0.12);
 
-      /* Focus ring */
-      --vx-focus-ring: rgba(15, 168, 113, 0.5);
-    }
+    /* Selection */
+    --vx-selection-bg: rgba(15, 168, 113, 0.2);
+
+    /* Focus ring */
+    --vx-focus-ring: rgba(15, 168, 113, 0.5);
   }
 
   /* ── Body ────────────────────────────────────────────────────────────────── */
@@ -177,8 +195,12 @@
     background-image: linear-gradient(160deg, color-mix(in srgb, var(--vx-sage) 2.5%, transparent) 0%, transparent 50%);
   }
 
+  /* The vx-* colours are CSS variables, so Tailwind can't apply an opacity
+     modifier to them (`bg-vx-surface/60` fails the build); translucent
+     variants below use color-mix() instead. */
   .card-sm {
-    @apply bg-vx-surface/60 border border-vx-border rounded-lg;
+    @apply border border-vx-border rounded-lg;
+    background-color: color-mix(in srgb, var(--vx-surface) 60%, transparent);
   }
 
   .eyebrow {
@@ -195,19 +217,29 @@
   }
 
   .input-swap {
-    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg placeholder-vx-dim/60 caret-vx-sage focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
+    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg caret-vx-sage focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
+  }
+
+  .input-swap::placeholder {
+    color: color-mix(in srgb, var(--vx-dim) 60%, transparent);
   }
 
   .token-btn {
-    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg border border-vx-border hover:border-vx-border hover:bg-vx-card/80 transition-all duration-150 cursor-pointer select-none;
+    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg border border-vx-border hover:border-vx-border transition-all duration-150 cursor-pointer select-none;
+  }
+
+  .token-btn:hover {
+    background-color: color-mix(in srgb, var(--vx-card) 80%, transparent);
   }
 
   .chain-badge {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-lav-bg text-vx-lav border border-vx-lav/20;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-lav-bg text-vx-lav border;
+    border-color: color-mix(in srgb, var(--vx-lav) 20%, transparent);
   }
 
   .stellar-badge {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-sage-bg text-vx-sage border border-vx-sage/20;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-sage-bg text-vx-sage border;
+    border-color: color-mix(in srgb, var(--vx-sage) 20%, transparent);
   }
 
   .state-dot {
@@ -251,7 +283,7 @@
 .intent-flow-line {
   stroke-dasharray: 6 4;
   stroke-dashoffset: 10;
-  animation: flow 1.2s linear infinite;
+  animation: flow var(--vx-motion-duration) linear infinite;
 }
 
 @keyframes flow {
@@ -260,7 +292,20 @@
   }
 }
 
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+/*
+ * Motion is disabled when either the OS requests it (prefers-reduced-motion)
+ * or the user picks "reduce" in SettingsPanel (html[data-motion="reduce"]).
+ * Durations collapse to 0.01ms and infinite loops are stopped so no animation
+ * keeps running (WCAG 2.2.2).  Essential progress indicators stay visible as
+ * static marks rather than disappearing.
+ */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --vx-motion-duration: 0.01ms;
+    --vx-motion-duration-fast: 0.01ms;
+  }
+
   *,
   *::before,
   *::after {
@@ -269,6 +314,11 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-motion="reduce"] {
+  --vx-motion-duration: 0.01ms;
+  --vx-motion-duration-fast: 0.01ms;
 }
 
 html[data-motion="reduce"] *,
@@ -280,16 +330,100 @@ html[data-motion="reduce"] *::after {
   scroll-behavior: auto !important;
 }
 
-html[data-motion="allow"] *,
-html[data-motion="allow"] *::before,
-html[data-motion="allow"] *::after {
-  scroll-behavior: smooth;
+/* ── Print: force the light palette ──────────────────────────────────────── */
+/*
+ * Printing on a dark palette wastes ink and is often unreadable.  When the
+ * user prints, force the light token values regardless of the active theme.
+ */
+@media print {
+  :root,
+  html[data-theme="dark"],
+  html[data-theme="light"] {
+    color-scheme: light;
+
+    --vx-ink:     #FFFFFF;
+    --vx-base:    #FFFFFF;
+    --vx-surface: #FFFFFF;
+    --vx-card:    #FFFFFF;
+    --vx-border:  rgba(0, 0, 0, 0.15);
+    --vx-line:    rgba(0, 0, 0, 0.1);
+
+    --vx-sage:     #0A6849;
+    --vx-sage-dim: #0A6849;
+    --vx-sage-bg:  rgba(15, 168, 113, 0.08);
+
+    --vx-lav:     #4C1D95;
+    --vx-lav-dim: #4C1D95;
+    --vx-lav-bg:  rgba(124, 58, 237, 0.08);
+
+    --vx-amber: #92400E;
+    --vx-rose:  #991B1B;
+
+    --vx-text:  #000000;
+    --vx-muted: #374151;
+    --vx-dim:   #9CA3AF;
+
+    --vx-body-bg:      #FFFFFF;
+    --vx-body-radial1: transparent;
+    --vx-body-radial2: transparent;
+
+    --vx-scrollbar-thumb: rgba(0, 0, 0, 0.2);
+    --vx-selection-bg:    rgba(15, 168, 113, 0.2);
+    --vx-focus-ring:      rgba(15, 168, 113, 0.5);
+  }
+
+  body {
+    background-image: none;
+  }
 }
 
-/* Safe-area padding for notched/dynamic-island iOS devices */
-@layer utilities {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+/* ── Print (#447) ─────────────────────────────────────────────────────────
+ * Printed receipts/records always use a light palette regardless of the
+ * user's theme, and drop navigation and interactive chrome.
+ */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  :root,
+  :root[data-theme] {
+    --vx-ink: #ffffff;
+    --vx-base: #ffffff;
+    --vx-surface: #f5f5f5;
+    --vx-card: #ffffff;
+    --vx-border: rgba(0, 0, 0, 0.2);
+    --vx-line: rgba(0, 0, 0, 0.1);
+    --vx-text: #111111;
+    --vx-muted: #444444;
+    --vx-dim: #666666;
+    --vx-sage: #1b6b49;
+    --vx-body-bg: #ffffff;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .receipt dd {
+    word-break: break-all;
+  }
+
+  .receipt dl > div {
+    break-inside: avoid;
   }
 
   /*
