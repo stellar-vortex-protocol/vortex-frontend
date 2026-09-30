@@ -11,10 +11,11 @@ import { useWalletStore } from "@/store/wallet";
 import { useMyLiveIntents } from "@/hooks/useMyLiveIntents";
 import { useIntent } from "@/hooks/useIntent";
 import { CHAINS } from "@/lib/marketData";
-import { downloadCsv, buildIntentsCsv } from "@/lib/csv";
+import { timeAgo } from "@/lib/time";
+import { buildIntentsCsv, downloadCsv, CSV_HEADERS } from "@/lib/csv";
 import { SkeletonCard } from "@/components/Skeleton";
-import { buildIntentsCsv, downloadCsv } from "@/lib/csv";
-import type { IntentStatus } from "@/lib/types";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
+import type { FeedItem, IntentStatus } from "@/lib/types";
 
 const STATUS_OPTIONS: Array<IntentStatus | "all"> = [
   "all",
@@ -72,6 +73,7 @@ export default function MyIntentsPage() {
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([...CSV_HEADERS]);
 
   const { intent: expandedIntent, isLoading: expandedLoading, error: expandedError } = useIntent(expandedId);
 
@@ -285,7 +287,7 @@ export default function MyIntentsPage() {
               </div>
             ) : (
               <div data-address={address} data-testid="intents-list" className="space-y-2" role="list">
-                {filtered.map((item) => {
+                {paginated.map((item) => {
                   const isExpanded = expandedId === item.id;
                   return (
                     <div
@@ -295,15 +297,19 @@ export default function MyIntentsPage() {
                       <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-4">
                         <Link
                           href={`/explore/${item.id}`}
-                          className="flex-1 min-w-0 active:opacity-80 transition-opacity"
+                          className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 flex-1 min-w-0 active:opacity-80 transition-opacity"
                         >
-                          <div className="text-sm font-medium text-vx-text truncate">
-                            {item.srcAmount} {item.srcToken} → {item.dstToken}
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-vx-text truncate">
+                              {item.srcAmount} {item.srcToken} → {item.dstToken}
+                            </div>
+                            <div className="text-xs text-vx-muted capitalize">
+                              {item.srcChain} · via {item.solver}
+                            </div>
+                            <div className="text-[11px] text-vx-muted mt-0.5">
+                              submitted {timeAgo(item.createdAt)}
+                            </div>
                           </div>
-                          <div className="text-xs text-vx-muted capitalize">
-                            {item.srcChain} · via {item.solver}
-                          </div>
-                          <IntentStatusBadge status={item.status} />
                         </Link>
                         <div className="self-start sm:self-center flex items-center gap-3">
                           <IntentStatusBadge status={item.status} />

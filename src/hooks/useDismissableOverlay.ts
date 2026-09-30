@@ -38,8 +38,8 @@ export function useDismissableOverlay<T extends HTMLElement>({
       if (event.key !== "Tab") return;
       const focusable = containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
       if (!focusable || focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();

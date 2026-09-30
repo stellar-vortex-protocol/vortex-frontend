@@ -14,11 +14,15 @@ import {
   isSubmitRegistrationResponse,
 } from "./schemas";
 
-const API_URL = process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000";
 const TIMEOUT_MS = 10_000;
 
-// Validate API_URL at module load time for supply-chain defense
-function validateApiUrl(urlString: string): string {
+/**
+ * Validate the API base URL at module load time (supply-chain defense):
+ * https:// is required in production, http:// is allowed otherwise, anything
+ * else throws. Trailing slashes are stripped so `${API_URL}${path}` never
+ * produces `//`; a path prefix (e.g. `https://host/api`) is kept.
+ */
+export function validateApiUrl(urlString: string): string {
   try {
     const url = new URL(urlString);
 
@@ -36,7 +40,7 @@ function validateApiUrl(urlString: string): string {
       );
     }
 
-    return urlString;
+    return urlString.replace(/\/+$/, "");
   } catch (err) {
     if (err instanceof Error && err.message.includes("API_URL must")) {
       throw err;
@@ -47,7 +51,7 @@ function validateApiUrl(urlString: string): string {
   }
 }
 
-const API_URL = validateApiUrl(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000");
+const API_URL = validateApiUrl(process.env["NEXT_PUBLIC_API_URL"] ?? "http://localhost:4000");
 
 export class ApiError extends Error {
   status: number;

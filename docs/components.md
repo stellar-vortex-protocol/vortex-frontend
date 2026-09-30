@@ -133,3 +133,61 @@ All portal state is URL-synced (`useQueryState`) so views are shareable and the 
   - *Performance (200 rows):* one shared 1 s ticker (`useNow`, `useSyncExternalStore`) drives every countdown instead of a timer per row, filtering/sorting is memoised, and a tick only changes countdown text, so 200 rows cost one interval and one list re-render per second (no per-row effects). If profiling shows otherwise at larger sizes, the list can adopt the same virtualisation as `DataTable`.
 - **`RegistrationWizard`** — steps *eligibility → verify address → bond → review & sign → done* driven by the pure `wizardReducer` with per-step validators (`src/lib/registrationWizard.ts`). Eligibility checks (wallet, network, valid address, not already registered, account funded via the `/api/account-status` Horizon proxy — cancelable) each show pass/fail/pending plus remediation text. Bond maths uses 7-decimal integer (BigInt) units; minimum, suggestions and the unbonding period come from `SOLVER_BOND_CONFIG`. Progress is saved per wallet with a 24 h TTL (`useLocalStorageDraft`) and restored only through an explicit "Resume registration" banner; switching wallets mid-flow resets with a notice; a draft whose bond is now below the minimum is sent back to the bond step. The step is mirrored in `?step=` so the browser back button moves between steps.
 - **`SolverBadge` / `SolverIdentityChip`** — optional stellar.toml identity chip (`verified | unverified | mismatch | unavailable`) with icon + text + tooltip (never colour-only). Display only — see the threat model in `security-audit.md`.
+
+## `IntentTracker`
+
+[`src/components/IntentTracker.tsx`](../src/components/IntentTracker.tsx) shows an
+intent's journey after submission: **submitted → accepted → filled / failed /
+expired**, with step timestamps, a live deadline countdown and localised
+next-step guidance for each state.
+
+- **Where:** under the swap card on `/` after a submit (the intent id is
+  persisted in `localStorage` under `vortex:lastSubmittedIntent`, so a reload
+  mid-flight keeps tracking; terminal trackers can be dismissed) and on
+  `/explore/[id]`.
+- **Data:** `useIntentLifecycle(id)` merges the REST detail (`/intents/:id`)
+  with WebSocket updates from the shared realtime connection, filtered by id.
+  Status never regresses on out-of-order frames. When the socket is not open
+  it polls with backoff (5 s doubling to 60 s) until the intent is terminal.
+- **States:** `expired` is derived client-side (non-terminal past its
+  deadline) and is distinct from `failed`. The API exposes only `createdAt`,
+  so accept/fill timestamps are the times the client observed them and are
+  omitted when unknown. Derivation is the pure `deriveTrackerSteps(intent, now)`
+  in [`src/lib/intentLifecycle.ts`](../src/lib/intentLifecycle.ts).
+- **Retry:** failed/expired intents offer "Retry this swap", which links to
+  `/?srcChain=&srcToken=&amount=&dstToken=` to pre-fill `SwapCard`. The
+  destination address is never carried over (existing policy).
+- **Cancel — known gap:** neither `src/lib/api.ts` nor the relay contract
+  exposes a cancel endpoint today, so no Cancel action is shown. When one
+  lands, add it behind a feature flag with a confirmation dialog and the
+  standard XDR review step. Refund execution is out of scope.
+
+## `FeedbackForm`
+
+[`src/components/FeedbackForm.tsx`](../src/components/FeedbackForm.tsx)
+
+"Suggest a feature" intake for users who don't file GitHub issues. A toggle in
+the footer opens a small form (title + description); submitting opens GitHub's
+new-issue page in a new tab, pre-filled by
+[`buildFeatureRequestUrl`](../src/lib/featureRequest.ts) with the `enhancement`
+label and a body that follows
+[`feature_request.md`](../.github/ISSUE_TEMPLATE/feature_request.md)'s sections.
+
+```tsx
+import { FeedbackForm } from "@/components/FeedbackForm";
+
+<FeedbackForm />;
+```
+
+**Props**: none. Already mounted in [`Footer`](../src/components/Footer.tsx).
+
+**Behaviour**
+
+- No backend: nothing is stored in-app, and posting the issue needs a GitHub
+  account. The form says so before the user submits.
+- Titles are capped at 120 characters and descriptions at 2,000 (longer text is
+  truncated with a note in the issue body), which keeps the URL within the
+  length browsers and GitHub reliably accept.
+- The `template` query parameter isn't used, because GitHub would then show the
+  template's empty body instead of the pre-filled one.
+

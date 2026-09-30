@@ -10,6 +10,15 @@ vi.mock("@/hooks/useGlobalErrorCapture", () => ({
   useGlobalErrorCapture: useGlobalErrorCaptureMock,
 }));
 
+// Stub the other global client components so this test only checks that the
+// layout mounts them.
+vi.mock("@/components/CommandPalette", () => ({
+  CommandPalette: () => <div data-testid="command-palette" />,
+}));
+vi.mock("@/components/ConnectivityBanner", () => ({
+  ConnectivityBanner: () => <div data-testid="connectivity-banner" />,
+}));
+
 import RootLayout from "./layout";
 
 describe("RootLayout", () => {
@@ -43,5 +52,16 @@ describe("RootLayout", () => {
       </RootLayout>
     );
     expect(useGlobalErrorCaptureMock).toHaveBeenCalled();
+  });
+
+  it("mounts the global error capture, command palette and connectivity banner", () => {
+    render(
+      <RootLayout>
+        <div />
+      </RootLayout>,
+    );
+    expect(useGlobalErrorCaptureMock).toHaveBeenCalled();
+    expect(screen.getByTestId("command-palette")).toBeInTheDocument();
+    expect(screen.getByTestId("connectivity-banner")).toBeInTheDocument();
   });
 });

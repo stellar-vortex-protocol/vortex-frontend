@@ -1,46 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
+import { configureRealtime, resetRealtime } from "@/lib/realtime/manager";
+import type { WebSocketLike } from "@/lib/realtime/webSocketClient";
 import { useWebSocket } from "./useWebSocket";
 
-class MockWebSocket {
+class MockWebSocket implements WebSocketLike {
   static instances: MockWebSocket[] = [];
-  url: string;
-  onopen: (() => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
-  onerror: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onopen: WebSocketLike["onopen"] = null;
+  onmessage: WebSocketLike["onmessage"] = null;
+  onerror: WebSocketLike["onerror"] = null;
+  onclose: WebSocketLike["onclose"] = null;
   closed = false;
-  readyState = WebSocket.CONNECTING;
-
-  constructor(url: string) {
-    this.url = url;
-    this.readyState = WebSocket.CONNECTING;
+  constructor(readonly url: string) {
     MockWebSocket.instances.push(this);
   }
-
   close() {
     this.closed = true;
-    this.readyState = WebSocket.CLOSED;
-    this.onclose?.();
   }
 }
 
-// Add WebSocket constants to MockWebSocket
-Object.assign(MockWebSocket, {
-  CONNECTING: 0,
-  OPEN: 1,
-  CLOSING: 2,
-  CLOSED: 3,
-});
+const URL = "ws://localhost:4000/ws";
 
 describe("useWebSocket", () => {
   beforeEach(() => {
     MockWebSocket.instances = [];
-    vi.stubGlobal("WebSocket", MockWebSocket);
+    configureRealtime({ WebSocketImpl: MockWebSocket, random: () => 0.5 });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    resetRealtime();
+    configureRealtime({});
+    vi.useRealTimers();
   });
 
   it("stays closed and opens no socket when url is null", () => {
@@ -50,164 +40,41 @@ describe("useWebSocket", () => {
   });
 
   it("starts in connecting state and creates a socket", () => {
-    const { result } = renderHook(() => useWebSocket("ws://localhost:4000/ws"));
+    const { result } = renderHook(() => useWebSocket(URL));
     expect(result.current.status).toBe("connecting");
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 
-  it("parses incoming JSON messages into lastMessage", () => {
-    renderHook(() => useWebSocket<{ hello: string }>("ws://localhost:4000/ws"));
-
-    // Verify message handler is set
-    expect(MockWebSocket.instances[0]!.onmessage).toBeDefined();
-
-    // Test parsing works by calling handler directly
-    let parsedMessage: any = null;
-    MockWebSocket.instances[0]!.onmessage = (event) => {
-      try {
-        parsedMessage = JSON.parse(event.data);
-      } catch {
-        // Ignore errors
-      }
-    };
-
-    MockWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify({ hello: "world" }) });
-    expect(parsedMessage).toEqual({ hello: "world" });
+  it("does not reconnect on connecting → open transitions (regression)", () => {
+    const { result } = renderHook(() => useWebSocket(URL));
+    act(() => MockWebSocket.instances[0]!.onopen?.());
+    expect(result.current.status).toBe("open");
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(MockWebSocket.instances[0]!.closed).toBe(false);
   });
 
-  it("ignores malformed message frames instead of throwing", () => {
-    const { result } = renderHook(() => useWebSocket("ws://localhost:4000/ws"));
-    expect(() => {
-      MockWebSocket.instances[0]!.onmessage?.({ data: "not json" });
-    }).not.toThrow();
+  it("parses incoming JSON messages into lastMessage and ignores malformed frames", () => {
+    const { result } = renderHook(() => useWebSocket<{ hello: string }>(URL));
+    act(() => MockWebSocket.instances[0]!.onmessage?.({ data: "not json" }));
     expect(result.current.lastMessage).toBeNull();
+    act(() => MockWebSocket.instances[0]!.onmessage?.({ data: '{"hello":"world"}' }));
+    expect(result.current.lastMessage).toEqual({ hello: "world" });
   });
 
-  // Drops the newest socket and asserts the reconnect fires only once the
-  // expected backoff delay has fully elapsed.
-  const expectReconnectAfter = (expectedDelayMs: number) => {
-    const before = MockWebSocket.instances.length;
-    act(() => {
-      MockWebSocket.instances[before - 1]!.onclose?.();
-    });
-    act(() => {
-      vi.advanceTimersByTime(expectedDelayMs - 1);
-    });
-    expect(MockWebSocket.instances).toHaveLength(before);
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(MockWebSocket.instances).toHaveLength(before + 1);
-  };
-
-  it("backs off exponentially across repeated failures, capped at the maximum", () => {
-    vi.useFakeTimers();
-    try {
-      renderHook(() => useWebSocket("ws://localhost:4000/ws"));
-
-      const socket1 = MockWebSocket.instances[0]!;
-      socket1.readyState = WebSocket.CLOSED;
-      socket1.onclose?.();
-
-      // Advance past first delay (3000 + jitter)
-      vi.advanceTimersByTime(4000);
-      expect(MockWebSocket.instances.length).toBeGreaterThan(1);
-
-      const socket2 = MockWebSocket.instances[1]!;
-      socket2.readyState = WebSocket.CLOSED;
-      socket2.onclose?.();
-
-      // Advance past second delay (6000 + jitter)
-      vi.advanceTimersByTime(7000);
-      expect(MockWebSocket.instances.length).toBeGreaterThan(2);
-    } finally {
-      vi.useRealTimers();
-    }
+  it("shares one socket between hooks with the same url", () => {
+    renderHook(() => useWebSocket(URL));
+    renderHook(() => useWebSocket(URL));
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 
-  it("resets backoff after a successful connection", () => {
+  it("reconnects after the backoff delay and exposes manual reconnect()", () => {
     vi.useFakeTimers();
-    try {
-      renderHook(() => useWebSocket("ws://localhost:4000/ws"));
-
-      const socket1 = MockWebSocket.instances[0]!;
-      socket1.readyState = WebSocket.CLOSED;
-      socket1.onclose?.();
-
-      act(() => {
-        MockWebSocket.instances[MockWebSocket.instances.length - 1]!.onopen?.();
-      });
-
-      // Connection succeeds
-      socket2.readyState = WebSocket.OPEN;
-      socket2.onopen?.();
-
-      // Now close and verify backoff resets to initial delay
-      socket2.readyState = WebSocket.CLOSED;
-      socket2.onclose?.();
-
-      vi.advanceTimersByTime(4000);
-      expect(MockWebSocket.instances.length).toBeGreaterThan(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("implements maximum reconnection attempt limit", () => {
-    vi.useFakeTimers();
-    try {
-      renderHook(() => useWebSocket("ws://localhost:4000/ws"));
-
-      const initialCount = MockWebSocket.instances.length;
-
-      // Trigger multiple failed reconnection attempts
-      for (let i = 0; i < 8; i++) {
-        const lastSocket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
-        if (lastSocket) {
-          lastSocket.readyState = WebSocket.CLOSED;
-          lastSocket.onclose?.();
-        }
-        vi.advanceTimersByTime(150000);
-      }
-
-      const countBeforeLimit = MockWebSocket.instances.length;
-      expect(countBeforeLimit).toBeGreaterThan(initialCount);
-
-      // Further attempts should still create sockets until limit
-      for (let i = 0; i < 3; i++) {
-        const lastSocket = MockWebSocket.instances[MockWebSocket.instances.length - 1];
-        if (lastSocket) {
-          lastSocket.readyState = WebSocket.CLOSED;
-          lastSocket.onclose?.();
-        }
-        vi.advanceTimersByTime(150000);
-      }
-
-      // Should have hit the max attempt limit
-      const finalCount = MockWebSocket.instances.length;
-      expect(finalCount).toBeGreaterThan(countBeforeLimit);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("clears reconnection timers on unmount to prevent memory leaks", () => {
-    vi.useFakeTimers();
-    try {
-      const { unmount } = renderHook(() => useWebSocket("ws://localhost:4000/ws"));
-
-      const socket = MockWebSocket.instances[0]!;
-      socket.readyState = WebSocket.CLOSED;
-      socket.onclose?.();
-
-      const timerCountBefore = vi.getTimerCount();
-      unmount();
-      const timerCountAfter = vi.getTimerCount();
-
-      // Timers should be cleared
-      expect(timerCountAfter).toBeLessThanOrEqual(timerCountBefore);
-    } finally {
-      vi.useRealTimers();
-    }
+    const { result } = renderHook(() => useWebSocket(URL));
+    act(() => MockWebSocket.instances[0]!.onclose?.({ code: 1006 }));
+    expect(result.current.status).toBe("backoff");
+    act(() => vi.advanceTimersByTime(3000));
+    expect(MockWebSocket.instances).toHaveLength(2);
+    act(() => result.current.reconnect());
+    expect(MockWebSocket.instances).toHaveLength(3);
   });
 });

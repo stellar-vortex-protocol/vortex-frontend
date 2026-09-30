@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/lib/i18n/I18nProvider";
+import { FeedbackForm } from "@/components/FeedbackForm";
 
 export function Footer() {
   const { t } = useTranslation();
@@ -10,6 +11,7 @@ export function Footer() {
       <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-vx-muted">
         <span>{t("footer.copyright")}</span>
         <div className="flex gap-5">
+          <FeedbackForm />
           <a href="https://github.com/vortex-protocol" className="hover:text-vx-text transition-colors">
             {t("footer.github")}
           </a>

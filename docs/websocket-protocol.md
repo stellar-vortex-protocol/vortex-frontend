@@ -2,15 +2,30 @@
 
 ## Overview
 
-The frontend connects to a WebSocket endpoint defined by `NEXT_PUBLIC_WS_URL`. The generic
-`useWebSocket<T>` hook (`src/hooks/useWebSocket.ts`) manages the connection, auto-reconnect, and
-JSON parsing. Each frame is expected to be a JSON object matched to the generic type `T`.
+The frontend connects to a WebSocket endpoint defined by `NEXT_PUBLIC_WS_URL`. Connection
+lifecycle lives in `WebSocketClient` (`src/lib/realtime/webSocketClient.ts`); one client per URL
+is shared by every hook through the realtime manager (see `docs/architecture.md`). Each frame is
+expected to be a JSON object.
+
+**Connection states:** `idle → connecting → open`, then on drop `backoff → connecting …`, ending
+in `unavailable` after the attempt cap; `closed` once released or when the URL is `null`.
 
 **Connection behavior:**
 
-- Reconnect delay: 3 seconds
-- Malformed frames are silently ignored
-- Passing `null` as the URL tears down the socket and stays idle
+- Reconnect: exponential backoff starting at 3 s, doubling per attempt, capped at 60 s, with
+  ±20 % jitter; after 10 consecutive failed attempts the state becomes `unavailable`.
+- Attempts reset only after a **stable** open (the connection survived ≥ 10 s), not on `onopen`,
+  so a server that accepts then immediately drops cannot cause a tight reconnect loop.
+- Heartbeat watchdog: if no frame arrives for 45 s while open, the socket is treated as
+  half-open, closed, and reconnected through backoff.
+- Close codes: `1008` (policy violation) and `1003` (unsupported data) go straight to
+  `unavailable`; others (`1000`, `1006`, …) reconnect with backoff.
+- Offline/online: going offline pauses reconnects; coming back online retries immediately.
+- Page visibility: returning to the tab while in `backoff`/`unavailable` retries immediately.
+- Manual retry: `useWebSocket(url).reconnect()` / `useRealtimeStatus(url).reconnect()`.
+- Status transitions never tear down the socket (the hook effect depends only on the URL).
+- Late events from replaced sockets are ignored; malformed frames are silently dropped.
+- Passing `null` as the URL tears down the subscription and stays idle.
 
 ## Feeds
 
@@ -68,6 +83,30 @@ a single "N intents updated" toast when several land within the same
 the connected wallet address changes. Browser `Notification` support was
 scoped out of the initial pass — see issue #231 — since it requires an
 explicit settings toggle to request permission.
+
+## Per-Intent Live Updates (`useIntent`)
+
+`useIntent` (`src/hooks/useIntent.ts`) provides live updates for a single intent
+detail page using two complementary mechanisms:
+
+1. **SWR polling** — `refreshInterval: 5_000` while the intent is non-terminal.
+   Once `filled` or `failed` is observed the interval drops to `0`, stopping
+   unnecessary requests automatically.
+
+2. **WebSocket overlay** — subscribes to the same `NEXT_PUBLIC_WS_URL` feed as
+   `useLiveIntents`. Because the backend broadcasts every status change as a
+   `FeedItem`, filtering is done client-side by `id`. This gives sub-second
+   updates when the socket is live, with polling as an automatic fallback.
+
+**No new subscription shape is introduced** — the existing `FeedItem` message
+format is reused. If the backend gains per-intent rooms in the future, the WS
+URL passed to `useWebSocket` in `useIntent` can be changed to a targeted
+endpoint without any changes to the broader protocol.
+
+**Terminal state handling** — once `filled` or `failed` is observed (from either
+the REST snapshot or a WS message), `useIntent` passes `null` to `useWebSocket`,
+tearing down the socket subscription for that intent, and sets SWR's
+`refreshInterval` to `0`.
 
 ## Backend Reference
 

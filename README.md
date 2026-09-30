@@ -28,7 +28,8 @@ registrations. Part of the multi-repo Vortex stack — see also
 | `/api/verify-solver` | `src/app/api/verify-solver/route.ts` | Server-side, SSRF-guarded stellar.toml fetch for solver home-domain badges (display only; see `docs/security-audit.md`) |
 | `/api/account-status` | `src/app/api/account-status/route.ts` | Same-origin Horizon proxy used by the registration wizard's "account funded" check |
 | `/governance` | `src/app/governance/page.tsx` | Governance proposals list and voting overview |
-| `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread |
+| `/governance/[id]` | `src/app/governance/[id]/page.tsx` | Governance proposal detail view with wallet-gated comment discussion thread and, for minimum-bond proposals, an impact preview ("N of M current solvers would no longer qualify", from `src/lib/governanceImpact.ts`) |
+| `/requests` | `src/app/requests/page.tsx` | Community chain/token support requests: a connected wallet can request a chain or token (rejected with a clear message if it's already in `marketData.ts` or already requested) and upvote requests once each, sorted by upvotes. Backed by the in-memory mock `src/lib/supportRequestStore.ts` (same pattern as the governance mock store), so data resets on reload until a backend endpoint exists. A standalone route rather than a governance tab, because it's lightweight signal-gathering, not a parameter proposal with a vote |
 | `/contributors` | `src/app/contributors/page.tsx` | Drips Wave contribution transparency dashboard parsing repository issue metrics |
 
 ---
@@ -288,6 +289,10 @@ The CI pipeline runs visual regression tests on every build, preventing CSS regr
 - [ ] Per-wallet swap history / "my intents" view
 - [ ] Solver reputation detail (fill history, uptime over time)
 - [ ] Localization
+
+Quarterly community reports on protocol activity, shipped changes and governance
+live in [`docs/reports/`](./docs/reports/): start with the latest,
+[2026 Q3](./docs/reports/2026-q3.md), or the [template](./docs/reports/TEMPLATE.md).
 
 ---
 

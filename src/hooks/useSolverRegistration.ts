@@ -7,6 +7,7 @@ import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import { decodeXdr, validateRegistrationXdr, XdrMismatchError } from "@/lib/xdrReview";
+import { assertWalletReady } from "@/lib/network";
 
 export type SolverRegistrationStatus =
   | "idle"
@@ -74,6 +75,8 @@ export function useSolverRegistration() {
         }
       }
 
+      assertWalletReady(process.env.NEXT_PUBLIC_NETWORK ?? "testnet", wallet.network);
+
       advance("building");
       const { registrationId, unsignedXdr } = await registerSolver({ address, bondUsd });
 
@@ -86,6 +89,7 @@ export function useSolverRegistration() {
       // ──────────────────────────────────────────────────────────────────────
 
       setStatus("awaiting-signature");
+      assertWalletReady(process.env.NEXT_PUBLIC_NETWORK ?? "testnet", useWalletStore.getState().network);
       const signedXdr = await walletAdapter.signTransaction(unsignedXdr, {
         network: wallet.network ?? undefined,
       });

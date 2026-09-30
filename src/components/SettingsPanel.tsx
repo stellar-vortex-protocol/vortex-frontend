@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { useLocale, useSetLocale } from "@/lib/i18n/I18nProvider";
 import { useDismissableOverlay } from "@/hooks/useDismissableOverlay";
@@ -26,14 +26,13 @@ export function SettingsPanel() {
   const setLocale = useSetLocale();
   const toggleRef = useRef<HTMLButtonElement>(null);
   const closeSettings = useCallback(() => setOpen(false), []);
+  // Focus-in on open, Tab trapping, Escape (restoring focus to the toggle)
+  // and outside-click dismissal all come from useDismissableOverlay.
   const panelRef = useDismissableOverlay<HTMLDivElement>({
     isOpen: open,
     onClose: closeSettings,
     triggerRef: toggleRef,
   });
-
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -42,43 +41,6 @@ export function SettingsPanel() {
     setMotionPreference(preference);
     applyMotionPreference(preference);
   }, []);
-
-  // Move focus into the panel when it opens.
-  useEffect(() => {
-    if (!open) return;
-    const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
-      "select, button, input, [tabindex]:not([tabindex='-1'])"
-    );
-    firstFocusable?.focus();
-  }, [open]);
-
-  const closePanel = () => {
-    setOpen(false);
-    toggleRef.current?.focus();
-  };
-
-  // Trap Tab focus inside panel; Escape closes it.
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      closePanel();
-      return;
-    }
-    if (e.key !== "Tab") return;
-    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
-      "select, button, input, [tabindex]:not([tabindex='-1'])"
-    );
-    if (!focusable || focusable.length === 0) return;
-    const first = focusable[0]!;
-    const last = focusable[focusable.length - 1]!;
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
 
   const handleMotionChange = (preference: MotionPreference) => {
     setMotionPreference(preference);
@@ -95,7 +57,7 @@ export function SettingsPanel() {
       <button
         ref={toggleRef}
         type="button"
-        onClick={() => (open ? closePanel() : setOpen(true))}
+        onClick={() => setOpen((isOpen) => !isOpen)}
         aria-expanded={open}
         aria-controls="settings-panel"
         aria-haspopup="dialog"
@@ -111,7 +73,6 @@ export function SettingsPanel() {
           role="dialog"
           aria-modal="true"
           aria-label="Settings"
-          onKeyDown={handleKeyDown}
           className="absolute right-0 mt-2 w-64 rounded-xl border border-vx-border bg-vx-card p-4 shadow-xl z-50"
         >
           <div className="space-y-4">
