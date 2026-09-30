@@ -18,6 +18,11 @@ jobs:
   deploy-preview:
     name: Deploy to Preview
     runs-on: ubuntu-latest
+    outputs:
+      is-fork: ${{ steps.fork-check.outputs.is-fork }}
+      deployment-url: ${{ steps.vercel.outputs.deployment-url }}
+      deployment-success: ${{ steps.vercel.outputs.deployment-success }}
+      build-timestamp: ${{ steps.build.outputs.build-timestamp }}
 
     steps:
       - name: Check if fork PR
@@ -31,12 +36,12 @@ jobs:
           fi
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -93,7 +98,7 @@ jobs:
 
       - name: Comment on PR - Fork PR
         if: steps.fork-check.outputs.is-fork == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
@@ -105,7 +110,7 @@ jobs:
 
       - name: Comment on PR - Preview Ready
         if: steps.fork-check.outputs.is-fork == 'false' && steps.vercel.outputs.deployment-success == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
@@ -117,7 +122,7 @@ jobs:
 
       - name: Comment on PR - Deployment Failed
         if: steps.fork-check.outputs.is-fork == 'false' && steps.vercel.outputs.deployment-success == 'false'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
@@ -129,7 +134,7 @@ jobs:
 
       - name: Comment on PR - Credentials Missing
         if: steps.fork-check.outputs.is-fork == 'false' && steps.vercel.outputs.deployment-url == 'CREDENTIALS_MISSING'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.createComment({
@@ -138,3 +143,197 @@ jobs:
               repo: context.repo.repo,
               body: `### ℹ️ Preview Deployment Unavailable\n\n**Reason**: Deployment credentials not configured\n\nThe maintainers need to set up Vercel integration by configuring:\n- \`VERCEL_TOKEN\`\n- \`VERCEL_ORG_ID\`\n- \`VERCEL_PROJECT_ID\`\n\nTo review these changes, clone the repository and run \`npm run dev\` locally.`
             });
+
+  preview-checks:
+    name: Preview Checks (e2e, Lighthouse, visual diff)
+    needs: deploy-preview
+    if: needs.deploy-preview.outputs.is-fork == 'false' && needs.deploy-preview.outputs.deployment-success == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for preview to be ready
+        id: wait
+        env:
+          PREVIEW_URL: ${{ needs.deploy-preview.outputs.deployment-url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          echo "Polling $PREVIEW_URL until ready (timeout 120s)..."
+          for i in $(seq 1 24); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "x-vercel-protection-bypass: ${VERCEL_AUTOMATION_BYPASS_SECRET}" \
+              "$PREVIEW_URL" || echo "000")
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ] || [ "$STATUS" = "403" ]; then
+              echo "Preview responded with HTTP $STATUS"
+              echo "ready=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "ready=false" >> $GITHUB_OUTPUT
+          echo "::warning::Preview did not become ready within timeout; continuing anyway"
+
+      - name: Run Playwright smoke suite
+        id: smoke
+        continue-on-error: true
+        env:
+          BASE_URL: ${{ needs.deploy-preview.outputs.deployment-url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          npx playwright test e2e/smoke --project=chromium --reporter=line,json \
+            --output=playwright-report || echo "smoke-failed=true" >> $GITHUB_OUTPUT
+
+      - name: Upload Playwright traces on failure
+        if: steps.smoke.outputs.smoke-failed == 'true' || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ github.event.pull_request.number }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Run Lighthouse on key routes
+        id: lighthouse
+        continue-on-error: true
+        env:
+          PREVIEW_URL: ${{ needs.deploy-preview.outputs.deployment-url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          mkdir -p lighthouse-report
+          for ROUTE in "/" "/orders" "/intents"; do
+            SAFE=$(echo "$ROUTE" | tr '/' '_')
+            npx --yes lighthouse@11 "$PREVIEW_URL$ROUTE" \
+              --only-categories=performance,accessibility,best-practices,seo \
+              --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+              --extra-headers "{\"x-vercel-protection-bypass\":\"${VERCEL_AUTOMATION_BYPASS_SECRET}\"}" \
+              --output=json --output-path="lighthouse-report/${SAFE}.json" \
+              --quiet || echo "::warning::Lighthouse failed for $ROUTE"
+          done
+
+      - name: Visual diff of key routes
+        id: visual
+        continue-on-error: true
+        env:
+          BASE_URL: ${{ needs.deploy-preview.outputs.deployment-url }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          npx playwright test e2e/visual --project=chromium --update-snapshots \
+            --output=visual-diff || echo "::warning::Visual capture failed"
+
+      - name: Upload visual diff bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff-${{ github.event.pull_request.number }}
+          path: visual-diff/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload Lighthouse report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report-${{ github.event.pull_request.number }}
+          path: lighthouse-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Build consolidated report and upsert sticky comment
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ needs.deploy-preview.outputs.deployment-url }}
+          SMOKE_FAILED: ${{ steps.smoke.outputs.smoke-failed }}
+          BUILD_TIMESTAMP: ${{ needs.deploy-preview.outputs.build-timestamp }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- preview-report -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const previewUrl = process.env.PREVIEW_URL || '';
+            const smokeFailed = process.env.SMOKE_FAILED === 'true';
+
+            const smokeStatus = smokeFailed ? '❌ failed' : '✅ passed';
+
+            // Lighthouse deltas (best-effort; report raw scores if no baseline)
+            let lighthouseLines = [];
+            try {
+              const files = fs.readdirSync('lighthouse-report').filter((f) => f.endsWith('.json'));
+              for (const file of files) {
+                const data = JSON.parse(fs.readFileSync(`lighthouse-report/${file}`, 'utf8'));
+                const perf = Math.round((data.categories?.performance?.score ?? 0) * 100);
+                const a11y = Math.round((data.categories?.accessibility?.score ?? 0) * 100);
+                lighthouseLines.push(`| \`${file.replace('.json', '').replace(/_/g, '/') || '/'}\` | ${perf} | ${a11y} |`);
+              }
+            } catch (e) {
+              lighthouseLines.push('| _no report_ | - | - |');
+            }
+
+            const body = [
+              marker,
+              '## 🔍 Preview Report',
+              '',
+              `**Preview URL:** ${previewUrl ? `[${previewUrl}](${previewUrl})` : '_unavailable_'}`,
+              `**Built:** ${process.env.BUILD_TIMESTAMP || 'unknown'}`,
+              '',
+              '### Checks',
+              `- Playwright smoke e2e: ${smokeStatus}`,
+              `- Lighthouse: ${lighthouseLines.length ? 'see table below' : '⚠️ not available'}`,
+              `- Visual diff: see downloadable bundle below`,
+              '',
+              '### Lighthouse (Performance / Accessibility)',
+              '| Route | Perf | A11y |',
+              '| --- | --- | --- |',
+              ...lighthouseLines,
+              '',
+              '### Artifacts',
+              `- [Workflow run & artifacts](${runUrl})`,
+              `- Playwright traces: \`playwright-traces-${{ github.event.pull_request.number }}\``,
+              `- Visual diff bundle: \`visual-diff-${{ github.event.pull_request.number }}\``,
+              `- Lighthouse report: \`lighthouse-report-${{ github.event.pull_request.number }}\``,
+              '',
+              '<sub>This comment is updated in place on each push.</sub>',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

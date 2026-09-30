@@ -1,4 +1,11 @@
-import { TransactionBuilder, Networks, StrKey } from "@stellar/stellar-sdk";
+import {
+  Address,
+  FeeBumpTransaction,
+  Networks,
+  StrKey,
+  TransactionBuilder,
+  xdr,
+} from "@stellar/stellar-sdk";
 
 export class ContractVerificationError extends Error {
   constructor(message: string) {
@@ -7,44 +14,24 @@ export class ContractVerificationError extends Error {
   }
 }
 
+/**
+ * Returns the contract ID of the first contract invocation in a transaction
+ * envelope (fee-bump envelopes are unwrapped). The network passphrase only
+ * affects the hash, not the decoded operations, so any network works here.
+ */
 export function decodeContractIdFromXdr(xdrString: string): string {
   try {
-    const envelope = TransactionBuilder.fromXDR(xdrString, Networks.TESTNET_NETWORK_PASSPHRASE);
-    const operations = envelope.operations;
+    const parsed = TransactionBuilder.fromXDR(xdrString, Networks.TESTNET);
+    const tx = parsed instanceof FeeBumpTransaction ? parsed.innerTransaction : parsed;
 
-    const contractAddresses: string[] = [];
-
-    for (const op of operations) {
-      if (
-        op.type === "invokeHostFunction" &&
-        "hostFunction" in op &&
-        op.hostFunction &&
-        "type" in op.hostFunction &&
-        op.hostFunction.type === "InvokeContractHostFunction"
-      ) {
-        const hostFn = op.hostFunction as any;
-        if (hostFn.args && hostFn.args.length > 0) {
-          const firstArg = hostFn.args[0];
-          if (
-            firstArg &&
-            typeof firstArg === "object" &&
-            "contractId" in firstArg &&
-            firstArg.contractId
-          ) {
-            const contractId = firstArg.contractId as string;
-            if (StrKey.isContractId(contractId)) {
-              contractAddresses.push(contractId);
-            }
-          }
-        }
-      }
+    for (const op of tx.operations) {
+      if (op.type !== "invokeHostFunction") continue;
+      if (op.func.switch() !== xdr.HostFunctionType.hostFunctionTypeInvokeContract()) continue;
+      const contractId = Address.fromScAddress(op.func.invokeContract().contractAddress()).toString();
+      if (StrKey.isValidContract(contractId)) return contractId;
     }
 
-    if (contractAddresses.length === 0) {
-      throw new Error("No contract invocations found in transaction");
-    }
-
-    return contractAddresses[0];
+    throw new Error("No contract invocations found in transaction");
   } catch (err) {
     throw new Error(
       `Failed to decode XDR transaction: ${err instanceof Error ? err.message : String(err)}`

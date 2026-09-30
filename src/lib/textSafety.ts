@@ -31,6 +31,18 @@
  *     characters in solver names or Stellar addresses.
  *   • Stripping is silent and user-friendly; flagging would require UI changes
  *     in every consumer and could cause confusing error messages for benign input.
+ *
+ * Issue #476 additions:
+ *   • `normalizeCommentText` — Unicode NFC normalisation + newline/whitespace
+ *     canonicalisation used before hashing comment text for signature
+ *     verification.  Both the signer and the verifier must hash the exact same
+ *     canonical bytes, so this is the single source of truth for the
+ *     "canonical message format" documented in docs/message-signing.md.
+ *   • `COMMENT_MIN_LENGTH` / `COMMENT_MAX_LENGTH` — the enforced 1–2,000
+ *     character bounds for proposal discussion comments.
+ *   • `sanitizeCommentForDisplay` — strips dangerous Unicode and neutralises
+ *     control characters before a comment is rendered through the safe
+ *     Markdown subset.
  */
 
 // ─── Dangerous Unicode ranges ─────────────────────────────────────────────────
@@ -61,6 +73,21 @@ const BIDI_CONTROLS_RE = /[\u202A-\u202E\u2066-\u2069]/g;
  */
 const ZERO_WIDTH_INVIS_RE = /[\u200B-\u200D\uFEFF\u00AD]/g;
 
+/**
+ * C0/C1 control characters other than tab (U+0009) and newline (U+000A).
+ * Carriage returns are normalised to newlines by `normalizeCommentText`
+ * before this runs, so they are not preserved here.
+ */
+const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+
+// ─── Comment length bounds (issue #476) ───────────────────────────────────────
+
+/** Minimum number of characters required for a proposal comment. */
+export const COMMENT_MIN_LENGTH = 1;
+
+/** Maximum number of characters allowed in a proposal comment. */
+export const COMMENT_MAX_LENGTH = 2000;
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -81,3 +108,54 @@ export function sanitizeDisplayText(value: string): string {
 export function containsDangerousUnicode(value: string): boolean {
   return BIDI_CONTROLS_RE.test(value) || ZERO_WIDTH_INVIS_RE.test(value);
 }
+
+/**
+ * Canonicalise comment text before it is hashed for signature verification.
+ *
+ * The canonical form is part of the documented message-signing spec
+ * (docs/message-signing.md) and MUST be applied identically by the signer and
+ * the verifier, otherwise valid signatures will fail to verify.
+ *
+ * Steps:
+ *   1. Unicode NFC normalisation — collapses canonically-equivalent sequences
+ *      (e.g. "é" as U+00E9 vs "e" + U+0301) so visually identical text hashes
+ *      to identical bytes.
+ *   2. Normalise CRLF / CR line endings to LF.
+ *   3. Strip bidi-override and zero-width/invisible characters.
+ *   4. Drop remaining C0/C1 control characters (keeping tab and newline).
+ *   5. Trim leading/trailing whitespace.
+ *
+ * The result is the exact string whose UTF-8 bytes are hashed when building
+ * the canonical signed message.
+ */
+export function normalizeCommentText(value: string): string {
+  return value
+    .normalize("NFC")
+    .replace(/\r\n?/g, "\n")
+    .replace(BIDI_CONTROLS_RE, "")
+    .replace(ZERO_WIDTH_INVIS_RE, "")
+    .replace(CONTROL_CHARS_RE, "")
+    .trim();
+}
+
+/**
+ * Sanitise comment text for safe rendering through the Markdown subset.
+ *
+ * Applies the same canonicalisation as `normalizeCommentText` (so what the
+ * reader sees matches what was signed) and additionally strips any remaining
+ * dangerous Unicode.  Returns the display-ready string.
+ */
+export function sanitizeCommentForDisplay(value: string): string {
+  return normalizeCommentText(value);
+}
+
+/**
+ * Returns `true` when `value` satisfies the 1–2,000 character comment bounds
+ * after canonicalisation.  Used by the composer to gate the submit button and
+ * by the API layer to reject malformed payloads.
+ */
+export function isValidCommentLength(value: string): boolean {
+  const length = normalizeCommentText(value).length;
+  return length >= COMMENT_MIN_LENGTH && length <= COMMENT_MAX_LENGTH;
+}
+

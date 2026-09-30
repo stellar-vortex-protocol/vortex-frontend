@@ -72,7 +72,17 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // RTL support: enable `rtl:` / `ltr:` variants so direction-sensitive
+    // icons, chevrons, sparklines and timeline connectors can be mirrored
+    // without duplicating markup. Tailwind v3.3+ ships these variants, but
+    // registering them explicitly keeps the config self-documenting and
+    // guards against future preset changes.
+    function ({ addVariant }: { addVariant: (name: string, definition: string) => void }) {
+      addVariant("rtl", '&:where([dir="rtl"], [dir="rtl"] *)');
+      addVariant("ltr", '&:where([dir="ltr"], [dir="ltr"] *)');
+    },
+  ],
 };
 
 export default config;

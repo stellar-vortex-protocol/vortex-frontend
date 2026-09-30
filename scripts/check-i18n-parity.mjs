@@ -8,21 +8,21 @@
  * 3. Reports any parity mismatches or missing key references
  * 4. Validates ICU plural/select placeholders, plural categories per locale,
  *    empty strings, and max length ratios across all locale catalogs
+ * 5. Every translation uses the same {placeholder} tokens as English.
+ * 6. JSX in src/app/** and src/components/** has no hard-coded user-facing
+ *    text (JSX text, or aria-label / title / placeholder / alt strings),
+ *    except entries in scripts/i18n-literal-allowlist.json.
  *
  * Usage:
  *   node scripts/check-i18n-parity.mjs
- *
- * Exit codes:
- *   0 — catalog parity maintained, all referenced keys exist
- *   1 — catalog drift detected or missing key references found
  */
 
-import { readFileSync, readdirSync, statSync, existsSync } from "fs";
-import { join, relative } from "path";
-import { fileURLToPath } from "url";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const ROOT = join(__dirname, "..");
+const USER_FACING_ATTRIBUTES = new Set(["aria-label", "title", "placeholder", "alt"]);
 
 // ── 1. Load message catalogs ──────────────────────────────────────────────
 
@@ -132,42 +132,55 @@ function walk(dir, cb) {
         cb(full);
       }
     }
-  } catch (err) {
-    // Permission errors or deleted directories during walk can be safely ignored
-  }
+  });
+  return catalog;
 }
 
-walk(join(ROOT, "src"), (filePath) => {
-  const content = readFileSync(filePath, "utf8");
-  const lines = content.split("\n");
-  for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-    let match;
-    KEY_REF_RE.lastIndex = 0;
-    while ((match = KEY_REF_RE.exec(lines[lineNo])) !== null) {
-      const keyName = match[1];
-      if (!keyName) continue;
+/** The {placeholder} names in a message, sorted. */
+export function placeholders(message) {
+  return [...message.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+}
 
-      // Check if this is a legacy getMessage call (footer.*, nav.*)
-      if (keyName.startsWith("footer.") || keyName.startsWith("nav.")) {
-        const location = `${relative(ROOT, filePath)}:${lineNo + 1}`;
-        if (!legacyUsedKeys.has(keyName)) legacyUsedKeys.set(keyName, []);
-        legacyUsedKeys.get(keyName).push(location);
-      } else {
-        const location = `${relative(ROOT, filePath)}:${lineNo + 1}`;
-        if (!usedKeys.has(keyName)) usedKeys.set(keyName, []);
-        usedKeys.get(keyName).push(location);
+/** Parity errors between the English catalog and every other locale. */
+export function checkCatalogs(catalogs) {
+  const errors = [];
+  const en = catalogs.en;
+  for (const [locale, catalog] of Object.entries(catalogs)) {
+    if (locale === "en") continue;
+    for (const key of en.keys()) {
+      if (!catalog.has(key)) errors.push(`${locale}: missing key "${key}"`);
+    }
+    for (const [key, value] of catalog) {
+      if (!en.has(key)) {
+        errors.push(`${locale}: key "${key}" is not in the English catalog`);
+        continue;
+      }
+      const expected = placeholders(en.get(key)).join(",");
+      if (placeholders(value).join(",") !== expected) {
+        errors.push(`${locale}: "${key}" uses {${placeholders(value).join("},{")}} but English uses {${expected.split(",").join("},{")}}`);
       }
     }
   }
-});
+  return errors;
+}
 
-// ── 4. Check that all used keys exist in the English catalog ──────────────
+// ── 5. ICU placeholder / plural validation ────────────────────────────────
 
-const missingKeyReferences = new Map();
-for (const [keyName, locations] of usedKeys) {
-  if (!enKeys.has(keyName)) {
-    missingKeyReferences.set(keyName, locations);
+/**
+ * Extract simple `{name}` placeholders from a message, ignoring ICU plural
+ * and select blocks (which are validated separately).
+ *
+ * @param {string} message
+ * @returns {Set<string>}
+ */
+function extractPlaceholders(message) {
+  const names = new Set();
+  // Strip ICU plural/select blocks so their inner placeholders are handled
+  // by the plural validator in
+      }
+    }
   }
+  return errors;
 }
 
 // ── 5. ICU placeholder / plural validation ────────────────────────────────
@@ -356,157 +369,151 @@ function checkPlaceholderParity(key, enVals, otherVals, locale) {
 
 // ── 7. Report results ────────────────────────────────────────────────────
 
-if (missingInEs.size > 0) {
-  errors.push({
-    type: "catalog-drift",
-    severity: "critical",
-    message: `${missingInEs.size} key(s) in en.ts but missing from es.ts`,
-    keys: Array.from(missingInEs).sort(),
+/**
+ * t() calls in a source file: literal keys, and calls whose key is a template
+ * string with substitutions (reported as dynamic).
+ */
+export function findKeyReferences(source, fileName) {
+  const keys = [];
+  const dynamic = [];
+  const sf = parse(source, fileName);
+  walk(sf, (node) => {
+    if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== "t") return;
+    const [arg] = node.arguments;
+    if (!arg) return;
+    const line = sf.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+    if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)) keys.push({ key: arg.text, line });
+    else if (ts.isTemplateExpression(arg)) dynamic.push({ text: arg.getText(sf), line });
+  });
+  return { keys, dynamic };
+}
+
+/** Hard-coded user-facing text in the JSX of a source file. */
+export function findJsxLiterals(source, fileName, allowed = new Set()) {
+  const found = [];
+  const sf = parse(source, fileName);
+  const report = (text, node) => {
+    const value = text.replace(/\s+/g, " ").trim();
+    if (!/[A-Za-z]{2,}/.test(value) || allowed.has(value)) return;
+    found.push({ text: value, line: sf.getLineAndCharacterOfPosition(node.getStart()).line + 1 });
+  };
+  walk(sf, (node) => {
+    if (ts.isJsxText(node)) {
+      report(node.text, node);
+    } else if (
+      ts.isJsxAttribute(node) &&
+      USER_FACING_ATTRIBUTES.has(node.name.getText(sf)) &&
+      node.initializer
+    ) {
+      const init = node.initializer;
+      if (ts.isStringLiteral(init)) report(init.text, node);
+      else if (ts.isJsxExpression(init) && init.expression && ts.isStringLiteral(init.expression)) {
+        report(init.expression.text, node);
+      }
+    }
+  });
+  return found;
+}
+
+function listFiles(dir) {
+  return readdirSync(dir).flatMap((entry) => {
+    if (entry.startsWith(".") || entry === "node_modules") return [];
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) return listFiles(full);
+    return /\.(ts|tsx|js|jsx|mjs)$/.test(entry) ? [full] : [];
   });
 }
 
-if (missingInEn.size > 0) {
-  errors.push({
-    type: "catalog-drift",
-    severity: "critical",
-    message: `${missingInEn.size} key(s) in es.ts but missing from en.ts`,
-    keys: Array.from(missingInEn).sort(),
-  });
-}
+const isTestOrStory = (file) => /\.(test|stories)\.[jt]sx?$/.test(file) || /\.test\.[a-z]+\.[jt]sx?$/.test(file);
 
 if (missingKeyReferences.size > 0) {
   errors.push({
-    type: "missing-key-reference",
-    severity: "critical",
-    message: `${missingKeyReferences.size} key(s) referenced in code but missing from catalog`,
-    references: Array.from(missingKeyReferences.entries()).map(([key, locs]) => ({
-      key,
-      locations: locs,
-    })),
+    t
+
+function listFiles(dir) {
+  return readdirSync(dir).flatMap((entry) => {
+    if (entry.startsWith(".") || entry === "node_modules") return [];
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) return listFiles(full);
+    return /\.(ts|tsx|js|jsx|mjs)$/.test(entry) ? [full] : [];
   });
 }
 
-// Validate the English catalog itself (source of truth).
-const enValidationProblems = [];
-for (const [key, msg] of enValues) {
-  for (const p of validateMessage(key, msg, "en")) {
-    enValidationProblems.push(p);
-  }
-}
-if (enValidationProblems.length > 0) {
-  errors.push({
-    type: "invalid-message",
-    severity: "critical",
-    message: `${enValidationProblems.length} invalid message(s) in en.ts`,
-    problems: enValidationProblems,
-  });
-}
+const isTestOrStory = (file) => /\.(test|stories)\.[jt]sx?$/.test(file) || /\.test\.[a-z]+\.[jt]sx?$/.test(file);
 
-// Validate extra locales (pt-BR, fr, zh-CN) when present.
-const lengthWarnings = [];
-for (const { locale, path } of EXTRA_LOCALES) {
-  if (!existsSync(path)) continue;
-  const content = readFileSync(path, "utf8");
-  const keys = extractMessageKeys(content);
-  const values = extractMessageValues(content);
-
-  const missing = [...enKeys].filter(k => !keys.has(k));
-  const extra = [...keys].filter(k => !enKeys.has(k));
-  if (missing.length > 0) {
-    errors.push({
-      type: "catalog-drift",
-      severity: "critical",
-      message: `${missing.length} key(s) in en.ts but missing from ${locale}.ts`,
-      keys: missing.sort(),
-    });
-  }
-  if (extra.length > 0) {
-    errors.push({
-      type: "catalog-drift",
-      severity: "critical",
-      message: `${extra.length} key(s) in ${locale}.ts but missing from en.ts`,
-      keys: extra.sort(),
-    });
-  }
-
-  const validationProblems = [];
-  for (const [key, msg] of values) {
-    for (const p of validateMessage(key, msg, locale)) {
-      validationProblems.push(p);
-    }
-    for (const p of checkPlaceholderParity(key, enValues, values, locale)) {
-      validationProblems.push(p);
-    }
-    const enMsg = enValues.get(key);
-    if (enMsg && enMsg.length > 0 && msg.length / enMsg.length > MAX_LENGTH_RATIO) {
-      lengthWarnings.push(
-        `key "${key}" in ${locale} is ${(msg.length / enMsg.length).toFixed(1)}x the English length`
-      );
-    }
-  }
-  if (validationProblems.length > 0) {
-    errors.push({
-      type: "invalid-message",
-      severity: "critical",
-      message: `${validationProblems.length} invalid message(s) in ${locale}.ts`,
-      problems: validationProblems,
-    });
-  }
-}
-
-if (errors.length === 0) {
-  console.log(
-    `✅  i18n catalog parity maintained.\n` +
-    `    • English catalog: ${enKeys.size} keys\n` +
-    `    • Spanish catalog: ${esKeys.size} keys (synced)\n` +
-    `    • Code references: ${usedKeys.size} keys used (all valid)`
+function main() {
+  const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+  const messagesDir = join(root, "src/lib/i18n/messages");
+  const catalogs = Object.fromEntries(
+    readdirSync(messagesDir)
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => [f.replace(/\.ts$/, ""), parseCatalog(readFileSync(join(messagesDir, f), "utf8"))]),
   );
+  const allowlist = JSON.parse(readFileSync(join(root, "scripts/i18n-literal-allowlist.json"), "utf8"));
+  const allowed = new Set(allowlist.strings);
 
-  if (lengthWarnings.length > 0) {
-    console.log(`\n⚠️  Length ratio warnings (>${MAX_LENGTH_RATIO}x English):`);
-    for (const w of lengthWarnings) {
-      console.log(`    • ${w}`);
+  const errors = checkCatalogs(catalogs);
+  const literals = [];
+
+  for (const file of listFiles(join(root, "src"))) {
+    if (isTestOrStory(file)) continue;
+    const rel = relative(root, file);
+    const source = readFileSync(file, "utf8");
+    const { keys, dynamic } = findKeyReferences(source, file);
+    for (const { key, line } of keys) {
+      if (!catalogs.en.has(key)) errors.push(`${rel}:${line}: t("${key}") is not in the English catalog`);
+    }
+    for (const { text, line } of dynamic) {
+      errors.push(`${rel}:${line}: t(${text}) builds its key dynamically; use a typed Record<..., MessageKey> map`);
+    }
+    if (file.endsWith(".tsx") && /^src\/(app|components)\//.test(rel) && !allowlist.files.includes(rel)) {
+      for (const { text, line } of findJsxLiterals(source, file, allowed)) {
+        literals.push(`${rel}:${line}: "${text}"`);
+      }
     }
   }
 
-  if (legacyUsedKeys.size > 0) {
-    console.log(
-      `\n📝  Legacy i18n system (getMessage) still in use:\n` +
-      `    • Legacy keys found: ${legacyUsedKeys.size}\n` +
-      `    • Tracked in issue #4 for migration to modern i18n system`
+  if (literals.length > 0) {
+    errors.push(
+      `${literals.length} hard-coded JSX string(s); move them to src/lib/i18n/messages/ ` +
+        `(or, for brand names and symbols, scripts/i18n-literal-allowlist.json):\n    ${literals.join("\n    ")}`,
     );
   }
 
-  process.exit(0);
+  if (errors.length > 0) {
+    console.error(`❌  i18n check failed:\n\n  ${errors.join("\n  ")}\n`);
+    process.exit(1);
+  }
+  console.log(
+    `✅  i18n OK: ${catalogs.en.size} keys in ${Object.keys(catalogs).join(", ")}; ` +
+      "no unknown or dynamic keys and no hard-coded JSX text.",
+  );
 }
 
-// Report errors
-console.error(`❌  i18n catalog parity check FAILED:\n`);
-for (const error of errors) {
-  if (error.type === "catalog-drift") {
-    console.error(`  ${error.message}:`);
-    for (const key of error.keys) {
-      console.error(`    • ${key}`);
-    }
-    console.error("");
-  } else if (error.type === "invalid-message") {
-    console.error(`  ${error.message}:`);
-    for (const problem of error.problems) {
-      console.error(`    • ${problem}`);
-    }
-    console.error("");
-  }
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main();
 }
 
-if (missingKeyReferences.size > 0) {
-  console.error(`  ${missingKeyReferences.size} key(s) referenced in code are missing from catalog:`);
-  for (const { key, locations } of errors.find(e => e.type === "missing-key-reference")?.references || []) {
-    console.error(`    • ${key}`);
-    for (const loc of locations) {
-      console.error(`      → ${loc}`);
-    }
+function listFiles(dir) {
+  return readdirSync(dir).flatMap((entry) => {
+    if (entry.startsWith(".") || entry === "node_modules") return [];
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) return listFiles(full);
+    return /\.(ts|tsx|js|jsx|mjs)$/.test(entry) ? [full] : [];
+  });
+}
+
+const isTestOrStory = (file) => /\.(test|stories)\.[jt]sx?$/.test(file) || /\.test\.[a-z]+\.[jt]sx?$/.test(file);
+
   }
-  console.error("");
+  console.log(
+    `✅  i18n OK: ${catalogs.en.size} keys in ${Object.keys(catalogs).join(", ")}; ` +
+      "no unknown or dynamic keys and no hard-coded JSX text.",
+  );
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main();
 }
 
 console.error(

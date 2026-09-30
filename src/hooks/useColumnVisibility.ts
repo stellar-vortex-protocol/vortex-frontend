@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { storage } from "@/lib/storage";
 
 export type ColumnVisibility<K extends string> = Record<K, boolean>;
 
@@ -27,7 +28,7 @@ export function useColumnVisibility<K extends string>(
   const readStored = useCallback((): ColumnVisibility<K> => {
     const base = buildDefault();
     try {
-      const raw = localStorage.getItem(storageKey);
+      const raw = storage.getItem(storageKey);
       if (!raw) return base;
       const parsed = JSON.parse(raw) as Record<string, unknown>;
       for (const column of allColumns) {
@@ -53,7 +54,7 @@ export function useColumnVisibility<K extends string>(
   const persist = useCallback(
     (next: ColumnVisibility<K>) => {
       try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
+        storage.setItem(storageKey, JSON.stringify(next));
       } catch {
         // Ignore - the preference just won't survive a reload.
       }

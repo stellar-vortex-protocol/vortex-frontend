@@ -11,7 +11,7 @@
  *                          try/catch — common in fire-and-forget async calls.
  *
  * Both are forwarded to the shared toast store as "error" notifications and
- * also logged via console.error so they still appear in DevTools.
+ * also logged via secureLogger (redacted) so they still appear in DevTools.
  *
  * The hook is intentionally side-effect-only (no return value) and is safe
  * to call at the top of the component tree (e.g. RootLayout's client shell).
@@ -20,6 +20,7 @@
 
 import { useEffect } from "react";
 import { useToastStore } from "@/store/toast";
+import { secureLogger } from "@/lib/secureLogging";
 
 /** Maximum characters shown in the toast for an error message. */
 const MAX_MSG_LENGTH = 120;
@@ -38,13 +39,13 @@ export function useGlobalErrorCapture(): void {
   useEffect(() => {
     const handleError = (event: ErrorEvent): void => {
       const message = extractMessage(event.error ?? event.message);
-      console.error("[GlobalErrorCapture] Uncaught error:", event.error ?? event.message);
+      secureLogger.error("[GlobalErrorCapture] Uncaught error:", event.error ?? event.message);
       useToastStore.getState().addToast(truncate(message), "error");
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent): void => {
       const message = extractMessage(event.reason);
-      console.error("[GlobalErrorCapture] Unhandled rejection:", event.reason);
+      secureLogger.error("[GlobalErrorCapture] Unhandled rejection:", event.reason);
       useToastStore.getState().addToast(truncate(message), "error");
     };
 

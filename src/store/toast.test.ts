@@ -80,4 +80,56 @@ describe("useToastStore", () => {
     expect(remaining).toHaveLength(1);
     expect(remaining[0]!.id).toBe(pausedId);
   });
+
+  it("stores a valid internal href", () => {
+    useToastStore.getState().addToast("Message", "info", "/explore/abc123");
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.href).toBe("/explore/abc123");
+  });
+
+  it("stores a valid external href from a whitelisted origin", () => {
+    useToastStore.getState().addToast(
+      "Message",
+      "info",
+      "https://github.com/vortex-protocol",
+    );
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.href).toBe("https://github.com/vortex-protocol");
+  });
+
+  it("drops an invalid href (path traversal)", () => {
+    useToastStore.getState().addToast(
+      "Message",
+      "info",
+      "/../etc/passwd",
+    );
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.href).toBeUndefined();
+  });
+
+  it("drops an invalid href (non-whitelisted external)", () => {
+    useToastStore.getState().addToast(
+      "Message",
+      "info",
+      "https://evil.com/phishing",
+    );
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.href).toBeUndefined();
+  });
+
+  it("drops an invalid href (javascript: protocol)", () => {
+    useToastStore.getState().addToast(
+      "Message",
+      "info",
+      "javascript:alert(1)",
+    );
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.href).toBeUndefined();
+  });
+
+  it("does not store an href when none is provided", () => {
+    useToastStore.getState().addToast("No href");
+    const [toast] = useToastStore.getState().toasts;
+    expect(toast!.href).toBeUndefined();
+  });
 });

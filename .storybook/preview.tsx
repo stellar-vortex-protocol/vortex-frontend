@@ -11,7 +11,23 @@ const preview: Preview = {
   ],
   parameters: {
     a11y: {
-      test: "todo",
+      // Enforced: axe violations fail `npm run test:storybook` in CI.
+      test: "error",
+      config: {
+        rules: [
+          {
+            // Storybook's own chrome/iframe markup is outside our control.
+            id: "region",
+            enabled: false,
+          },
+        ],
+      },
+      options: {
+        runOnly: {
+          type: "tag",
+          values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"],
+        },
+      },
     },
     controls: {
       matchers: {
