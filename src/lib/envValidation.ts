@@ -6,17 +6,8 @@
  * a sensitive value was accidentally prefixed with NEXT_PUBLIC_.
  */
 
-const SUSPICIOUS_PATTERNS = [
-  /secret/i,
-  /key/i,
-  /token/i,
-  /password/i,
-  /private/i,
-  /api_?key/i,
-  /bearer/i,
-  /credential/i,
-  /auth/i,
-];
+// Shared with scripts/check-env-vars.mjs, which runs this check at build time.
+import { SUSPICIOUS_PATTERNS } from "./env-schema.mjs";
 
 export interface EnvValidationError {
   variable: string;
@@ -41,10 +32,10 @@ export function checkSuspiciousPattern(variableName: string): RegExp | null {
  * Validate all NEXT_PUBLIC_* environment variables.
  * Raises an error if any NEXT_PUBLIC_ variable matches a suspicious pattern.
  */
-export function validatePublicEnvVariables(env: NodeJS.ProcessEnv): EnvValidationError[] {
+export function validatePublicEnvVariables(env: Record<string, string | undefined>): EnvValidationError[] {
   const errors: EnvValidationError[] = [];
 
-  for (const [key, value] of Object.entries(env)) {
+  for (const key of Object.keys(env)) {
     if (!key.startsWith("NEXT_PUBLIC_")) {
       continue;
     }
@@ -66,7 +57,7 @@ export function validatePublicEnvVariables(env: NodeJS.ProcessEnv): EnvValidatio
  * Validate environment variables and throw an error if issues are found.
  * Should be called during build time.
  */
-export function enforcePublicEnvValidation(env: NodeJS.ProcessEnv): void {
+export function enforcePublicEnvValidation(env: Record<string, string | undefined>): void {
   const errors = validatePublicEnvVariables(env);
 
   if (errors.length > 0) {
@@ -81,7 +72,7 @@ export function enforcePublicEnvValidation(env: NodeJS.ProcessEnv): void {
 /**
  * Get a list of all NEXT_PUBLIC_* variables for audit purposes.
  */
-export function getPublicEnvVariables(env: NodeJS.ProcessEnv): string[] {
+export function getPublicEnvVariables(env: Record<string, string | undefined>): string[] {
   return Object.keys(env)
     .filter(key => key.startsWith("NEXT_PUBLIC_"))
     .sort();

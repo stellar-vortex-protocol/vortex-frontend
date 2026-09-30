@@ -1,0 +1,5 @@
+import { useEffect, useState } from "react";
+import { horizonProvider, type ChainStatus } from "@/lib/chain/horizon";
+import { useConnectivity } from "@/hooks/useConnectivity";
+const cache = new Map<string, ChainStatus>();
+export function useOnChainStatus(txHash?: string) { const [status, setStatus] = useState<ChainStatus | null>(() => txHash ? cache.get(txHash) ?? null : null); const { connectivity } = useConnectivity(); useEffect(() => { if (!txHash || !/^[a-f0-9]{64}$/i.test(txHash) || connectivity === "offline") return; let cancelled = false; let delay = 1500; let timer: ReturnType<typeof setTimeout> | undefined; const poll = async () => { const result = await horizonProvider.getTransaction(txHash); if (cancelled) return; setStatus(result); if (result.state === "confirmed" || result.state === "failed") { cache.set(txHash, result); return; } timer = setTimeout(poll, delay); delay = Math.min(delay * 2, 30000); }; void poll(); return () => { cancelled = true; if (timer) clearTimeout(timer); }; }, [txHash, connectivity]); return status ?? { state: txHash ? "unknown" : "not-found" as const }; }

@@ -113,3 +113,111 @@ import { Tooltip } from "@/components/Tooltip";
 - Currently applied to `Price impact`, `Protocol fee`, and `Est. fill time` in
   SwapCard's quote details panel. See `Tooltip.stories.tsx` for interactive examples.
 
+
+## Live feed buffering (`useBufferedFeed`, `LiveFeedControls`)
+
+Home `ActivityFeed`, Explore and My Intents stop inserting rows while the user is reading (WCAG 2.2.2).
+`useFeedPause(feedId)` pauses when the pointer or focus is inside the list, when it is scrolled away from the
+top, or when the user presses the Live/Paused toggle (persisted per feed under `vortex-feed-paused:<feedId>`).
+`useBufferedFeed(items, { isPaused })` returns `{ visible, pending, overflow, flush }`: already-visible items
+keep updating in place (status changes) without reordering, new ones are queued (count capped at 500, shown
+as "500+"). The "N new intents" pill flushes the queue and moves focus to the list; counts are announced
+politely at most every 5 s. See the `BufferedLiveUpdates` story.
+
+## `DataTable`
+
+Generic accessible table (`src/components/DataTable.tsx`), first used by the solver leaderboard.
+
+- Real `<table>` with a screen-reader caption, `scope`d headers, a row header per row and `aria-sort` on the primary sorted column.
+- Sort buttons in headers: click = single sort (asc → desc → cleared), **shift-click / Shift+Enter / Shift+Space** = add a secondary key. Sort state is owned by the caller (`sorts` / `onSort`), so it can live in the URL.
+- Sticky header; below 640 px each row collapses into a labelled card via CSS (`data-label`), keeping a single DOM.
+- More than `virtualizeAbove` (default 200) rows are windowed with `@tanstack/react-virtual`.
+- Story: `DataTable.stories.tsx` (ties, zero fills, spoofing characters, 500 rows, mobile).
+
+## Solver portal (`/solve`)
+
+`SolvePageClient.tsx` went from 708 lines to about 125 and is now just the page shell: hero, steps, and the tab
+list. Each tab is its own module in `src/app/solve/_components/`:
+
+| Module | Responsibility |
+| --- | --- |
+| `LeaderboardTab` | `useSolvers`, sort state, renders `SolverRow` |
+| `OpenIntentsTab` | `useOpenIntents` + `useAcceptIntent`, renders `DeadlineChip` |
+| `RegisterSolverTab` | `useRegistrationForm` + `useSolverRegistration`, renders `SolverOnboardingChecklist` |
+| `useRegistrationForm` | reducer owning field state, validation and per-wallet draft persistence |
+| `useSolveTab` | active tab synced to `?tab=` |
+
+Data fetching stays in hooks called by each tab; `SolverRow`, `DeadlineChip` and the checklist are
+presentational. Formatting helpers (`usdCompact`, `formatTimeRemaining`) live in `src/lib/format.ts`.
+
+**Tabs** follow the WAI-ARIA tabs pattern: roving `tabIndex`, Arrow Left/Right wrap, and Home/End jump to the
+first and last tab. The URL is read after mount, so server and client render the same markup, and it is
+updated with `history.replaceState`, which adds no history entries or route transitions. **Panels are kept
+alive:** a tab mounts the first time it is shown and is then hidden rather than unmounted. That keeps each
+tab's scroll position, sort order and form input, at the cost of keeping its SWR subscriptions running.
+
+All portal state is URL-synced (`useQueryState`) so views are shareable and the back button works.
+
+- **`SolverLeaderboard`** — ranking from `rankSolvers()` (`src/lib/solverRanking.ts`): volume → fills → success rate → avg fill time → address (stable tiebreak); success rate is recomputed from fills/failed and is 0 for solvers without attempts. Time windows `24h | 7d | 30d | all` read `GET /solvers?window=…` (the relay aggregates per window). Rank deltas use the relay's `previousRank` when present, otherwise a snapshot persisted in `localStorage` per window. Filters: chain, status, min bond, verified-only. Column visibility via `useColumnVisibility`. CSV export of the visible rows/columns through the injection-safe `buildCsv`. URL keys: `window`, `sort` (`key:dir,…`), `chain`, `status`, `minBond`, `verified`.
+- **`OpenIntentsBoard`** — `useOpenIntentBoard` merges the `/intents/open` REST snapshot with `intent.open` / `intent.closed` WebSocket events (see `websocket-protocol.md`). Sorted by soonest deadline; countdowns use `formatTimeRemaining` and turn urgent under 60 s; Accept is disabled once expired, on a network mismatch, or when the connected wallet is not a registered solver. Accept outcomes drive a per-row state machine (`rowReducer`): 409 → "Taken by another solver" (announced, removed after 3 s), 410/expired → explanatory state, success → "Accepted by you". While the pointer or focus is inside the list, updates are buffered (no jumping rows) and offered via a "show N updates" button. URL keys: `ichain`, `itoken`, `minUsd`, `density`.
+  - *Performance (200 rows):* one shared 1 s ticker (`useNow`, `useSyncExternalStore`) drives every countdown instead of a timer per row, filtering/sorting is memoised, and a tick only changes countdown text, so 200 rows cost one interval and one list re-render per second (no per-row effects). If profiling shows otherwise at larger sizes, the list can adopt the same virtualisation as `DataTable`.
+- **`RegistrationWizard`** — steps *eligibility → verify address → bond → review & sign → done* driven by the pure `wizardReducer` with per-step validators (`src/lib/registrationWizard.ts`). Eligibility checks (wallet, network, valid address, not already registered, account funded via the `/api/account-status` Horizon proxy — cancelable) each show pass/fail/pending plus remediation text. Bond maths uses 7-decimal integer (BigInt) units; minimum, suggestions and the unbonding period come from `SOLVER_BOND_CONFIG`. Progress is saved per wallet with a 24 h TTL (`useLocalStorageDraft`) and restored only through an explicit "Resume registration" banner; switching wallets mid-flow resets with a notice; a draft whose bond is now below the minimum is sent back to the bond step. The step is mirrored in `?step=` so the browser back button moves between steps.
+- **`SolverBadge` / `SolverIdentityChip`** — optional stellar.toml identity chip (`verified | unverified | mismatch | unavailable`) with icon + text + tooltip (never colour-only). Display only — see the threat model in `security-audit.md`.
+
+## `IntentTracker`
+
+[`src/components/IntentTracker.tsx`](../src/components/IntentTracker.tsx) shows an
+intent's journey after submission: **submitted → accepted → filled / failed /
+expired**, with step timestamps, a live deadline countdown and localised
+next-step guidance for each state.
+
+- **Where:** under the swap card on `/` after a submit (the intent id is
+  persisted in `localStorage` under `vortex:lastSubmittedIntent`, so a reload
+  mid-flight keeps tracking; terminal trackers can be dismissed) and on
+  `/explore/[id]`.
+- **Data:** `useIntentLifecycle(id)` merges the REST detail (`/intents/:id`)
+  with WebSocket updates from the shared realtime connection, filtered by id.
+  Status never regresses on out-of-order frames. When the socket is not open
+  it polls with backoff (5 s doubling to 60 s) until the intent is terminal.
+- **States:** `expired` is derived client-side (non-terminal past its
+  deadline) and is distinct from `failed`. The API exposes only `createdAt`,
+  so accept/fill timestamps are the times the client observed them and are
+  omitted when unknown. Derivation is the pure `deriveTrackerSteps(intent, now)`
+  in [`src/lib/intentLifecycle.ts`](../src/lib/intentLifecycle.ts).
+- **Retry:** failed/expired intents offer "Retry this swap", which links to
+  `/?srcChain=&srcToken=&amount=&dstToken=` to pre-fill `SwapCard`. The
+  destination address is never carried over (existing policy).
+- **Cancel — known gap:** neither `src/lib/api.ts` nor the relay contract
+  exposes a cancel endpoint today, so no Cancel action is shown. When one
+  lands, add it behind a feature flag with a confirmation dialog and the
+  standard XDR review step. Refund execution is out of scope.
+
+## `FeedbackForm`
+
+[`src/components/FeedbackForm.tsx`](../src/components/FeedbackForm.tsx)
+
+"Suggest a feature" intake for users who don't file GitHub issues. A toggle in
+the footer opens a small form (title + description); submitting opens GitHub's
+new-issue page in a new tab, pre-filled by
+[`buildFeatureRequestUrl`](../src/lib/featureRequest.ts) with the `enhancement`
+label and a body that follows
+[`feature_request.md`](../.github/ISSUE_TEMPLATE/feature_request.md)'s sections.
+
+```tsx
+import { FeedbackForm } from "@/components/FeedbackForm";
+
+<FeedbackForm />;
+```
+
+**Props**: none. Already mounted in [`Footer`](../src/components/Footer.tsx).
+
+**Behaviour**
+
+- No backend: nothing is stored in-app, and posting the issue needs a GitHub
+  account. The form says so before the user submits.
+- Titles are capped at 120 characters and descriptions at 2,000 (longer text is
+  truncated with a note in the issue body), which keeps the URL within the
+  length browsers and GitHub reliably accept.
+- The `template` query parameter isn't used, because GitHub would then show the
+  template's empty body instead of the pre-filled one.
+

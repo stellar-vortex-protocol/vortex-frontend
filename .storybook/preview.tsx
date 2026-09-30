@@ -11,7 +11,8 @@ const preview: Preview = {
   ],
   parameters: {
     a11y: {
-      test: "todo",
+      // Enforced: axe violations fail `npm run test:storybook` in CI.
+      test: "error",
     },
     controls: {
       matchers: {

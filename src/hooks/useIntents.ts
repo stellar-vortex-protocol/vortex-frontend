@@ -1,6 +1,8 @@
 import useSWR from "swr";
-import { fetcher } from "@/lib/api";
-import { swrRetryConfig } from "@/hooks/useRetry";
+import { endpoint } from "@/lib/api";
+import { feedItemListSchema } from "@/lib/schemas";
+
+const fetcher = endpoint(feedItemListSchema);
 import type { FeedItem } from "@/lib/types";
 
 // No polling needed — useLiveIntents layers a WebSocket subscription on top
@@ -11,11 +13,10 @@ import type { FeedItem } from "@/lib/types";
 // interval) so rapid re-mounts share one in-flight request without hitting
 // the relay repeatedly.
 export function useIntents() {
-  const { data, error, isLoading } = useSWR<FeedItem[]>("/intents", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<FeedItem[]>("/intents", fetcher, {
     refreshInterval: 0,
     dedupingInterval: 8_000,
-    ...swrRetryConfig,
   });
 
-  return { intents: data ?? [], isLoading, error };
+  return { intents: data ?? [], isLoading, error, mutate };
 }

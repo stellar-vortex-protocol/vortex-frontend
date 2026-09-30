@@ -1,5 +1,8 @@
 import useSWR from "swr";
-import { fetcher } from "@/lib/api";
+import { endpoint } from "@/lib/api";
+import { solverSchema } from "@/lib/schemas";
+
+const fetcher = endpoint(solverSchema);
 import type { Solver } from "@/lib/types";
 
 export function useSolver(address: string | null) {

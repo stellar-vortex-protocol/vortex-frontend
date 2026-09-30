@@ -28,6 +28,7 @@ type StoredEntry<T> = {
   value: T;
   savedAt: number;
   walletAddress: string | null;
+  version?: number;
 };
 
 function readEntry<T>(key: string): StoredEntry<T> | null {
@@ -40,9 +41,9 @@ function readEntry<T>(key: string): StoredEntry<T> | null {
   }
 }
 
-function writeEntry<T>(key: string, value: T, walletAddress: string | null): void {
+function writeEntry<T>(key: string, value: T, walletAddress: string | null, version?: number): void {
   try {
-    const entry: StoredEntry<T> = { value, savedAt: Date.now(), walletAddress };
+    const entry: StoredEntry<T> = { value, savedAt: Date.now(), walletAddress, version };
     localStorage.setItem(key, JSON.stringify(entry));
   } catch {
     // Silently ignore quota errors — draft persistence is best-effort.
@@ -60,7 +61,7 @@ function removeEntry(key: string): void {
 export function useLocalStorageDraft<T>(
   key: string,
   walletAddress: string | null,
-  options?: { debounceMs?: number; ttlMs?: number },
+  options?: { debounceMs?: number; ttlMs?: number; version?: number; validate?: (value: unknown) => value is T },
 ): [T | null, (value: T) => void, () => void] {
   const debounceMs = options?.debounceMs ?? DEFAULT_DEBOUNCE_MS;
   const ttlMs = options?.ttlMs ?? DEFAULT_TTL_MS;
@@ -78,6 +79,8 @@ export function useLocalStorageDraft<T>(
       removeEntry(key);
       return null;
     }
+    if (options?.version !== undefined && entry.version !== options.version) { removeEntry(key); return null; }
+    if (options?.validate && !options.validate(entry.value)) { removeEntry(key); return null; }
     return entry.value;
   });
 
@@ -95,7 +98,7 @@ export function useLocalStorageDraft<T>(
       setDraftState(value);
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
-        writeEntry(key, value, walletRef.current);
+        writeEntry(key, value, walletRef.current, options?.version);
         timerRef.current = null;
       }, debounceMs);
     },

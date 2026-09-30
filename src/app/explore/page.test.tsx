@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FeedItem } from "@/lib/types";
 
-const { useLiveIntentsMock } = vi.hoisted(() => ({ useLiveIntentsMock: vi.fn() }));
+const { useLiveIntentsMock, downloadCsvMock } = vi.hoisted(() => ({
+  useLiveIntentsMock: vi.fn(),
+  downloadCsvMock: vi.fn(),
+}));
 vi.mock("@/hooks/useLiveIntents", () => ({ useLiveIntents: useLiveIntentsMock }));
+vi.mock("@/lib/csv", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/csv")>()),
+  downloadCsv: downloadCsvMock,
+}));
 
 import ExplorePage from "./ExplorePageClient";
 

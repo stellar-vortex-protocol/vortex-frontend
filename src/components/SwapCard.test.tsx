@@ -18,6 +18,16 @@ vi.mock("@stellar/freighter-api", () => ({
   },
 }));
 
+// The XDR review/verification steps (#244, #308) have their own tests in
+// xdrReview.test.ts and useSwapSubmission.test.ts; here they're stubbed to pass
+// so the UI flow can run with placeholder XDR strings.
+vi.mock("@/lib/xdrReview", () => ({
+  decodeXdr: vi.fn(() => ({ networkPassphrase: "", fee: "100", operationCount: 1, operations: [], sourceAccount: "" })),
+  validateSwapXdr: vi.fn(),
+  verifySignedXdrMatches: vi.fn(() => ({ valid: true })),
+  XdrMismatchError: class XdrMismatchError extends Error {},
+}));
+
 import { useWalletStore } from "@/store/wallet";
 import { useSwapSettingsStore } from "@/store/swapSettings";
 import { SwapCard } from "./SwapCard";
@@ -292,5 +302,26 @@ describe("SwapCard", () => {
         body: expect.stringContaining('"minOut":"492.152166"'),
       }),
     );
+  });
+
+  it("does not show the network guard before any wallet is connected", () => {
+    renderSwapCard();
+    expect(screen.queryByTestId("swap-network-mismatch")).not.toBeInTheDocument();
+  });
+
+  it("blocks submission and explains why when the wallet is on the wrong network", () => {
+    useWalletStore.setState({
+      isConnected: true,
+      address: "GABC123",
+      network: "PUBLIC",
+      networkMismatch: true,
+    });
+    renderSwapCard();
+    expect(screen.getByTestId("swap-network-mismatch")).toHaveTextContent(
+      /submission blocked.*wrong network/i,
+    );
+    for (const button of screen.getAllByRole("button", { name: "Wrong network", hidden: true })) {
+      expect(button).toBeDisabled();
+    }
   });
 });
