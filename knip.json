@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/app/**/{page,layout,route,error,loading,opengraph-image,manifest}.{ts,tsx}", "src/**/*.test.{ts,tsx}", "src/**/*.stories.{ts,tsx}", "e2e/**/*.{ts,tsx}"],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,ts}"],
+  "ignore": ["src/**/*.stories.{ts,tsx}", ".next/**", "coverage/**"],
+  "ignoreDependencies": ["@storybook/*"],
+  "ignoreBinaries": ["playwright"]
+}

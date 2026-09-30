@@ -16,6 +16,24 @@
 // GF(256) arithmetic (primitive polynomial x^8+x^4+x^3+x^2+1 = 0x11D)
 // ---------------------------------------------------------------------------
 
+/**
+ * Bounds-checked array read. Every index in this encoder is in range by
+ * construction, so a miss is a bug rather than a value to handle.
+ */
+function at<T>(arr: readonly T[], i: number): T {
+  const value = arr[i];
+  if (value === undefined) throw new RangeError(`QR encoder: index ${i} out of range`);
+  return value;
+}
+
+function get<T>(m: readonly (readonly T[])[], r: number, c: number): T {
+  return at(at(m, r), c);
+}
+
+function set<T>(m: T[][], r: number, c: number, value: T): void {
+  at(m, r)[c] = value;
+}
+
 const EXP: number[] = new Array(512);
 const LOG: number[] = new Array(256);
 
@@ -27,22 +45,22 @@ const LOG: number[] = new Array(256);
     x <<= 1;
     if (x & 0x100) x ^= 0x11d;
   }
-  for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+  for (let i = 255; i < 512; i++) EXP[i] = at(EXP, i - 255);
 })();
 
 function gfMul(a: number, b: number): number {
   if (a === 0 || b === 0) return 0;
-  return EXP[(LOG[a] + LOG[b]) % 255];
+  return at(EXP, (at(LOG, a) + at(LOG, b)) % 255);
 }
 
 function gfPoly(degree: number): number[] {
   let g = [1];
   for (let i = 0; i < degree; i++) {
-    const term = [1, EXP[i]];
+    const term = [1, at(EXP, i)];
     const result: number[] = new Array(g.length + term.length - 1).fill(0);
     for (let a = 0; a < g.length; a++)
       for (let b = 0; b < term.length; b++)
-        result[a + b] ^= gfMul(g[a], term[b]);
+        result[a + b] = at(result, a + b) ^ gfMul(at(g, a), at(term, b));
     g = result;
   }
   return g;
@@ -52,10 +70,10 @@ function rsEncode(data: number[], ecCount: number): number[] {
   const gen = gfPoly(ecCount);
   const msg = [...data, ...new Array(ecCount).fill(0)];
   for (let i = 0; i < data.length; i++) {
-    const coef = msg[i];
+    const coef = at(msg, i);
     if (coef !== 0)
       for (let j = 1; j < gen.length; j++)
-        msg[i + j] ^= gfMul(gen[j], coef);
+        msg[i + j] = at(msg, i + j) ^ gfMul(at(gen, j), coef);
   }
   return msg.slice(data.length);
 }
@@ -114,7 +132,7 @@ class BitBuffer {
   putBit(bit: boolean) {
     const byteIdx = Math.floor(this.bitLength / 8);
     if (this.data.length <= byteIdx) this.data.push(0);
-    if (bit) this.data[byteIdx] |= 0x80 >> this.bitLength % 8;
+    if (bit) this.data[byteIdx] = at(this.data, byteIdx) | (0x80 >> this.bitLength % 8);
     this.bitLength++;
   }
 
@@ -135,19 +153,9 @@ function setFinderPattern(m: (boolean | null)[][], row: number, col: number) {
     for (let c = -1; c <= 7; c++) {
       const pr = row + r, pc = col + c;
       if (pr < 0 || pc < 0 || pr >= m.length || pc >= m.length) continue;
-      const onBorder = r === -1 || r === 7 || c === -1 || c === 7;
-      const onInner = r >= 1 && r <= 5 && c >= 1 && c <= 5;
-      const onCore  = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-      m[pr][pc] = onBorder || (onCore && !onInner) || (onCore);
-      // Simplified: dark if on outer border OR in inner 3x3
-      m[pr][pc] = !(r === 0 || r === 6 || c === 0 || c === 6
-        ? false
-        : r >= 2 && r <= 4 && c >= 2 && c <= 4
-          ? false
-          : true);
-      // Use proper finder logic:
+      // Dark on the outer ring and the 3x3 core; the separator (ring 4) is light.
       const ring = Math.max(Math.abs(r - 3), Math.abs(c - 3));
-      m[pr][pc] = ring === 0 || ring === 2 || ring === 3;
+      set(m, pr, pc, ring === 0 || ring === 2 || ring === 3);
     }
 }
 
@@ -155,15 +163,15 @@ function setAlignmentPattern(m: (boolean | null)[][], row: number, col: number) 
   for (let r = -2; r <= 2; r++)
     for (let c = -2; c <= 2; c++) {
       const ring = Math.max(Math.abs(r), Math.abs(c));
-      m[row + r][col + c] = ring === 0 || ring === 2;
+      set(m, row + r, col + c, ring === 0 || ring === 2);
     }
 }
 
 function setTimingPatterns(m: (boolean | null)[][], size: number) {
   for (let i = 8; i < size - 8; i++) {
     const dark = i % 2 === 0;
-    if (m[6][i] === null) m[6][i] = dark;
-    if (m[i][6] === null) m[i][6] = dark;
+    if (get(m, 6, i) === null) set(m, 6, i, dark);
+    if (get(m, i, 6) === null) set(m, i, 6, dark);
   }
 }
 
@@ -175,22 +183,24 @@ function setFormatInfo(m: (boolean | null)[][], mask: number) {
   // 15-bit BCH error correction of format information
   const formatStr = bchFormat(formatData) ^ 0b101010000010010;
 
-  const positions = [
+  const positions: [number, number][] = [
     [0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[7,8],[8,8],
     [8,7],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0]
   ];
-  const positions2 = [
+  const positions2: [number, number][] = [
     [size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],
     [8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]
   ];
 
   for (let i = 0; i < 15; i++) {
     const bit = ((formatStr >> (14 - i)) & 1) === 1;
-    m[positions[i][0]][positions[i][1]] = bit;
-    m[positions2[i][0]][positions2[i][1]] = bit;
+    const [r1, c1] = at(positions, i);
+    const [r2, c2] = at(positions2, i);
+    set(m, r1, c1, bit);
+    set(m, r2, c2, bit);
   }
   // Dark module
-  m[size - 8][8] = true;
+  set(m, size - 8, 8, true);
 }
 
 function bchFormat(data: number): number {
@@ -223,7 +233,7 @@ const MASK_PATTERNS: ((r: number, c: number) => boolean)[] = [
 ];
 
 function applyMask(m: (boolean | null)[][], mask: number): boolean[][] {
-  const fn = MASK_PATTERNS[mask];
+  const fn = at(MASK_PATTERNS, mask);
   return m.map((row, r) =>
     row.map((cell, c) =>
       cell === null ? false : cell !== fn(r, c) ? cell : !cell
@@ -238,13 +248,13 @@ function penaltyScore(m: boolean[][]): number {
   // Rule 1: 5+ in a row/col
   for (let r = 0; r < size; r++) {
     for (let run = 0, c = 0; c < size; c++) {
-      if (c > 0 && m[r][c] === m[r][c - 1]) run++; else run = 1;
+      if (c > 0 && get(m, r, c) === get(m, r, c - 1)) run++; else run = 1;
       if (run === 5) score += 3; else if (run > 5) score++;
     }
   }
   for (let c = 0; c < size; c++) {
     for (let run = 0, r = 0; r < size; r++) {
-      if (r > 0 && m[r][c] === m[r - 1][c]) run++; else run = 1;
+      if (r > 0 && get(m, r, c) === get(m, r - 1, c)) run++; else run = 1;
       if (run === 5) score += 3; else if (run > 5) score++;
     }
   }
@@ -252,7 +262,7 @@ function penaltyScore(m: boolean[][]): number {
   // Rule 2: 2x2 blocks
   for (let r = 0; r < size - 1; r++)
     for (let c = 0; c < size - 1; c++)
-      if (m[r][c] === m[r][c+1] && m[r][c] === m[r+1][c] && m[r][c] === m[r+1][c+1])
+      if (get(m, r, c) === get(m, r, c + 1) && get(m, r, c) === get(m, r + 1, c) && get(m, r, c) === get(m, r + 1, c + 1))
         score += 3;
 
   // Rule 4: proportion of dark modules
@@ -282,7 +292,7 @@ function encodeData(text: string, version: number, info: VersionInfo): number[] 
 
   const padBytes = [0xEC, 0x11];
   for (let i = 0; buf.length < totalDataBits; i++)
-    buf.put(padBytes[i % 2], 8);
+    buf.put(at(padBytes, i % 2), 8);
 
   return buf.getBytes();
 }
@@ -304,10 +314,10 @@ function interleaveBlocks(dataBytes: number[], info: VersionInfo): number[] {
 
   const maxLen = Math.max(...blocks.map(b => b.length));
   for (let i = 0; i < maxLen; i++)
-    blocks.forEach(b => { if (i < b.length) interleaved.push(b[i]); });
-  const maxEC = ecBlocks[0].length;
+    blocks.forEach(b => { if (i < b.length) interleaved.push(at(b, i)); });
+  const maxEC = at(ecBlocks, 0).length;
   for (let i = 0; i < maxEC; i++)
-    ecBlocks.forEach(ec => interleaved.push(ec[i]));
+    ecBlocks.forEach(ec => interleaved.push(at(ec, i)));
 
   return interleaved;
 }
@@ -315,6 +325,12 @@ function interleaveBlocks(dataBytes: number[], info: VersionInfo): number[] {
 // ---------------------------------------------------------------------------
 // Matrix population
 // ---------------------------------------------------------------------------
+
+/** Copies a function module (non-null in `m`) into the masked matrix. */
+function preserveModule(m: (boolean | null)[][], final: boolean[][], r: number, c: number) {
+  const cell = get(m, r, c);
+  if (cell !== null) set(final, r, c, cell);
+}
 
 function buildMatrix(version: number, codewords: number[]): boolean[][] {
   const size = version * 4 + 17;
@@ -333,21 +349,21 @@ function buildMatrix(version: number, codewords: number[]): boolean[][] {
   if (alignPos.length >= 2) {
     for (let r of alignPos)
       for (let c of alignPos) {
-        if (m[r][c] !== null) continue; // overlaps finder
+        if (get(m, r, c) !== null) continue; // overlaps finder
         setAlignmentPattern(m, r, c);
       }
   }
 
   // Reserve format info areas
   for (let i = 0; i <= 8; i++) {
-    if (m[i][8] === null) m[i][8] = false;
-    if (m[8][i] === null) m[8][i] = false;
+    if (get(m, i, 8) === null) set(m, i, 8, false);
+    if (get(m, 8, i) === null) set(m, 8, i, false);
   }
   for (let i = size - 8; i < size; i++) {
-    if (m[i][8] === null) m[i][8] = false;
-    if (m[8][i] === null) m[8][i] = false;
+    if (get(m, i, 8) === null) set(m, i, 8, false);
+    if (get(m, 8, i) === null) set(m, 8, i, false);
   }
-  m[size - 8][8] = true; // dark module
+  set(m, size - 8, 8, true); // dark module
 
   // Place data bits
   let bitIdx = 0;
@@ -363,8 +379,8 @@ function buildMatrix(version: number, codewords: number[]): boolean[][] {
       const row = up ? size - 1 - i : i;
       for (let d = 0; d < 2; d++) {
         const col = right - d;
-        if (m[row][col] === null) {
-          m[row][col] = bitIdx < allBits.length ? allBits[bitIdx++] : false;
+        if (get(m, row, col) === null) {
+          set(m, row, col, bitIdx < allBits.length ? at(allBits, bitIdx++) : false);
         }
       }
     }
@@ -385,7 +401,7 @@ function buildMatrix(version: number, codewords: number[]): boolean[][] {
   // Re-apply format info to the final masked matrix
   for (let r = 0; r < size; r++)
     for (let c = 0; c < size; c++)
-      if (m[r][c] !== null) final[r][c] = m[r][c] as boolean; // preserve function modules
+      preserveModule(m, final, r, c); // preserve function modules
   setFormatInfo(m, bestMask);
   // Copy format info from m back to final
   const formatPositions = [
@@ -394,7 +410,7 @@ function buildMatrix(version: number, codewords: number[]): boolean[][] {
     ...Array.from({length: 7}, (_, i) => [size - 1 - i, 8] as [number,number]),
     ...Array.from({length: 8}, (_, i) => [8, size - 8 + i] as [number,number]),
   ];
-  formatPositions.forEach(([r,c]) => { if (m[r][c] !== null) final[r][c] = m[r][c] as boolean; });
+  formatPositions.forEach(([r, c]) => preserveModule(m, final, r, c));
 
   return final;
 }
@@ -440,7 +456,7 @@ export function encodeQrSvg(text: string, options: QrCodeOptions = {}): string {
     );
   }
   const version = versionIndex + 1;
-  const info = VERSION_INFO[versionIndex];
+  const info = at(VERSION_INFO, versionIndex);
 
   const dataBytes = encodeData(text, version, info);
   const codewords = interleaveBlocks(dataBytes, info);
@@ -453,7 +469,7 @@ export function encodeQrSvg(text: string, options: QrCodeOptions = {}): string {
   const rects: string[] = [];
   for (let r = 0; r < moduleCount; r++) {
     for (let c = 0; c < moduleCount; c++) {
-      if (matrix[r][c]) {
+      if (get(matrix, r, c)) {
         const x = ((c + quietZone) * moduleSize).toFixed(2);
         const y = ((r + quietZone) * moduleSize).toFixed(2);
         const s = (moduleSize + 0.1).toFixed(2); // slight overlap avoids hairlines

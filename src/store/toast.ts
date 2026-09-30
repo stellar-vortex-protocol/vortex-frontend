@@ -34,7 +34,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
 
   addToast: (message, variant = "info", href) => {
     const id = crypto.randomUUID();
-    set({ toasts: [...get().toasts, { id, message, variant }] });
+    set({ toasts: [...get().toasts, { id, message, variant, ...(href ? { href } : {}) }] });
     timers.set(id, {
       timeoutId: setTimeout(() => get().dismissToast(id), TOAST_DURATION_MS),
       remainingMs: TOAST_DURATION_MS,

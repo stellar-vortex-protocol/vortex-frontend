@@ -35,7 +35,7 @@ describe("useSolvers", () => {
     const solvers: Solver[] = [
       {
         name: "Alpha",
-        address: "GABC123",
+        address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
         bondUsd: 10000,
         fills: 42,
         failed: 1,

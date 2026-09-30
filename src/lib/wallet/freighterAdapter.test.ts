@@ -40,4 +40,17 @@ describe("freighterAdapter", () => {
   it("disconnect() resolves without calling freighter (no programmatic disconnect exists)", async () => {
     await expect(freighterAdapter.disconnect()).resolves.toBeUndefined();
   });
+
+  it("normalises a thrown string (freighter-api <= 2.x) into a typed WalletError", async () => {
+    freighterApiMock.requestAccess.mockRejectedValue("User declined access");
+    await expect(freighterAdapter.connect()).rejects.toMatchObject({
+      name: "WalletError",
+      kind: "user-rejected",
+    });
+  });
+
+  it("normalises an `{ error }` result object (freighter-api >= 3.x) into a typed WalletError", async () => {
+    freighterApiMock.signTransaction.mockResolvedValue({ error: "Freighter is locked" });
+    await expect(freighterAdapter.signTransaction("XDR")).rejects.toMatchObject({ kind: "locked" });
+  });
 });
