@@ -5,6 +5,7 @@ import { secureLogger } from "@/lib/secureLogging";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -12,26 +13,27 @@ interface ErrorPageProps {
 }
 
 export default function MyIntentsError({ error, reset }: ErrorPageProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     secureLogger.error("Route error boundary caught an error", error);
   }, [error]);
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label="My Intents — Error" />
+      <Nav variant="breadcrumb" label={t("errorPage.myIntents.breadcrumb")} />
 
       <main
         id="main-content"
         className="max-w-2xl mx-auto px-5 py-24 text-center"
       >
-        <div className="eyebrow mb-3">My Intents</div>
+        <div className="eyebrow mb-3">{t("errorPage.myIntents.eyebrow")}</div>
         <h1 className="text-3xl font-bold text-vx-text mb-3">
-          Couldn&apos;t load your intents
+          {t("errorPage.myIntents.title")}
         </h1>
         <p className="text-vx-muted text-sm mb-8">
           {error.message
             ? error.message
-            : "There was a problem loading your swap history. Please make sure your wallet is connected and try again."}
+            : t("errorPage.myIntents.message")}
         </p>
 
         <div className="flex items-center justify-center gap-4">
@@ -41,10 +43,10 @@ export default function MyIntentsError({ error, reset }: ErrorPageProps) {
             className="text-sm px-4 py-2 rounded-lg bg-vx-sage text-vx-ink font-semibold
                        hover:brightness-110 transition-all"
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
           <Link href="/" className="text-sm text-vx-sage hover:underline">
-            ← Back to Vortex
+            {t("errorPage.myIntents.back")}
           </Link>
         </div>
       </main>

@@ -24,7 +24,7 @@ vi.mock("@stellar/freighter-api", () => ({
   },
 }));
 
-import { useWalletStore } from "./wallet";
+import { PERSIST_KEY, useWalletStore } from "./wallet";
 
 const initialState = useWalletStore.getState();
 const VALID_STELLAR_ADDRESS = "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
@@ -161,7 +161,7 @@ describe("useWalletStore", () => {
 
     const state = useWalletStore.getState();
     expect(state.notInstalled).toBe(false);
-    expect(state.error).toBe("User declined access");
+    expect(state.errorKind).toBe("user-rejected");
   });
 
   it("sets an error when requestAccess rejects", async () => {
@@ -172,7 +172,10 @@ describe("useWalletStore", () => {
 
     const state = useWalletStore.getState();
     expect(state.isConnected).toBe(false);
-    expect(state.error).toBe("User declined access");
+    expect(state.errorKind).toBe("user-rejected");
+    expect(state.errorKey).toBe("wallet.error.user-rejected");
+    // Raw extension text never reaches the UI-facing error string.
+    expect(state.error).not.toContain("User declined access");
   });
 
   it("clears wallet state on disconnect", async () => {
@@ -278,5 +281,127 @@ describe("useWalletStore", () => {
 
     expect(isConnectedMock).not.toHaveBeenCalled();
     expect(useWalletStore.getState().address).toBe("GABC123");
+  });
+
+  // ── Transitions documented in docs/wallet-hydration.md ──────────────────
+
+  it("connect() uses the translated connectFailed key when the wallet rejects with a non-Error", async () => {
+    isConnectedMock.mockResolvedValue(true);
+    requestAccessMock.mockRejectedValue("opaque failure");
+
+    await useWalletStore.getState().connect();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.errorKey).toBe("wallet.error.connectFailed");
+    expect(state.error).toBe("Failed to connect wallet.");
+  });
+
+  it("disconnect() flags the cleared session and keeps the last known address", async () => {
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, lastKnownAddress: VALID_STELLAR_ADDRESS });
+
+    useWalletStore.getState().disconnect();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.address).toBeNull();
+    expect(state.wasSessionCleared).toBe(true);
+    expect(state.lastKnownAddress).toBe(VALID_STELLAR_ADDRESS);
+  });
+
+  it("hydrate() clears the session, keeping the last address, when the extension is unreachable", async () => {
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, network: "TESTNET" });
+    isConnectedMock.mockRejectedValue(new Error("extension removed"));
+
+    await useWalletStore.getState().hydrate();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.address).toBeNull();
+    expect(state.lastKnownAddress).toBe(VALID_STELLAR_ADDRESS);
+    expect(state.wasSessionCleared).toBe(true);
+  });
+
+  it("hydrate() does not overwrite a user-initiated connect that started meanwhile", async () => {
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, network: "TESTNET" });
+    isConnectedMock.mockImplementation(async () => {
+      // The user clicks Connect while hydrate is waiting on the extension.
+      useWalletStore.setState({ isConnecting: true });
+      return true;
+    });
+    isAllowedMock.mockResolvedValue(false);
+
+    await useWalletStore.getState().hydrate();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(true);
+    expect(state.address).toBe(VALID_STELLAR_ADDRESS);
+    expect(state.wasSessionCleared).toBe(false);
+  });
+
+  it("checkForChanges() picks up an account and network switch made in the extension", async () => {
+    const OTHER_ADDRESS = "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H";
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, network: "TESTNET" });
+    isConnectedMock.mockResolvedValue(true);
+    isAllowedMock.mockResolvedValue(true);
+    getPublicKeyMock.mockResolvedValue(OTHER_ADDRESS);
+    getNetworkMock.mockResolvedValue("PUBLIC");
+
+    await useWalletStore.getState().checkForChanges();
+
+    const state = useWalletStore.getState();
+    expect(state.address).toBe(OTHER_ADDRESS);
+    expect(state.lastKnownAddress).toBe(OTHER_ADDRESS);
+    expect(state.network).toBe("PUBLIC");
+    expect(state.networkMismatch).toBe(true);
+    expect(requestAccessMock).not.toHaveBeenCalled();
+  });
+
+  it("checkForChanges() leaves the session alone while the extension is locked", async () => {
+    useWalletStore.setState({ isConnected: true, address: VALID_STELLAR_ADDRESS, network: "TESTNET" });
+    isConnectedMock.mockResolvedValue(true);
+    isAllowedMock.mockResolvedValue(false);
+
+    await useWalletStore.getState().checkForChanges();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(true);
+    expect(state.address).toBe(VALID_STELLAR_ADDRESS);
+  });
+
+  it("ignores a corrupted persisted payload on rehydrate", async () => {
+    localStorage.setItem(
+      PERSIST_KEY,
+      JSON.stringify({ state: { address: "not-a-stellar-key", isConnected: true }, version: 0 }),
+    );
+
+    await useWalletStore.persist.rehydrate();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(false);
+    expect(state.address).toBeNull();
+    localStorage.removeItem(PERSIST_KEY);
+  });
+
+  it("restores a valid persisted payload on rehydrate", async () => {
+    localStorage.setItem(
+      PERSIST_KEY,
+      JSON.stringify({
+        state: {
+          address: VALID_STELLAR_ADDRESS,
+          lastKnownAddress: VALID_STELLAR_ADDRESS,
+          network: "TESTNET",
+          isConnected: true,
+        },
+        version: 0,
+      }),
+    );
+
+    await useWalletStore.persist.rehydrate();
+
+    const state = useWalletStore.getState();
+    expect(state.isConnected).toBe(true);
+    expect(state.address).toBe(VALID_STELLAR_ADDRESS);
+    localStorage.removeItem(PERSIST_KEY);
   });
 });

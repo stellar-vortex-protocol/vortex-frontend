@@ -5,6 +5,7 @@ import { secureLogger } from "@/lib/secureLogging";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -12,6 +13,7 @@ interface ErrorPageProps {
 }
 
 export default function Error({ error, reset }: ErrorPageProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     // Log to an error reporting service in production.
     secureLogger.error("Route error boundary caught an error", error);
@@ -19,20 +21,20 @@ export default function Error({ error, reset }: ErrorPageProps) {
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label="Error" />
+      <Nav variant="breadcrumb" label={t("errorPage.root.breadcrumb")} />
 
       <main
         id="main-content"
         className="max-w-2xl mx-auto px-5 py-24 text-center"
       >
-        <div className="eyebrow mb-3">Something went wrong</div>
+        <div className="eyebrow mb-3">{t("errorPage.root.eyebrow")}</div>
         <h1 className="text-3xl font-bold text-vx-text mb-3">
-          An unexpected error occurred
+          {t("errorPage.root.title")}
         </h1>
         <p className="text-vx-muted text-sm mb-8">
           {error.message
             ? error.message
-            : "We hit an unexpected error. Please try again or return home."}
+            : t("errorPage.root.message")}
         </p>
 
         <div className="flex items-center justify-center gap-4">
@@ -42,10 +44,10 @@ export default function Error({ error, reset }: ErrorPageProps) {
             className="text-sm px-4 py-2 rounded-lg bg-vx-sage text-vx-ink font-semibold
                        hover:brightness-110 transition-all"
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
           <Link href="/" className="text-sm text-vx-sage hover:underline">
-            ← Back to Vortex
+            {t("errorPage.root.back")}
           </Link>
         </div>
       </main>

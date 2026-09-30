@@ -1,0 +1,1 @@
+export function explorerTransactionUrl(hash: string, network = process.env.NEXT_PUBLIC_NETWORK ?? "testnet") { const host = network.toLowerCase() === "mainnet" || network.toLowerCase() === "public" ? "stellar.expert/explorer/public" : "stellar.expert/explorer/testnet"; return `https://${host}/tx/${encodeURIComponent(hash)}`; }

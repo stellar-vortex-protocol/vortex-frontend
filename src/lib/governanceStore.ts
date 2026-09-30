@@ -1,5 +1,16 @@
 import { sanitizeText } from "./textSafety";
 
+/**
+ * A proposal that changes one numeric protocol parameter. Only
+ * `minSolverBondUsd` currently gets an automated impact preview (see
+ * `src/lib/governanceImpact.ts`).
+ */
+export type ParameterChange = {
+  parameter: "minSolverBondUsd" | (string & {});
+  currentValue: number;
+  proposedValue: number;
+};
+
 export type GovernanceProposal = {
   id: string;
   title: string;
@@ -11,6 +22,7 @@ export type GovernanceProposal = {
   votesAgainst: number;
   createdAt: string;
   deadline: string;
+  parameterChange?: ParameterChange;
 };
 
 export type ProposalComment = {
@@ -42,6 +54,7 @@ const INITIAL_PROPOSALS: GovernanceProposal[] = [
     votesAgainst: 42000,
     createdAt: "2026-08-25T10:00:00Z",
     deadline: "2026-09-10T10:00:00Z",
+    parameterChange: { parameter: "minSolverBondUsd", currentValue: 50, proposedValue: 100 },
   },
   {
     id: "VIP-2",

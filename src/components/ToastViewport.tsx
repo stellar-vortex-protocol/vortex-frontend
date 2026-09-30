@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useToastStore, type ToastVariant } from "@/store/toast";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
   success: "border-vx-sage/40 bg-vx-sage-bg text-vx-sage",
@@ -10,6 +11,7 @@ const VARIANT_STYLES: Record<ToastVariant, string> = {
 };
 
 export function ToastViewport() {
+  const { t } = useTranslation();
   const { toasts, dismissToast, pauseToast, resumeToast } = useToastStore();
 
   if (toasts.length === 0) return null;
@@ -39,7 +41,7 @@ export function ToastViewport() {
           )}
           <button
             onClick={() => dismissToast(toast.id)}
-            aria-label="Dismiss notification"
+            aria-label={t("toast.dismiss")}
             className="text-current opacity-60 hover:opacity-100 transition-opacity"
           >
             ×

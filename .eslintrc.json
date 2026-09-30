@@ -23,8 +23,37 @@
       "rules": { "no-restricted-globals": "off", "no-restricted-properties": "off" }
     },
     {
+      "files": ["src/**/*.{ts,tsx,js,jsx,mjs}"],
+      "excludedFiles": ["src/lib/config.ts", "src/lib/env-schema.mjs", "**/*.test.*"],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "parseFloat",
+            "message": "Money code must use src/lib/decimal.ts (parseDecimal/tryParseDecimal), not parseFloat."
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "process",
+            "property": "env",
+            "message": "Read configuration from `config` in src/lib/config.ts (see docs/configuration.md)."
+          },
+          {
+            "object": "Number",
+            "property": "parseFloat",
+            "message": "Money code must use src/lib/decimal.ts (parseDecimal/tryParseDecimal), not Number.parseFloat."
+          }
+        ]
+      }
+    },
+    {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "e2e/**", "scripts/**", "*.config.*", "vitest.setup.ts"],
       "rules": { "no-console": "off", "no-restricted-globals": "off", "no-restricted-properties": "off" }
+    }
+  ]
+}
     }
   ]
 }
