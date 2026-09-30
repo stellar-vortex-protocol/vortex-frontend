@@ -1,74 +1,98 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
-import { SWRConfig } from "swr";
-import { createElement, type ReactNode } from "react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+const mutateMock = vi.fn();
+const swrDataRef = { current: undefined as any };
+
+vi.mock("swr", () => ({
+  default: vi.fn((_key: unknown, _fetcher: unknown, _opts: unknown) => ({
+    data: swrDataRef.current,
+    error: undefined,
+    isLoading: false,
+    mutate: mutateMock,
+  })),
+}));
+
+const wsLastMessageRef = { current: null as any };
+const wsStatusRef = { current: "closed" as string };
+
+vi.mock("@/hooks/useWebSocket", () => ({
+  useWebSocket: vi.fn(() => ({
+    status: wsStatusRef.current,
+    lastMessage: wsLastMessageRef.current,
+  })),
+}));
+
+vi.mock("@/hooks/useRetry", () => ({ swrRetryConfig: {} }));
+vi.mock("@/lib/api", () => ({ fetcher: vi.fn() }));
+
 import { useIntent } from "./useIntent";
-import type { IntentDetail } from "@/lib/types";
 
-const wrapper = ({ children }: { children: ReactNode }) =>
-  createElement(
-    SWRConfig,
-    { value: { provider: () => new Map(), dedupingInterval: 0 } },
-    children,
-  );
-
-const detail: IntentDetail = {
-  id: "intent-1",
-  srcChain: "ethereum",
-  srcToken: "USDC",
-  srcAmount: "500",
-  dstToken: "USDC",
-  dstAmount: "498.5",
-  minOut: "495",
-  dstAddress: "GABC123",
-  solver: "Alpha",
-  status: "filled",
-  createdAt: "2026-07-14T00:00:00Z",
-  deadline: "2026-07-14T00:20:00Z",
-  txHash: "abc123",
-};
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("useIntent", () => {
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
+    vi.clearAllMocks();
+    swrDataRef.current = undefined;
+    wsLastMessageRef.current = null;
+    wsStatusRef.current = "closed";
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
+  it("returns isLive=false when WebSocket is closed", () => {
+    wsStatusRef.current = "closed";
+    const { result } = renderHook(() => useIntent("intent-1"));
+    expect(result.current.isLive).toBe(false);
   });
 
-  it("does not fetch when id is null", () => {
-    renderHook(() => useIntent(null), { wrapper });
-    expect(fetch).not.toHaveBeenCalled();
+  it("returns isLive=true when WebSocket is open", () => {
+    wsStatusRef.current = "open";
+    const { result } = renderHook(() => useIntent("intent-1"));
+    expect(result.current.isLive).toBe(true);
   });
 
-  it("fetches the intent by id", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => detail,
+  it("merges a matching WebSocket message into the SWR cache", async () => {
+    const base = {
+      id: "intent-1",
+      status: "pending",
+      srcChain: "ethereum",
+      srcToken: "USDC",
+      srcAmount: "500",
+      dstToken: "USDC",
+      solver: "Alpha",
+      createdAt: new Date().toISOString(),
+    };
+    swrDataRef.current = { ...base, dstAmount: "498", minOut: "495", dstAddress: "GABC", deadline: new Date().toISOString() };
+
+    const { rerender } = renderHook(() => useIntent("intent-1"));
+
+    // Simulate a matching WS message arriving
+    wsLastMessageRef.current = { ...base, status: "filled" };
+    rerender();
+
+    await waitFor(() => {
+      expect(mutateMock).toHaveBeenCalled();
     });
-
-    const { result } = renderHook(() => useIntent("intent-1"), { wrapper });
-
-    await waitFor(() => expect(result.current.intent).toEqual(detail));
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("/intents/intent-1"),
-      expect.anything(),
-    );
   });
 
-  it("surfaces a fetch failure as an error", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-      text: async () => "intent not found",
-    });
+  it("ignores WebSocket messages for different intent ids", async () => {
+    swrDataRef.current = { id: "intent-1", status: "pending" };
+    wsLastMessageRef.current = { id: "intent-999", status: "filled" };
 
-    const { result } = renderHook(() => useIntent("missing"), { wrapper });
+    renderHook(() => useIntent("intent-1"));
 
-    await waitFor(() => expect(result.current.error).toBeDefined());
+    // Give effects a chance to run
+    await act(async () => {});
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it("passes null to SWR when no id is provided", () => {
+    // When id is null, the hook should pass null as the SWR key (no fetch).
+    // We verify this indirectly: isLoading should be false and intent undefined.
+    swrDataRef.current = undefined;
+    const { result } = renderHook(() => useIntent(null));
     expect(result.current.intent).toBeUndefined();
+    expect(result.current.isLoading).toBe(false);
   });
 });

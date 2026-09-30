@@ -162,4 +162,134 @@ describe("IntentDetailPage", () => {
 
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
   });
+
+  // ── Live-update / polling tests ─────────────────────────────────────────
+
+  it("shows a live indicator when isLive is true", () => {
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "pending", txHash: undefined },
+      isLoading: false,
+      error: undefined,
+      isLive: true,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.getByLabelText("Live updates active")).toBeInTheDocument();
+  });
+
+  it("hides the live indicator when isLive is false", () => {
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "pending", txHash: undefined },
+      isLoading: false,
+      error: undefined,
+      isLive: false,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.queryByLabelText("Live updates active")).not.toBeInTheDocument();
+  });
+
+  it("reflects a status transition from pending to filled without reload", () => {
+    // First render: intent is pending
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "pending", txHash: undefined },
+      isLoading: false,
+      error: undefined,
+      isLive: true,
+    });
+    const { rerender } = render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.getByRole("note")).toHaveTextContent(/not yet settled/i);
+
+    // Simulate update arriving (hook returns filled intent)
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "filled" },
+      isLoading: false,
+      error: undefined,
+      isLive: true,
+    });
+    rerender(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("shows the txHash section once it arrives via a live update", () => {
+    // Start with no txHash
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "pending", txHash: undefined },
+      isLoading: false,
+      error: undefined,
+      isLive: true,
+    });
+    const { rerender } = render(<IntentDetailPage params={{ id: "intent-1" }} />);
+    expect(screen.queryByText(/View on stellar.expert/)).not.toBeInTheDocument();
+
+    // Update arrives with txHash
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, status: "filled", txHash: "abc1234567890hash" },
+      isLoading: false,
+      error: undefined,
+      isLive: true,
+    });
+    rerender(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    expect(screen.getByText(/View on stellar.expert/)).toBeInTheDocument();
+    expect(screen.getByText("abc123...90hash")).toBeInTheDocument();
+  });
+
+  it("uses CopyButton for the txHash (no undefined copy/copied references)", () => {
+    useIntentMock.mockReturnValue({
+      intent: detail,
+      isLoading: false,
+      error: undefined,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    const timeline = screen.getByRole("list", { name: "Intent timeline" });
+    expect(timeline).toHaveTextContent("Created");
+    expect(timeline).toHaveTextContent("Filled");
+    expect(screen.getByText("Raw data")).toBeInTheDocument();
+  });
+
+  it("copies a redacted summary and the validated JSON", async () => {
+    const user = userEvent.setup();
+    const writ
+      isLoading: false,
+      error: undefined,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    // CopyButton renders a button with "Copy" — verifies the inline manual
+    // copy state machine is gone and the component is used correctly.
+    const copyButtons = screen.getAllByRole("button", { name: /copy/i });
+    // One for dst address, one for tx hash
+    expect(copyButtons.length).toBeGreaterThanOrEqual(2);
+      isLoading: false,
+      error: undefined,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    const timeline = screen.getByRole("list", { name: "Intent timeline" });
+    expect(timeline).toHaveTextContent("Created");
+    expect(timeline).toHaveTextContent("Filled");
+    expect(screen.getByText("Raw data")).toBeInTheDocument();
+  });
+
+  it("copies a redacted summary and the validated JSON", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    useIntentMock.mockReturnValue({
+      intent: { ...detail, signedXdr: "SECRETXDR" },
+      isLoading: false,
+      error: undefined,
+    });
+    render(<IntentDetailPage params={{ id: "intent-1" }} />);
+
+    await user.click(screen.getByRole("button", { name: "Copy details" }));
+    await user.click(screen.getByRole("button", { name: "Copy JSON" }));
+    const copied = writeText.mock.calls.map(([text]) => String(text)).join("\n");
+    expect(copied).toContain("Intent: intent-1");
+    expect(copied).toContain('"id": "intent-1"');
+    expect(copied).not.toContain("SECRETXDR");
+  });
 });

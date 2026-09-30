@@ -8,6 +8,7 @@ const {
   addToastMock,
   decodeXdrMock,
   validateSwapXdrMock,
+  verifySignedXdrMatchesMock,
   assertWalletReadyMock,
 } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
@@ -16,6 +17,7 @@ const {
   addToastMock: vi.fn(),
   decodeXdrMock: vi.fn(),
   validateSwapXdrMock: vi.fn(),
+  verifySignedXdrMatchesMock: vi.fn(),
   assertWalletReadyMock: vi.fn(),
 }));
 
@@ -31,10 +33,6 @@ vi.mock("@/lib/api", async (importOriginal) => {
     submitIntent: submitIntentMock,
   };
 });
-
-vi.mock("@/lib/xdrReview", () => ({
-  verifySignedXdrMatches: verifySignedXdrMatchesMock,
-}));
 
 vi.mock("@/store/toast", () => ({
   useToastStore: { getState: () => ({ addToast: addToastMock }) },
@@ -61,6 +59,7 @@ vi.mock("@/lib/xdrReview", () => {
   return {
     decodeXdr: decodeXdrMock,
     validateSwapXdr: validateSwapXdrMock,
+    verifySignedXdrMatches: verifySignedXdrMatchesMock,
     XdrMismatchError,
   };
 });
@@ -96,6 +95,8 @@ describe("useSwapSubmission", () => {
     vi.clearAllMocks();
     decodeXdrMock.mockReturnValue(DECODED_STUB);
     validateSwapXdrMock.mockReturnValue(undefined); // passes by default
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
+    assertWalletReadyMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

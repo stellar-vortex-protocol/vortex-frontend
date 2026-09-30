@@ -1,5 +1,6 @@
 // Storybook is optional in the application dependency graph.
 // @ts-nocheck
+import * as React from "react";
 import { ActivityFeedView } from "./ActivityFeed";
 import type { FeedItem } from "@/lib/types";
 
@@ -84,5 +85,28 @@ export const Error: Story = {
   args: {
     items: [],
     error: new Error("Feed unavailable"),
+  },
+};
+
+/**
+ * Buffered live updates: new fills arrive every 2 s. Hover or focus the feed
+ * (or press "Live — pause updates") and they queue behind a "N new intents"
+ * pill instead of shifting the rows under the cursor.
+ */
+export const BufferedLiveUpdates: Story = {
+  render: (args) => {
+    const [feed, setFeed] = React.useState(args.items);
+    React.useEffect(() => {
+      let n = 0;
+      const timer = setInterval(() => {
+        n += 1;
+        setFeed((current) => [
+          { ...items[n % items.length], id: `live-${n}`, createdAt: new Date().toISOString() },
+          ...current,
+        ]);
+      }, 2000);
+      return () => clearInterval(timer);
+    }, []);
+    return <ActivityFeedView {...args} items={feed} />;
   },
 };

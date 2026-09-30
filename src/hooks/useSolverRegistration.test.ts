@@ -11,6 +11,7 @@ const {
   decodeXdrMock,
   validateRegistrationXdrMock,
   assertWalletReadyMock,
+  verifySignedXdrMatchesMock,
 } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   registerSolverMock: vi.fn(),
@@ -41,9 +42,6 @@ vi.mock("@/lib/api", () => ({
   ApiError: apiErrorMock,
 }));
 
-vi.mock("@/lib/xdrReview", () => ({
-  verifySignedXdrMatches: verifySignedXdrMatchesMock,
-}));
 
 vi.mock("swr", () => ({ mutate: mutateMock }));
 vi.mock("@/store/toast", () => ({
@@ -60,6 +58,7 @@ vi.mock("@/lib/xdrReview", () => {
   return {
     decodeXdr: decodeXdrMock,
     validateRegistrationXdr: validateRegistrationXdrMock,
+    verifySignedXdrMatches: verifySignedXdrMatchesMock,
     XdrMismatchError,
   };
 });
@@ -136,9 +135,9 @@ describe("useSolverRegistration", () => {
       bondUsd: 50,
       solverAddress: "GXYZ999",
     });
-    expect(registerSolverMock).toHaveBeenCalledWith({ address: "GXYZ999", bondUsd: 50 });
+    expect(registerSolverMock).toHaveBeenCalledWith({ address: "GXYZ999", bondUsd: 50 }, expect.any(AbortSignal));
     expect(signTransactionMock).toHaveBeenCalledWith("unsigned-xdr", { network: "TESTNET" });
-    expect(submitSolverRegistrationMock).toHaveBeenCalledWith("reg-1", "signed-xdr");
+    expect(submitSolverRegistrationMock).toHaveBeenCalledWith("reg-1", "signed-xdr", expect.any(AbortSignal));
     expect(mutateMock).toHaveBeenCalledWith("/solvers");
     expect(result.current.status).toBe("success");
     expect(addToastMock).toHaveBeenCalledWith(
@@ -319,5 +318,20 @@ describe("useSolverRegistration", () => {
       "Insufficient bond amount. The bond must meet the minimum required.",
       "error",
     );
+  });
+
+  it("refuses to call Freighter when the wallet network does not match the expected network", async () => {
+    useWalletStore.setState({ isConnected: true, address: "GABC123", network: "PUBLIC" });
+    registerSolverMock.mockResolvedValue({ registrationId: "reg-net", unsignedXdr: "unsigned-xdr" });
+
+    const { result } = renderHook(() => useSolverRegistration());
+    await act(async () => {
+      await result.current.register("GXYZ999", 50);
+    });
+
+    expect(result.current.status).toBe("error");
+    expect(result.current.error).toMatch(/wrong network/i);
+    expect(signTransactionMock).not.toHaveBeenCalled();
+    expect(submitSolverRegistrationMock).not.toHaveBeenCalled();
   });
 });

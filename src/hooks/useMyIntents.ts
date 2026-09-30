@@ -1,6 +1,9 @@
+import { useMemo } from "react";
 import useSWR from "swr";
-import { fetcher } from "@/lib/api";
-import { swrRetryConfig } from "@/hooks/useRetry";
+import { endpoint } from "@/lib/api";
+import { feedItemListSchema } from "@/lib/schemas";
+
+const fetcher = endpoint(feedItemListSchema);
 import type { FeedItem } from "@/lib/types";
 
 // The /intents endpoint does not currently support an address filter, so we
@@ -17,16 +20,15 @@ export function useMyIntents(address: string | null) {
     {
       refreshInterval: 0,
       dedupingInterval: 8_000,
-      ...swrRetryConfig,
     },
   );
 
-  const intents = (data ?? []).filter(() => {
+  const intents = useMemo(() => (data ?? []).filter(() => {
     // FeedItem does not yet expose a userAddress field; when the backend adds
     // it we can filter on i.userAddress === address. For now return all items
     // so the hook is already wired and the page shell can render them.
     return true;
-  });
+  }), [data]);
 
   return { intents, isLoading: address ? isLoading : false, error, mutate };
 }

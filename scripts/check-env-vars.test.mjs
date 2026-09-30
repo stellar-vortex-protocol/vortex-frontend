@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { checkEnv, parseDotenvNames, parseReadmeEnvTable } from "./check-env-vars.mjs";
+import { ENV_SCHEMA } from "../src/lib/env-schema.mjs";
 
 // Helper function to check if URL is localhost
 function isLocalhost(url) {
@@ -123,5 +125,61 @@ describe("Environment Variable Security Checks", () => {
 
       expect(hasIssues).toBe(false);
     });
+  });
+});
+
+describe("checkEnv (schema-driven checks)", () => {
+  const names = ENV_SCHEMA.map((v) => v.name);
+  const envExample = names.map((n) => `${n}=`).join("\n");
+  const readme = [
+    "### Required Environment Variables",
+    "",
+    "| Variable | Where |",
+    "| --- | --- |",
+    ...names.map((n) => `| \`${n}\` | x |`),
+    "",
+    "## Next section",
+  ].join("\n");
+  const base = { envExample, readme, sources: [], env: {}, production: false };
+
+  it("passes when every file matches the schema", () => {
+    expect(checkEnv(base)).toEqual([]);
+  });
+
+  it("flags a duplicated .env.example entry", () => {
+    const errors = checkEnv({ ...base, envExample: `${envExample}\n${names[0]}=x` });
+    expect(errors).toEqual([`.env.example lists ${names[0]} more than once`]);
+  });
+
+  it("flags a README table that drifts from the schema", () => {
+    const errors = checkEnv({ ...base, readme: readme.replace(`| \`${names[1]}\` | x |\n`, "") });
+    expect(errors).toEqual([`README env table is missing ${names[1]}`]);
+  });
+
+  it("flags source reading an undefined variable", () => {
+    const errors = checkEnv({
+      ...base,
+      sources: [{ file: "src/a.ts", text: 'const x = process.env["NEXT_PUBLIC_UNKNOWN"]; process.env.NODE_ENV;' }],
+    });
+    expect(errors).toEqual([
+      "src/a.ts reads process.env.NEXT_PUBLIC_UNKNOWN, which src/lib/env-schema.mjs doesn't define",
+    ]);
+  });
+
+  it("validates values, with production rules only in production", () => {
+    const env = { NEXT_PUBLIC_API_URL: "http://relay.example.com" };
+    expect(checkEnv({ ...base, env })).toEqual([]);
+    expect(checkEnv({ ...base, env, production: true })[0]).toContain("must use https:// in production");
+  });
+
+  it("flags NEXT_PUBLIC_ names that look like secrets", () => {
+    const errors = checkEnv({ ...base, env: { NEXT_PUBLIC_API_SECRET: "x" } });
+    expect(errors[0]).toContain("NEXT_PUBLIC_API_SECRET");
+  });
+
+  it("parses dotenv names and the README table", () => {
+    expect(parseDotenvNames("# c\nA=1  # x\n\nB=\n")).toEqual(["A", "B"]);
+    expect(parseReadmeEnvTable("no table")).toBeNull();
+    expect(parseReadmeEnvTable(readme)).toEqual(names);
   });
 });

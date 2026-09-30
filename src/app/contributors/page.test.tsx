@@ -24,8 +24,8 @@ function renderPage() {
 
 describe("ContributorsPage", () => {
   const mockContributors = [
-    { login: "second-user", avatar_url: "https://example.com/b.png", html_url: "https://github.com/second-user", contributions: 3 },
-    { login: "first-user", avatar_url: "https://example.com/a.png", html_url: "https://github.com/first-user", contributions: 12 },
+    { login: "second-user", avatarUrl: "https://avatars.githubusercontent.com/second-user", profileUrl: "https://github.com/second-user", contributions: 3 },
+    { login: "first-user", avatarUrl: "https://avatars.githubusercontent.com/first-user", profileUrl: "https://github.com/first-user", contributions: 12 },
   ];
 
   beforeAll(() => {
@@ -38,8 +38,26 @@ describe("ContributorsPage", () => {
   beforeEach(() => {
     vi.mocked(global.fetch).mockClear().mockResolvedValue({
       ok: true,
-      json: async () => mockContributors,
+      json: async () => ({ contributors: mockContributors, source: "live" }),
     } as unknown as Response);
+  });
+
+  it("calls the same-origin endpoint, never api.github.com", async () => {
+    const { unmount } = renderPage();
+    await screen.findByText("@first-user");
+    expect(global.fetch).toHaveBeenCalledWith("/api/contributors");
+    unmount();
+  });
+
+  it("shows a stale notice when serving a cached/fallback list", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ contributors: mockContributors, source: "fallback" }),
+    } as unknown as Response);
+    const { unmount } = renderPage();
+    expect(await screen.findByText(/showing a cached list/)).toBeInTheDocument();
+    expect(screen.getByText("@first-user")).toBeInTheDocument();
+    unmount();
   });
 
   it("renders the page heading and description", async () => {

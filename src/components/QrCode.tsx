@@ -15,6 +15,8 @@ export type QrCodeProps = {
   label: string;
   /** Rendered size in pixels. Minimum 80 for scannability. Default 200. */
   size?: number;
+  /** Render the code expanded initially (e.g. printable receipts). */
+  defaultVisible?: boolean;
 };
 
 /**
@@ -24,8 +26,8 @@ export type QrCodeProps = {
  * the QR hidden until requested, avoiding visual clutter on desktop/keyboard
  * flows where the QR is less useful.
  */
-export function QrCode({ value, label, size = 200 }: QrCodeProps) {
-  const [visible, setVisible] = useState(false);
+export function QrCode({ value, label, size = 200, defaultVisible = false }: QrCodeProps) {
+  const [visible, setVisible] = useState(defaultVisible);
 
   // Encode eagerly so we can report encoding errors gracefully instead of
   // crashing the parent tree.
@@ -44,7 +46,7 @@ export function QrCode({ value, label, size = 200 }: QrCodeProps) {
         onClick={() => setVisible(v => !v)}
         aria-expanded={visible}
         aria-label={visible ? `Hide QR code for ${label}` : `Show QR code for ${label}`}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-vx-border
+        className="print:hidden inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-vx-border
                    text-vx-muted hover:text-vx-text hover:border-vx-sage/40
                    text-xs transition-colors focus-visible:outline-none
                    focus-visible:ring-2 focus-visible:ring-vx-sage focus-visible:ring-offset-2
