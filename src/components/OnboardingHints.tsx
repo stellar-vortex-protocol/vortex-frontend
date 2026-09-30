@@ -1,31 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
+import type { MessageKey } from "@/lib/i18n";
 
 const STORAGE_KEY = "vortex-onboarding-seen";
 
 type Step = {
   targetId: string;
-  title: string;
-  body: string;
+  title: MessageKey;
+  body: MessageKey;
 };
 
 const STEPS: Step[] = [
-  {
-    targetId: "swap-card-region",
-    title: "Start a swap here",
-    body: "Enter an amount on any supported chain. You're creating an intent, not a trade - competing solvers fill it and the funds land on Stellar.",
-  },
-  {
-    targetId: "live-feed-region",
-    title: "Watch it settle live",
-    body: "The activity feed streams real fills as solvers complete them, so you can see the network working in real time.",
-  },
-  {
-    targetId: "solver-portal-link",
-    title: "Run a solver",
-    body: "Solvers post a bond and compete to fill intents for a fee. If you want to provide liquidity, start from the solver portal.",
-  },
+  { targetId: "swap-card-region", title: "onboarding.swap.title", body: "onboarding.swap.body" },
+  { targetId: "live-feed-region", title: "onboarding.feed.title", body: "onboarding.feed.body" },
+  { targetId: "solver-portal-link", title: "onboarding.solver.title", body: "onboarding.solver.body" },
 ];
 
 function hasSeenOnboarding(): boolean {
@@ -46,6 +36,7 @@ function markSeen() {
 }
 
 export function OnboardingHints() {
+  const { t } = useTranslation();
   const [stepIndex, setStepIndex] = useState<number | null>(null);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -98,7 +89,7 @@ export function OnboardingHints() {
   if (!step || stepIndex === null) return null;
 
   const animate =
-    typeof document !== "undefined" && document.documentElement.dataset.motion !== "reduce";
+    typeof document !== "undefined" && document.documentElement.dataset["motion"] !== "reduce";
 
   // Fall back to a centred card when the target isn't measurable.
   const cardStyle: React.CSSProperties = rect
@@ -144,13 +135,13 @@ export function OnboardingHints() {
       >
         <div className="flex items-start justify-between gap-3">
           <h2 id="onboarding-title" className="text-sm font-semibold text-vx-text">
-            {step.title}
+            {t(step.title)}
           </h2>
           <span className="text-[10px] text-vx-muted whitespace-nowrap">
             {stepIndex + 1} / {STEPS.length}
           </span>
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-vx-muted">{step.body}</p>
+        <p className="mt-2 text-xs leading-relaxed text-vx-muted">{t(step.body)}</p>
 
         <div className="mt-4 flex items-center justify-between">
           <button
@@ -158,7 +149,7 @@ export function OnboardingHints() {
             onClick={dismiss}
             className="text-[11px] text-vx-muted hover:text-vx-text transition-colors"
           >
-            Skip
+            {t("onboarding.skip")}
           </button>
           <div className="flex items-center gap-2">
             {stepIndex > 0 && (
@@ -167,7 +158,7 @@ export function OnboardingHints() {
                 onClick={() => setStepIndex(stepIndex - 1)}
                 className="text-[11px] px-2.5 py-1 rounded-md border border-vx-border text-vx-muted hover:text-vx-text transition-colors"
               >
-                Back
+                {t("onboarding.back")}
               </button>
             )}
             <button
@@ -175,7 +166,7 @@ export function OnboardingHints() {
               onClick={() => (isLast ? dismiss() : setStepIndex(stepIndex + 1))}
               className="text-[11px] px-2.5 py-1 rounded-md bg-vx-sage-bg text-vx-sage border border-vx-sage/30 transition-colors"
             >
-              {isLast ? "Done" : "Next"}
+              {isLast ? t("onboarding.done") : t("onboarding.next")}
             </button>
           </div>
         </div>

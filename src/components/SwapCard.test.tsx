@@ -18,6 +18,16 @@ vi.mock("@stellar/freighter-api", () => ({
   },
 }));
 
+// The XDR review/verification steps (#244, #308) have their own tests in
+// xdrReview.test.ts and useSwapSubmission.test.ts; here they're stubbed to pass
+// so the UI flow can run with placeholder XDR strings.
+vi.mock("@/lib/xdrReview", () => ({
+  decodeXdr: vi.fn(() => ({ networkPassphrase: "", fee: "100", operationCount: 1, operations: [], sourceAccount: "" })),
+  validateSwapXdr: vi.fn(),
+  verifySignedXdrMatches: vi.fn(() => ({ valid: true })),
+  XdrMismatchError: class XdrMismatchError extends Error {},
+}));
+
 import { useWalletStore } from "@/store/wallet";
 import { SwapCard } from "./SwapCard";
 

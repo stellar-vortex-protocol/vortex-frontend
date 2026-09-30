@@ -52,7 +52,7 @@ const STATUS_ICONS: Record<IntentStatus, JSX.Element> = {
   ),
 };
 
-export function IntentStatusBadge({ status }: { status: IntentStatus }) {
+export function IntentStatusBadge({ status, verified = false }: { status: IntentStatus; verified?: boolean }) {
   return (
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${STATUS_STYLES[status]}`}
@@ -65,7 +65,7 @@ export function IntentStatusBadge({ status }: { status: IntentStatus }) {
       >
         {STATUS_ICONS[status]}
       </svg>
-      {status}
+      {status}{verified && <span aria-label="verified on chain" title="Verified on chain">✓ verified</span>}
     </span>
   );
 }

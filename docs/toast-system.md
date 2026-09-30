@@ -65,3 +65,35 @@ anything yourself — just call `addToast` and the fixed-position viewport
   survive a reload.
 - `id` is generated with `crypto.randomUUID()`; don't rely on it being
   human-readable or sequential.
+
+## Notification preferences (#446)
+
+Status-change alerts from `useIntentStatusWatcher` are routed through a pure
+decision function, `decideChannels()` in `src/lib/notifications/dispatcher.ts`,
+using preferences from `src/store/notificationPreferences.ts` (persisted to
+`localStorage` under `vortex-notification-prefs`, schema version 1 - unknown
+versions reset to defaults).
+
+| Preference | Default | Notes |
+| --- | --- | --- |
+| Per-status (`accepted`, `filled`, `failed`) | on | `pending` never notifies |
+| In-app toast | on | |
+| Browser notification | off | Permission is requested only from the settings checkbox (user gesture) |
+| Sound | off | Short WebAudio chime; muted during quiet hours |
+| Show details | off | When off, notification bodies show only a short intent id and status - no amounts/tokens/addresses |
+| Quiet hours | none | `HH:MM`-`HH:MM` local, may wrap midnight; mutes browser + sound |
+| Batching window | 1 s | Transitions within the window are grouped into one alert |
+
+Rules:
+
+- **Visible tab:** toast (+ sound) only - never a duplicate browser notification.
+- **Hidden tab:** browser notification if enabled, permission is `granted`, and
+  this tab is the leader; otherwise the toast is queued as a fallback.
+- **Multiple tabs:** a `BroadcastChannel` heartbeat election
+  (`src/lib/notifications/leader.ts`) ensures only one tab raises browser
+  notifications. Without `BroadcastChannel` every tab acts as leader.
+- Denied/unsupported permission disables the browser checkbox with an
+  explanatory hint. Service-worker push is out of scope.
+
+Table tests live in `src/lib/notifications/dispatcher.test.ts`. Settings UI:
+`src/components/NotificationSettings.tsx` (inside `SettingsPanel`).

@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { useAddressBook } from "@/store/addressBook";
+import { truncateAddress } from "@/lib/stellarAddress";
+export function AddressBookPanel() { const { entries, add, remove } = useAddressBook(); const [label, setLabel] = useState(""); const [address, setAddress] = useState(""); return <section aria-labelledby="address-book-title"><h2 id="address-book-title">Address book</h2><form onSubmit={(event) => { event.preventDefault(); add({ label, address }); setLabel(""); setAddress(""); }}><input aria-label="Label" value={label} onChange={(event) => setLabel(event.target.value)} /><input aria-label="Stellar address" value={address} onChange={(event) => setAddress(event.target.value)} /><button type="submit">Save address</button></form><ul>{entries.map((entry) => <li key={entry.address}><span>{entry.label} — {truncateAddress(entry.address)}</span>{!entry.verified && <strong> New / unverified</strong>}<button type="button" onClick={() => remove(entry.address)}>Remove</button></li>)}</ul></section>; }

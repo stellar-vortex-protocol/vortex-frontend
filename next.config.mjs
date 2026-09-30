@@ -1,4 +1,5 @@
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { parseEnv } from "./src/lib/env-schema.mjs";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -13,26 +14,18 @@ const isDev = process.env.NODE_ENV === "development";
 // the CSP connect-src directive.  These values are available here because
 // next.config.mjs runs server-side at build/start time and has full access
 // to process.env — they are NOT the same as NEXT_PUBLIC_* inlining (which
-// happens at compile time inside the browser bundle).
-const API_ORIGIN = (() => {
-  try {
-    return new URL(
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"
-    ).origin;
-  } catch {
-    return "http://localhost:4000";
-  }
-})();
+// happens at compile time inside the browser bundle).  Defaults and
+// validation come from the same schema as src/lib/config.ts.
+const { values: env, errors: envErrors } = parseEnv(process.env, {
+  production: process.env.NODE_ENV === "production",
+});
+if (envErrors.length > 0) {
+  throw new Error(`Invalid environment configuration:\n  - ${envErrors.join("\n  - ")}`);
+}
 
-const WS_ORIGIN = (() => {
-  try {
-    return new URL(
-      process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:4000/ws"
-    ).origin;
-  } catch {
-    return "ws://localhost:4000";
-  }
-})();
+const API_ORIGIN = new URL(env.apiUrl).origin;
+// No WebSocket URL configured means live updates are off; nothing to allow.
+const WS_ORIGIN = env.wsUrl ? new URL(env.wsUrl).origin : null;
 
 /**
  * Build the Content-Security-Policy header value.
@@ -71,7 +64,7 @@ function buildCsp() {
   const connectSrc = [
     "'self'",
     API_ORIGIN,
-    WS_ORIGIN,
+    ...(WS_ORIGIN ? [WS_ORIGIN] : []),
     ...(isDev ? ["ws://localhost:*", "http://localhost:*"] : []),
   ].join(" ");
 
@@ -80,6 +73,7 @@ function buildCsp() {
     `script-src 'self' 'unsafe-inline'`, // see tradeoff note 1 above
     "style-src 'self' 'unsafe-inline'",  // Tailwind injects inline styles via CSS-in-JS in dev
     `connect-src ${connectSrc}`,
+    "worker-src 'self' blob:",          // intent export worker (src/lib/export)
     "img-src 'self' data:",
     "font-src 'self'",
     "object-src 'none'",

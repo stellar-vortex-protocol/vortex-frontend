@@ -74,3 +74,16 @@ describe("catalogs", () => {
     }
   });
 });
+
+describe("placeholders", () => {
+  const tokens = (message: string) => [...message.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+
+  it("uses the same {tokens} in every locale as in English", () => {
+    for (const locale of LOCALES) {
+      const catalog = CATALOGS[locale];
+      for (const key of Object.keys(en) as (keyof typeof en)[]) {
+        expect(tokens(catalog[key]), `${locale}: ${key}`).toEqual(tokens(en[key]));
+      }
+    }
+  });
+});

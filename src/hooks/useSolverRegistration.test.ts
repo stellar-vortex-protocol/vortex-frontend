@@ -10,6 +10,7 @@ const {
   apiErrorMock,
   decodeXdrMock,
   validateRegistrationXdrMock,
+  verifySignedXdrMatchesMock,
 } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   registerSolverMock: vi.fn(),
@@ -39,9 +40,6 @@ vi.mock("@/lib/api", () => ({
   ApiError: apiErrorMock,
 }));
 
-vi.mock("@/lib/xdrReview", () => ({
-  verifySignedXdrMatches: verifySignedXdrMatchesMock,
-}));
 
 vi.mock("swr", () => ({ mutate: mutateMock }));
 vi.mock("@/store/toast", () => ({
@@ -58,6 +56,7 @@ vi.mock("@/lib/xdrReview", () => {
   return {
     decodeXdr: decodeXdrMock,
     validateRegistrationXdr: validateRegistrationXdrMock,
+    verifySignedXdrMatches: verifySignedXdrMatchesMock,
     XdrMismatchError,
   };
 });

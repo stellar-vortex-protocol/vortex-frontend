@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi , beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { FeedItem } from "@/lib/types";
 
@@ -24,6 +24,11 @@ vi.mock("./useActivityFeed", () => ({ useActivityFeed: useActivityFeedMock }));
 vi.mock("./useWebSocket", () => ({ useWebSocket: useWebSocketMock }));
 
 import { useIntentFeed } from "./useIntentFeed";
+import { useIntentStore } from "@/store/intents";
+
+beforeEach(() => {
+  useIntentStore.setState({ byId: {}, meta: {}, views: { feed: [], explore: [], mine: [] } });
+});
 
 describe("useIntentFeed", () => {
   it("falls back to the REST snapshot when there is no live message yet", () => {
@@ -89,7 +94,6 @@ describe("useIntentFeed", () => {
   });
 
   it("caps out-of-range overflow at the max item count, keeping the newest items", () => {
-    const base = seedItems[0]!;
     const overflowSeed: FeedItem[] = Array.from({ length: 10 }, (_, i) => ({
       ...seedItems[0]!,
       id: `seed-${i}`,
