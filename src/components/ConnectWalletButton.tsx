@@ -3,8 +3,42 @@
 import { useEffect } from "react";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
+import { truncateAddress } from "@/lib/stellarAddress";
+import type { WalletErrorKind } from "@/lib/wallet";
+import { QrCode } from "./QrCode";
 
 const FREIGHTER_INSTALL_URL = "https://www.freighter.app/";
+const FREIGHTER_CHROME_URL =
+  "https://chromewebstore.google.com/detail/freighter/bcacfldlkkdogcmkkibnjlakofdplcbk";
+const FREIGHTER_FIREFOX_URL = "https://addons.mozilla.org/firefox/addon/freighter/";
+
+/**
+ * Store link for the current browser. Mobile browsers can't run the extension,
+ * so they (and unknown browsers) get the Freighter homepage.
+ */
+export function freighterInstallUrl(
+  userAgent: string = typeof navigator === "undefined" ? "" : navigator.userAgent,
+): string {
+  if (/Android|iPhone|iPad|Mobile/i.test(userAgent)) return FREIGHTER_INSTALL_URL;
+  if (/Firefox\//.test(userAgent)) return FREIGHTER_FIREFOX_URL;
+  if (/Chrome\/|Chromium\/|Edg\//.test(userAgent)) return FREIGHTER_CHROME_URL;
+  return FREIGHTER_INSTALL_URL;
+}
+
+const expectedNetwork = () => process.env.NEXT_PUBLIC_NETWORK ?? "testnet";
+
+/** Kind-specific "what happened / what to do next" copy, announced to AT. */
+function WalletErrorGuidance({ kind }: { kind: WalletErrorKind }) {
+  const { t } = useTranslation();
+  return (
+    <p role="alert" className="max-w-xs text-right text-xs text-red-300">
+      {t(`wallet.error.${kind}`)}{" "}
+      {t(`wallet.errorHint.${kind}`, { network: expectedNetwork() })}
+    </p>
+  );
+}
+
 const NETWORK_CHECK_INTERVAL_MS = 8000;
 
 export function ConnectWalletButton({ compact = false }: { compact?: boolean }) {
@@ -14,6 +48,9 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
     isConnected,
     isConnecting,
     error,
+    errorKind,
+    errorKey,
+    lastKnownAddress,
     networkMismatch,
     notInstalled,
     wasSessionCleared,
@@ -21,13 +58,11 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
     disconnect,
   } = useWalletStore();
 
-  const displayError = error ?? null;
-
   const handleConnect = async () => {
     await connect();
-    const { error: latestError } = useWalletStore.getState();
+    const { error: latestError, errorKey: latestKey } = useWalletStore.getState();
     if (latestError) {
-      useToastStore.getState().addToast(latestError, "error");
+      useToastStore.getState().addToast(latestKey ? t(latestKey) : latestError, "error");
     }
   };
 
@@ -74,7 +109,8 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
 
         {networkMismatch && (
           <p role="alert" className="text-xs text-yellow-400">
-            ⚠ Wrong network. Switch Freighter to <span className="font-semibold">{process.env.NEXT_PUBLIC_NETWORK ?? "testnet"}</span>.
+            <span aria-hidden="true">⚠ </span>
+            {t("wallet.networkMismatch", { network: expectedNetwork() })}
           </p>
         )}
       </div>
@@ -95,74 +131,14 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
 
   if (notInstalled) {
     return (
-      <a
-        href={FREIGHTER_INSTALL_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Install the Freighter browser extension"
-        className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text`}
-      >
-        {!compact && (
-          <svg
-            aria-hidden="true"
-            className="w-4 h-4"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <circle
-              cx="8"
-              cy="8"
-              r="6"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M8 5v3l2 2"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-        )}
-        Install Freighter
-      </a>
-    );
-  }
-
-  // After a persisted session could not be silently restored, prompt to
-  // reconnect and show which address we last saw.
-  const reconnectLabel =
-    !isConnected && wasSessionCleared && lastKnownAddress
-      ? `Reconnect ${truncateAddress(lastKnownAddress)}`
-      : null;
-
-  return (
-    <button
-      type="button"
-      onClick={handleConnect}
-      disabled={isConnecting}
-      title={error ?? undefined}
-      className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
-    >
-      {isConnecting ? (
-        <>
-          <svg
-            aria-hidden="true"
-            className="w-3.5 h-3.5 animate-spin-slow flex-shrink-0"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
-          </svg>
-          <span>Connecting</span>
-          <span aria-hidden="true" className="inline-flex gap-0.5 items-end h-4">
-            <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:0ms]" />
-            <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:150ms]" />
-            <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:300ms]" />
-          </span>
-        </>
-      ) : (
-        <>
+      <div className="flex flex-col items-end gap-1">
+        <a
+          href={freighterInstallUrl()}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t("wallet.action.installAria")}
+          className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text`}
+        >
           {!compact && (
             <svg
               aria-hidden="true"
@@ -185,9 +161,78 @@ export function ConnectWalletButton({ compact = false }: { compact?: boolean }) 
               />
             </svg>
           )}
-          {reconnectLabel ?? (error ? "Retry Connection" : "Connect Freighter")}
-        </>
-      )}
-    </button>
+          {t("wallet.action.install")}
+        </a>
+        <WalletErrorGuidance kind="not-installed" />
+      </div>
+    );
+  }
+
+  // After a persisted session could not be silently restored, prompt to
+  // reconnect and show which address we last saw.
+  const reconnectLabel =
+    !isConnected && wasSessionCleared && lastKnownAddress
+      ? `Reconnect ${truncateAddress(lastKnownAddress)}`
+      : null;
+
+  const retryLabel =
+    errorKind === "locked" ? t("wallet.action.unlockedRetry") : t("wallet.connect.retry");
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={handleConnect}
+        disabled={isConnecting}
+        title={displayError ?? undefined}
+        className={`${baseClass} border-vx-border text-vx-muted hover:border-vx-sage/30 hover:text-vx-text disabled:opacity-60 disabled:cursor-wait`}
+      >
+        {isConnecting ? (
+          <>
+            <svg
+              aria-hidden="true"
+              className="w-3.5 h-3.5 animate-spin-slow flex-shrink-0"
+              viewBox="0 0 16 16"
+              fill="none"
+            >
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="8" />
+            </svg>
+            <span>Connecting</span>
+            <span aria-hidden="true" className="inline-flex gap-0.5 items-end h-4">
+              <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:0ms]" />
+              <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:150ms]" />
+              <span className="w-0.5 h-0.5 rounded-full bg-current animate-bounce [animation-delay:300ms]" />
+            </span>
+          </>
+        ) : (
+          <>
+            {!compact && (
+              <svg
+                aria-hidden="true"
+                className="w-4 h-4"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M8 5v3l2 2"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+            {reconnectLabel ?? (errorKind ? retryLabel : t("wallet.connect.cta"))}
+          </>
+        )}
+      </button>
+      {errorKind && !isConnecting && <WalletErrorGuidance kind={errorKind} />}
+    </div>
   );
 }

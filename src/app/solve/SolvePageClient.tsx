@@ -9,20 +9,21 @@ import { useOpenIntents } from "@/hooks/useOpenIntents";
 import { useAcceptIntent } from "@/hooks/useAcceptIntent";
 import { useSolverRegistration } from "@/hooks/useSolverRegistration";
 import { useLocalStorageDraft } from "@/hooks/useLocalStorageDraft";
-import { useWalletStore } from "@/store/wallet";
+import { EXPECTED_NETWORK, useWalletStore } from "@/store/wallet";
 import { timeRemaining } from "@/lib/time";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
 import { formatCurrency } from "@/lib/format";
 import { sanitizeDisplayText } from "@/lib/textSafety";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 import Link from "next/link";
 
 const TABS = ["leaderboard", "intents", "register"] as const;
 type Tab = (typeof TABS)[number];
 
 const MIN_BOND_USD = 50;
-const ONBOARDING_DISMISSED_KEY = "vortex_solver_onboarding_dismissed";
+const ONBOARDING_DISMISSED_KEY = STORAGE_KEYS.solverOnboardingDismissed.key;
 
 /** Shape of the persisted registration draft. */
 type RegistrationDraft = {
@@ -48,15 +49,25 @@ export default function SolvePageClient() {
   const [tab, setTab] = useState<"leaderboard" | "intents" | "register">("leaderboard");
   const { solvers, isLoading: solversLoading, error: solversError } = useSolvers();
   const { intents: openIntents, isLoading: intentsLoading, error: intentsError } = useOpenIntents();
-  const { accept, acceptingId, error: acceptError } = useAcceptIntent();
-  const { register, status: regStatus, error: regError, reset } =
-    useSolverRegistration();
+  const {
+    accept,
+    acceptingId,
+    error: acceptError,
+    cooldownSeconds: acceptCooldown,
+  } = useAcceptIntent();
+  const {
+    register,
+    status: regStatus,
+    error: regError,
+    reset,
+    cooldownSeconds: regCooldown,
+  } = useSolverRegistration();
 
   // Draft persistence — scoped to the currently connected wallet so that
   // switching wallets never silently restores the wrong address.
   const connectedAddress = useWalletStore((s) => s.address);
   const [draft, setDraft, clearDraft] = useLocalStorageDraft<RegistrationDraft>(
-    "vortex:solver-registration-draft",
+    STORAGE_KEYS.solverRegistrationDraft.key,
     connectedAddress ?? null,
   );
 
@@ -85,7 +96,7 @@ export default function SolvePageClient() {
 
   const [onboardingDismissed, setOnboardingDismissed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
+      return storage.getItem(ONBOARDING_DISMISSED_KEY) === "true";
     }
     return false;
   });
@@ -99,7 +110,7 @@ export default function SolvePageClient() {
     const nextState = !onboardingDismissed;
     setOnboardingDismissed(nextState);
     if (typeof window !== "undefined") {
-      localStorage.setItem(ONBOARDING_DISMISSED_KEY, String(nextState));
+      storage.setItem(ONBOARDING_DISMISSED_KEY, String(nextState));
     }
   };
 
@@ -190,7 +201,7 @@ export default function SolvePageClient() {
     return null;
   }, [bond, submitted]);
 
-  const canSubmit = Boolean(address && bond && !addressError && !bondError);
+  const canSubmit = Boolean(address && bond && !addressError && !bondError && !networkMismatch);
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -529,12 +540,14 @@ export default function SolvePageClient() {
                     <button
                       type="button"
                       onClick={() => accept(intent.id)}
-                      disabled={acceptingId === intent.id}
+                      disabled={acceptingId === intent.id || acceptCooldown > 0}
                       aria-busy={acceptingId === intent.id}
                       className="px-3 sm:px-4 py-2 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 transition-colors flex-shrink-0 w-full sm:w-auto disabled:opacity-60 disabled:cursor-wait"
                     >
                       {acceptingId === intent.id
                         ? t("solve.intents.accepting")
+                        : acceptCooldown > 0
+                        ? `Retry in ${acceptCooldown}s`
                         : t("solve.intents.accept")}
                     </button>
                   </div>
@@ -678,6 +691,16 @@ export default function SolvePageClient() {
                 <SubmissionStepper status={registration.status} errorStep={registration.errorStep} />
               )}
 
+              {networkMismatch && (
+                <p
+                  role="alert"
+                  data-testid="register-network-mismatch"
+                  className="text-xs text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded-lg px-3 py-2"
+                >
+                  {t("wallet.networkMismatch.blocked", { network: EXPECTED_NETWORK })}
+                </p>
+              )}
+
               {registration.status === "error" && (
                 <p role="alert" className="text-xs text-red-400">
                   {registration.error}
@@ -687,11 +710,13 @@ export default function SolvePageClient() {
               <button
                 type="button"
                 onClick={handleRegisterSubmit}
-                disabled={(!canSubmit && regStatus !== "success") || isBusy}
+                disabled={(!canSubmit && regStatus !== "success") || isBusy || regCooldown > 0}
                 aria-busy={isBusy}
                 className="w-full py-2.5 bg-vx-sage-bg text-vx-sage text-xs font-semibold rounded-lg border border-vx-sage/30 hover:bg-vx-sage/15 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {isRegistering
+                {regCooldown > 0
+                  ? `Retry in ${regCooldown}s`
+                  : isRegistering
                   ? t(REGISTRATION_LABEL_KEY[registration.status]!)
                   : registration.status === "success"
                   ? t("solve.register.button.registered")

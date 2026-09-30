@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi , beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { FeedItem } from "@/lib/types";
 
@@ -24,6 +24,11 @@ vi.mock("./useIntents", () => ({ useIntents: useIntentsMock }));
 vi.mock("./useWebSocket", () => ({ useWebSocket: useWebSocketMock }));
 
 import { useLiveIntents } from "./useLiveIntents";
+import { useIntentStore } from "@/store/intents";
+
+beforeEach(() => {
+  useIntentStore.setState({ byId: {}, meta: {}, views: { feed: [], explore: [], mine: [] } });
+});
 
 describe("useLiveIntents", () => {
   it("falls back to the REST list when there is no live message yet", () => {

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
+import { secureLogger } from "@/lib/secureLogging";
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 interface ErrorPageProps {
   error: Error & { digest?: string };
@@ -11,26 +13,27 @@ interface ErrorPageProps {
 }
 
 export default function IntentDetailError({ error, reset }: ErrorPageProps) {
+  const { t } = useTranslation();
   useEffect(() => {
-    console.error(error);
+    secureLogger.error("Route error boundary caught an error", error);
   }, [error]);
 
   return (
     <div className="min-h-screen">
-      <Nav variant="breadcrumb" label="Intent Detail — Error" />
+      <Nav variant="breadcrumb" label={t("errorPage.intent.breadcrumb")} />
 
       <main
         id="main-content"
         className="max-w-2xl mx-auto px-5 py-24 text-center"
       >
-        <div className="eyebrow mb-3">Intent Detail</div>
+        <div className="eyebrow mb-3">{t("errorPage.intent.eyebrow")}</div>
         <h1 className="text-3xl font-bold text-vx-text mb-3">
-          Couldn&apos;t load this intent
+          {t("errorPage.intent.title")}
         </h1>
         <p className="text-vx-muted text-sm mb-8">
           {error.message
             ? error.message
-            : "There was a problem loading the intent details. It may have been removed or the ID may be invalid."}
+            : t("errorPage.intent.message")}
         </p>
 
         <div className="flex items-center justify-center gap-4">
@@ -40,10 +43,10 @@ export default function IntentDetailError({ error, reset }: ErrorPageProps) {
             className="text-sm px-4 py-2 rounded-lg bg-vx-sage text-vx-ink font-semibold
                        hover:brightness-110 transition-all"
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
           <Link href="/explore" className="text-sm text-vx-sage hover:underline">
-            ← Back to Explorer
+            {t("errorPage.intent.back")}
           </Link>
         </div>
       </main>

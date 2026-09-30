@@ -17,15 +17,16 @@
 
 import { useCallback, useState } from "react";
 import { CHAINS } from "@/lib/marketData";
+import { STORAGE_KEYS, storage } from "@/lib/storage";
 
-export const RECENT_CHAINS_KEY = "vortex:recentChains";
+export const RECENT_CHAINS_KEY = STORAGE_KEYS.recentChains.key;
 export const MAX_RECENT = 3;
 
 /** Returns the valid (still-in-CHAINS), deduped, capped recent chain IDs. */
 function readFromStorage(): string[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(RECENT_CHAINS_KEY);
+    const raw = storage.getItem(RECENT_CHAINS_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -42,7 +43,7 @@ function readFromStorage(): string[] {
 function writeToStorage(ids: string[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(RECENT_CHAINS_KEY, JSON.stringify(ids));
+    storage.setItem(RECENT_CHAINS_KEY, JSON.stringify(ids));
   } catch {
     // localStorage may be unavailable (private browsing, quota, etc.) — fail silently.
   }
