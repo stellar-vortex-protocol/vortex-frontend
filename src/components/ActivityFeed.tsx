@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
-import { FeedSkeleton } from "@/components/Skeleton";
+import { useBufferedFeed, useFeedPause } from "@/hooks/useBufferedFeed";
+import { useLiveRelativeTime } from "@/hooks/useLiveRelativeTime";
+import { LiveFeedControls } from "@/components/LiveFeedControls";
 import { timeAgo } from "@/lib/time";
-import { useTranslation } from "@/lib/i18n/I18nProvider";
-import type { FeedItem } from "@/lib/types";
-import { SkeletonCard } from "./Skeleton";
 
 const CHAIN_COLOR: Record<string, string> = {
   ethereum: "#627EEA",
@@ -20,71 +19,47 @@ const CHAIN_COLOR: Record<string, string> = {
 /** Maximum number of activity items shown in the feed. */
 const FEED_LIMIT = 6;
 
-type ActivityFeedViewProps = ReturnType<typeof useIntentFeed>;
+/** How long to wait for a burst of arrivals to settle before announcing them. */
+const ANNOUNCE_DEBOUNCE_MS = 1500;
 
-export function ActivityFeedView({ items, isLoading, error, isLive }: ActivityFeedViewProps) {
-  const { t } = useTranslation();
-  const [announcement, setAnnouncement] = useState("");
-  const previousCount = useRef(items.length);
-  const pendingCount = useRef(0);
-  const announcementTimer = useRef<number | null>(null);
+type ActivityFeedViewProps = ReturnType<typeof useIntentFeed> & { now?: number };
 
-  // ── Screen-reader announcement ────────────────────────────────────────────
-  // We track how many items were present on the *previous* render so we can
-  // detect new arrivals.  The initial snapshot must never trigger an
-  // announcement — we only announce incremental additions after mount.
-  const prevCountRef = useRef<number | null>(null);
+export function ActivityFeedView({ items: liveItems, isLoading, error, isLive, now = Date.now() }: ActivityFeedViewProps) {
+  const pause = useFeedPause("home-activity");
+  const { visible: items, pending, overflow, flush } = useBufferedFeed(liveItems, { isPaused: pause.isPaused });
+
+  // === Debounced live-region announcement for newly arrived fills
   const [announcement, setAnnouncement] = useState("");
-  const pendingNewRef = useRef(0);
+  const knownIdsRef = useRef<Set<string> | null>(null);
+  const pendingCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Skip the first render (initial snapshot).
-    if (prevCountRef.current === null) {
-      prevCountRef.current = items.length;
+    const currentIds = new Set(liveItems.map((item) => item.id));
+    // The first snapshot is the baseline - it is not "new" activity.
+    if (knownIdsRef.current === null) {
+      knownIdsRef.current = currentIds;
       return;
     }
+    let arrived = 0;
+    for (const id of currentIds) if (!knownIdsRef.current.has(id)) arrived += 1;
+    knownIdsRef.current = currentIds;
+    if (arrived === 0) return;
 
-    const delta = items.length - prevCountRef.current;
-    prevCountRef.current = items.length;
-
-    if (delta <= 0) return;
-
-    // Accumulate across rapid arrivals; reset the debounce window each time.
-    pendingNewRef.current += delta;
+    pendingCountRef.current += arrived;
     if (timerRef.current !== null) clearTimeout(timerRef.current);
-
     timerRef.current = setTimeout(() => {
-      const count = pendingNewRef.current;
-      pendingNewRef.current = 0;
+      const count = pendingCountRef.current;
+      pendingCountRef.current = 0;
       setAnnouncement(count === 1 ? "1 new fill" : `${count} new fills`);
-    }, ANNOUNCE_DELAY_MS);
-  }, [items.length]);
+    }, ANNOUNCE_DEBOUNCE_MS);
+  }, [liveItems]);
 
-  // Cleanup timer on unmount.
-  useEffect(() => () => { if (timerRef.current !== null) clearTimeout(timerRef.current); }, []);
+  useEffect(() => () => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+  }, []);
 
-  // ── Visible items ─────────────────────────────────────────────────────────
   const visibleItems = useMemo(() => items.slice(0, FEED_LIMIT), [items]);
-
-  useEffect(() => {
-    if (items.length > previousCount.current && previousCount.current > 0) {
-      pendingCount.current += items.length - previousCount.current;
-      if (announcementTimer.current !== null) {
-        window.clearTimeout(announcementTimer.current);
-      }
-      announcementTimer.current = window.setTimeout(() => {
-        const newCount = pendingCount.current;
-        pendingCount.current = 0;
-        announcementTimer.current = null;
-        setAnnouncement(`${newCount} new fill${newCount === 1 ? "" : "s"}`);
-      }, 1500);
-      previousCount.current = items.length;
-      return undefined;
-    }
-    previousCount.current = items.length;
-    return undefined;
-  }, [items.length]);
 
   if (isLoading && items.length === 0) {
     return (
@@ -97,10 +72,26 @@ export function ActivityFeedView({ items, isLoading, error, isLive }: ActivityFe
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-[10px] text-vx-muted px-1">
-        <span aria-hidden="true" className={`state-dot ${isLive ? "bg-vx-sage" : "bg-vx-dim"}`} />
-        {isLive ? "Live" : "Polling"}
+    <div className="space-y-2 focus:outline-none" {...pause.containerProps}>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-1.5 text-[10px] text-vx-muted">
+          <span aria-hidden="true" className={`state-dot ${isLive ? "bg-vx-sage" : "bg-vx-dim"}`} />
+          {isLive ? "Live" : "Polling"}
+        </div>
+        <LiveFeedControls
+          userPaused={pause.userPaused}
+          onToggle={pause.toggle}
+          pending={pending}
+          overflow={overflow}
+          onFlush={() => {
+            flush();
+            pause.containerRef.current?.focus();
+          }}
+          announce={false}
+        />
+      </div>
+      <div role="status" aria-live="polite" className="sr-only">
+        {announcement}
       </div>
 
       {/* Error / empty states */}
@@ -152,4 +143,10 @@ export function ActivityFeedView({ items, isLoading, error, isLive }: ActivityFe
       })}
     </div>
   );
+}
+
+export function ActivityFeed() {
+  const feed = useIntentFeed();
+  const now = useLiveRelativeTime();
+  return <ActivityFeedView {...feed} now={now} />;
 }

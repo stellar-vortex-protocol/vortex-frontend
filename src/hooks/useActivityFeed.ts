@@ -12,11 +12,11 @@ import type { FeedItem } from "@/lib/types";
 // rapid re-mounts (e.g. strict-mode double-invocation) still share a single
 // in-flight request.
 export function useActivityFeed() {
-  const { data, error, isLoading } = useSWR<FeedItem[]>("/intents/feed", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<FeedItem[]>("/intents/feed", fetcher, {
     refreshInterval: 0,
     dedupingInterval: 8_000,
     ...swrRetryConfig,
   });
 
-  return { items: data ?? [], isLoading, error };
+  return { items: data ?? [], isLoading, error, mutate };
 }

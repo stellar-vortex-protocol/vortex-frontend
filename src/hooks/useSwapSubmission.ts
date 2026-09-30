@@ -1,9 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { walletAdapter } from "@/lib/wallet";
 import { createIntent, submitIntent } from "@/lib/api";
 import { verifySignedXdrMatches } from "@/lib/xdrReview";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
+import { useIntentStore } from "@/store/intents";
 import { decodeXdr, validateSwapXdr, XdrMismatchError } from "@/lib/xdrReview";
 import type { QuoteRequest } from "@/lib/types";
 
@@ -85,7 +86,12 @@ export const SWAP_ERROR_GUIDANCE: Record<SwapErrorKind, string> = {
   generic: "",
 };
 
-export function useSwapSubmission() {
+/** How long an optimistic entry waits for the relay before being flagged. */
+export const OPTIMISTIC_CONFIRM_TIMEOUT_MS = 60_000;
+
+export function useSwapSubmission({
+  confirmTimeoutMs = OPTIMISTIC_CONFIRM_TIMEOUT_MS,
+}: { confirmTimeoutMs?: number } = {}) {
   const [status, setStatus] = useState<SwapSubmissionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [errorKind, setErrorKind] = useState<SwapErrorKind | null>(null);
@@ -105,6 +111,7 @@ export function useSwapSubmission() {
     setError(null);
     setErrorKind(null);
     setIntentId(null);
+    let optimisticId: string | null = null;
 
     try {
       let wallet = useWalletStore.getState();
@@ -148,7 +155,37 @@ export function useSwapSubmission() {
       }
 
       setStatus("submitting");
-      await submitIntent(newIntentId, signedXdr);
+      // Optimistic entry keyed by the relay's intentId, replaced in place by
+      // the authoritative REST/WS record when it arrives (#435).
+      const intents = useIntentStore.getState();
+      intents.ingest(
+        [
+          {
+            id: newIntentId,
+            srcChain: params.srcChain,
+            srcToken: params.srcToken,
+            srcAmount: params.srcAmount,
+            dstToken: params.dstToken,
+            solver: "",
+            status: "pending",
+            createdAt: new Date().toISOString(),
+            optimistic: true,
+          },
+        ],
+        "optimistic",
+      );
+      optimisticId = newIntentId;
+      const submitted = await submitIntent(newIntentId, signedXdr);
+      if (submitted?.intentId && submitted.intentId !== newIntentId) {
+        // Server assigned a different id: re-key the optimistic entry.
+        const entry = useIntentStore.getState().byId[newIntentId];
+        intents.remove(newIntentId);
+        if (entry) intents.ingest([{ ...entry, id: submitted.intentId }], "optimistic");
+        optimisticId = submitted.intentId;
+      }
+      const confirmId = optimisticId;
+      setTimeout(() => useIntentStore.getState().markUnconfirmed(confirmId), confirmTimeoutMs);
+      optimisticId = null;
 
       advance("success");
       useToastStore.getState().addToast("Swap submitted successfully.", "success");
@@ -159,12 +196,13 @@ export function useSwapSubmission() {
           : err instanceof Error
           ? err.message
           : "Failed to submit swap.";
+      if (optimisticId) useIntentStore.getState().remove(optimisticId);
       setStatus("error");
       setError(message);
       setErrorKind(classifySwapError(err));
       useToastStore.getState().addToast(message, "error");
     }
-  }, [status]);
+  }, [status, confirmTimeoutMs]);
 
   const reset = useCallback(() => {
     stepRef.current = "idle";

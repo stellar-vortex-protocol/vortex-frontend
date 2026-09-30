@@ -14,11 +14,13 @@ export default function ContributorsPageClient({ metrics }: { metrics: WaveMetri
   const [selectedComplexity, setSelectedComplexity] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [goodFirstOnly, setGoodFirstOnly] = useState(false);
 
   const filteredIssues = metrics.issues.filter((issue) => {
     if (selectedCategory !== "all" && issue.category !== selectedCategory) return false;
     if (selectedComplexity !== "all" && issue.complexity !== selectedComplexity) return false;
     if (selectedStatus !== "all" && issue.status !== selectedStatus) return false;
+    if (goodFirstOnly && !issue.goodFirstIssue) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchesTitle = issue.title.toLowerCase().includes(q);
@@ -258,6 +260,16 @@ export default function ContributorsPageClient({ metrics }: { metrics: WaveMetri
                 <option value="In Progress">In Progress</option>
                 <option value="Open">Open</option>
               </select>
+
+              <label className="flex items-center gap-2 text-xs text-vx-text">
+                <input
+                  type="checkbox"
+                  checked={goodFirstOnly}
+                  onChange={(e) => setGoodFirstOnly(e.target.checked)}
+                  className="accent-vx-sage focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-sage"
+                />
+                Good first issues only
+              </label>
             </div>
           </div>
 
@@ -283,6 +295,11 @@ export default function ContributorsPageClient({ metrics }: { metrics: WaveMetri
                     </td>
                     <td className="px-5 py-3.5 font-medium text-vx-text max-w-xs sm:max-w-md truncate">
                       {issue.title}
+                      {issue.goodFirstIssue && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-vx-sage-bg text-vx-sage border border-vx-sage/20">
+                          Good first issue
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-vx-muted">{issue.category}</td>
                     <td className="px-5 py-3.5">

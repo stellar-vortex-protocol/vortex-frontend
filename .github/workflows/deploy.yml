@@ -18,9 +18,9 @@ jobs:
       build-id: ${{ steps.build.outputs.build-id }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -41,7 +41,7 @@ jobs:
           echo "build-id=$(date +%s)" >> $GITHUB_OUTPUT
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-build-${{ steps.build.outputs.build-id }}
           path: .next
@@ -57,9 +57,9 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -68,7 +68,7 @@ jobs:
         run: npm ci
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: nextjs-build-${{ needs.build.outputs.build-id }}
           path: .next
@@ -103,7 +103,7 @@ jobs:
 
       - name: Create deployment status
         if: steps.deploy.outputs.deployed == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const deployment = await github.rest.repos.createDeployment({

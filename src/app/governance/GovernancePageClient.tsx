@@ -6,8 +6,10 @@ import { Nav } from "@/components/Nav";
 import { getGovernanceProposals } from "@/lib/governanceStore";
 import { timeRemaining } from "@/lib/time";
 import { getMessage } from "@/i18n/messages";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 export default function GovernancePageClient() {
+  const { t } = useTranslation();
   const proposals = getGovernanceProposals();
   const [filter, setFilter] = useState<"all" | "active" | "passed" | "rejected">("all");
 
@@ -29,6 +31,12 @@ export default function GovernancePageClient() {
           <p className="text-vx-muted text-xs sm:text-sm max-w-lg leading-relaxed">
             {getMessage("solve.governance.description")}
           </p>
+          <Link
+            href="/requests"
+            className="inline-block mt-3 text-xs font-semibold text-vx-sage hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-sage rounded"
+          >
+            {t("governance.requestsLink")}
+          </Link>
         </div>
 
         {/* Filter buttons */}

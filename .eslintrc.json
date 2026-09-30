@@ -1,3 +1,31 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": [
+        "src/lib/decimal.ts",
+        "src/lib/format.ts",
+        "src/lib/analytics.ts",
+        "src/lib/xdrReview.ts",
+        "src/components/SwapCard.tsx"
+      ],
+      "rules": {
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "parseFloat",
+            "message": "Money code must use src/lib/decimal.ts (parseDecimal/tryParseDecimal), not parseFloat."
+          }
+        ],
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Number",
+            "property": "parseFloat",
+            "message": "Money code must use src/lib/decimal.ts (parseDecimal/tryParseDecimal), not Number.parseFloat."
+          }
+        ]
+      }
+    }
+  ]
 }

@@ -1,414 +1,131 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { OpenIntent, Solver } from "@/lib/types";
+import { SWRConfig } from "swr";
+import type { Solver } from "@/lib/types";
 
-const {
-  useSolversMock,
-  useOpenIntentsMock,
-  useAcceptIntentMock,
-  acceptMock,
-  useSolverRegistrationMock,
-  registerMock,
-  resetMock,
-} = vi.hoisted(() => ({
-  useSolversMock: vi.fn(),
-  useOpenIntentsMock: vi.fn(),
-  useAcceptIntentMock: vi.fn(),
-  acceptMock: vi.fn(),
-  useSolverRegistrationMock: vi.fn(),
-  registerMock: vi.fn(),
-  resetMock: vi.fn(),
+const { fetcherMock, downloadCsvMock } = vi.hoisted(() => ({
+  fetcherMock: vi.fn(),
+  downloadCsvMock: vi.fn(),
 }));
-vi.mock("@/hooks/useSolvers", () => ({ useSolvers: useSolversMock }));
-vi.mock("@/hooks/useOpenIntents", () => ({
-  useOpenIntents: useOpenIntentsMock,
-}));
-vi.mock("@/hooks/useAcceptIntent", () => ({
-  useAcceptIntent: useAcceptIntentMock,
-}));
-vi.mock("@/hooks/useSolverRegistration", () => ({
-  useSolverRegistration: useSolverRegistrationMock,
-}));
+vi.mock("@/lib/api", () => ({ fetcher: fetcherMock, acceptIntent: vi.fn(), ApiError: Error }));
+vi.mock("@/lib/csv", async (orig) => ({ ...(await orig<typeof import("@/lib/csv")>()), downloadCsv: downloadCsvMock }));
+vi.mock("next/navigation", async () => (await import("@/test/navigationMock")).navigationMock);
 vi.mock("@/components/Nav", () => ({ Nav: () => <nav /> }));
 vi.mock("@/components/Footer", () => ({ Footer: () => <footer /> }));
+// Skeleton.tsx currently has duplicate exports on main; stub it out.
+vi.mock("@/components/Skeleton", () => ({ SkeletonCard: () => <div /> }));
 
 import SolvePage from "./SolvePageClient";
 import { messages } from "@/i18n/messages";
+import { useWalletStore } from "@/store/wallet";
+import { getSearch, setSearch } from "@/test/navigationMock";
+
+const solver = (over: Partial<Solver>): Solver => ({
+  name: "Solver",
+  address: "GA",
+  bondUsd: 100,
+  fills: 10,
+  failed: 0,
+  volumeUsd: 1_000,
+  avgFillTimeSeconds: 12,
+  successRatePct: 100,
+  chains: ["ethereum"],
+  status: "active",
+  ...over,
+});
 
 const solvers: Solver[] = [
-  {
-    name: "Alpha Market Making",
-    address: "GABC...1234",
-    bondUsd: 5000,
-    fills: 842,
-    failed: 3,
-    volumeUsd: 4_200_000,
-    avgFillTimeSeconds: 47,
-    successRatePct: 99.6,
-    chains: ["Ethereum", "Base"],
-    status: "active",
-  },
+  solver({ name: "Alpha", address: "GALPHA", volumeUsd: 5_000, fills: 3, previousRank: 1 }),
+  solver({ name: "Beta‮", address: "GBETA", volumeUsd: 9_000, fills: 1, chains: ["base"], verified: true, homeDomain: "beta.example" }),
+  solver({ name: "Gamma", address: "GGAMMA", volumeUsd: 100, fills: 0, failed: 0, status: "inactive", bondUsd: 10 }),
 ];
 
-const openIntents: OpenIntent[] = [
-  {
-    id: "a1b2",
-    srcChain: "ethereum",
-    srcToken: "USDC",
-    srcAmount: "500",
-    dstToken: "USDC",
-    minOut: "495",
-    deadline: new Date(Date.now() + 18 * 60_000).toISOString(),
-  },
-];
-
-const VALID_ADDRESS =
-  "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
-
-async function openIntentsTab() {
-  const user = userEvent.setup();
-  await user.click(screen.getByText("intents"));
-  return user;
+function renderPage() {
+  fetcherMock.mockImplementation(async (path: string) => {
+    if (path.startsWith("/solvers")) return solvers;
+    if (path === "/intents/open") return [];
+    throw new Error(`Unexpected fetch: ${path}`);
+  });
+  return render(
+    <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+      <SolvePage />
+    </SWRConfig>,
+  );
 }
 
-async function registerTab() {
-  const user = userEvent.setup();
-  await user.click(screen.getByText("register"));
-  return user;
-}
+const bodyRows = () => within(screen.getByRole("table")).getAllByRole("row").slice(1);
+const names = () => bodyRows().map((r) => within(r).getByRole("rowheader").querySelector("a")?.textContent);
 
-describe("SolvePage", () => {
+describe("Solve page — leaderboard", () => {
   beforeEach(() => {
-    useOpenIntentsMock.mockReturnValue({
-      intents: [],
-      isLoading: false,
-      error: undefined,
-    });
-    useAcceptIntentMock.mockReturnValue({
-      accept: acceptMock,
-      acceptingId: null,
-      error: null,
-    });
-    useSolverRegistrationMock.mockReturnValue({
-      status: "idle",
-      error: null,
-      register: registerMock,
-      reset: resetMock,
-    });
+    localStorage.clear();
+    setSearch("");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ domain: "beta.example", domainUnicode: "beta.example", accounts: ["GBETA"], orgName: "Beta Org", orgUrl: null }))));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
-  it("renders content within a main landmark", () => {
-    useSolversMock.mockReturnValue({
-      solvers: [],
-      isLoading: false,
-      error: undefined,
-    });
-    render(<SolvePage />);
-    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+  it("renders a ranked, accessible table with sanitised names, rank deltas and identity chips", async () => {
+    renderPage();
+    expect(await screen.findByRole("table", { name: /Active Solvers/ })).toBeInTheDocument();
+    expect(names()).toEqual(["Beta", "Alpha", "Gamma"]);
+    expect(screen.getByText("Down 1 places", { exact: false })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Domain verified/ })).toBeInTheDocument();
   });
 
-  it("renders the default English copy from the message catalog", () => {
-    useSolversMock.mockReturnValue({
-      solvers: [],
-      isLoading: false,
-      error: undefined,
-    });
-    render(<SolvePage />);
-    expect(
-      screen.getByRole("heading", { name: messages.en.solve.hero.title }),
-    ).toBeInTheDocument();
-  });
-
-  it("exposes the tabs with correct ARIA roles and selected state", async () => {
-    useSolversMock.mockReturnValue({
-      solvers: [],
-      isLoading: false,
-      error: undefined,
-    });
-    render(<SolvePage />);
-
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(3);
-    expect(screen.getByRole("tab", { name: "leaderboard" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute(
-      "aria-selected",
-      "false",
-    );
-
+  it("sorts via header buttons and mirrors the sort in the URL", async () => {
     const user = userEvent.setup();
-    await user.click(screen.getByRole("tab", { name: "intents" }));
-
-    expect(screen.getByRole("tab", { name: "intents" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("id", "panel-intents");
+    renderPage();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: /^Fills/ }));
+    expect(getSearch().get("sort")).toBe("fills:asc");
+    expect(names()).toEqual(["Gamma", "Beta", "Alpha"]);
+    expect(screen.getByRole("columnheader", { name: /Fills/ })).toHaveAttribute("aria-sort", "ascending");
   });
 
-  describe("leaderboard tab", () => {
-    it("shows a loading skeleton while solvers are being fetched", () => {
-      useSolversMock.mockReturnValue({
-        solvers: [],
-        isLoading: true,
-        error: undefined,
-      });
-      const { container } = render(<SolvePage />);
-      expect(
-        container.querySelectorAll(".animate-pulse").length,
-      ).toBeGreaterThan(0);
-    });
-
-    it("shows an error state when the leaderboard fails to load", () => {
-      useSolversMock.mockReturnValue({
-        solvers: [],
-        isLoading: false,
-        error: new Error("boom"),
-      });
-      render(<SolvePage />);
-      expect(
-        screen.getByText(/Couldn't load the solver leaderboard/),
-      ).toBeInTheDocument();
-    });
-
-    it("shows an empty state when there are no active solvers", () => {
-      useSolversMock.mockReturnValue({
-        solvers: [],
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-      expect(screen.getByText("No active solvers yet.")).toBeInTheDocument();
-    });
-
-    it("renders solver rows with formatted volume and rates", () => {
-      useSolversMock.mockReturnValue({
-        solvers,
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-
-      expect(screen.getByText("Alpha Market Making")).toBeInTheDocument();
-      expect(screen.getByText("842")).toBeInTheDocument();
-      expect(screen.getByText("$4.2M")).toBeInTheDocument();
-      expect(screen.getByText("47s")).toBeInTheDocument();
-      expect(screen.getByText("99.6%")).toBeInTheDocument();
-    });
-
-    it("sorts the leaderboard by name, volume, fills, and success rate", async () => {
-      const baseSolver = solvers[0]!;
-      const otherSolver: Solver = {
-        ...solvers[0]!,
-        name: "Zulu Solver",
-        address: "GDEF...5678",
-        fills: 900,
-        volumeUsd: 5_000_000,
-        successRatePct: 99.9,
-      };
-      useSolversMock.mockReturnValue({ solvers: [otherSolver, solvers[0]!], isLoading: false, error: undefined });
-      const user = userEvent.setup();
-      render(<SolvePage />);
-
-      const solverNames = () =>
-        screen
-          .getAllByText(/^(Alpha Market Making|Zulu Solver)$/)
-          .map((element) => element.textContent);
-
-      await user.click(screen.getByRole("button", { name: /^Name/ }));
-      expect(solverNames()).toEqual(["Alpha Market Making", "Zulu Solver"]);
-
-      for (const name of ["Volume", "Fills", "Success"]) {
-        await user.click(
-          screen.getByRole("button", { name: new RegExp(`^${name}`, "i") }),
-        );
-        expect(solverNames()).toEqual(["Zulu Solver", "Alpha Market Making"]);
-      }
-    });
-
-    it("wraps solver rows in links to detail page", () => {
-      const baseSolver = solvers[0]!;
-      useSolversMock.mockReturnValue({
-        solvers,
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-
-      const solverLinks = screen.getAllByRole("link");
-      const detailLink = solverLinks.find(link =>
-        link.getAttribute("href") === `/solve/${solvers[0]!.address}`
-      );
-
-      expect(detailLink).toBeInTheDocument();
-      expect(detailLink).toHaveTextContent("Alpha Market Making");
-    });
-
-    it("ensures row links are keyboard accessible", async () => {
-      const baseSolver = solvers[0]!;
-      useSolversMock.mockReturnValue({
-        solvers,
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-
-      const links = screen.getAllByRole("link");
-      const detailLink = links.find(link =>
-        link.getAttribute("href") === `/solve/${solvers[0]!.address}`
-      );
-
-      // An <a> with an href is in the tab order and operable by keyboard.
-      expect(detailLink).toBeInTheDocument();
-      expect(detailLink?.tagName).toBe("A");
-      expect(detailLink).not.toHaveAttribute("tabindex", "-1");
-    });
-
-    it("preserves solver data in link target", () => {
-      const baseSolver = solvers[0]!;
-      useSolversMock.mockReturnValue({
-        solvers,
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-
-      const detailLink = screen.getByRole("link", { name: /Alpha Market Making/ });
-      expect(detailLink).toHaveAttribute("href", `/solve/${solvers[0]!.address}`);
-    });
-
-    it("maintains row hover and focus states for accessibility", () => {
-      const baseSolver = solvers[0]!;
-      useSolversMock.mockReturnValue({
-        solvers,
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-
-      const links = screen.getAllByRole("link");
-      const detailLink = links.find(link =>
-        link.getAttribute("href") === `/solve/${solvers[0]!.address}`
-      );
-
-      expect(detailLink).toBeInTheDocument();
-    });
+  it("filters by status, min bond and verified-only through the URL", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("table");
+    await user.selectOptions(screen.getByLabelText("Status"), "active");
+    expect(getSearch().get("status")).toBe("active");
+    expect(names()).toEqual(["Beta", "Alpha"]);
+    await user.click(screen.getByLabelText("Verified only"));
+    expect(names()).toEqual(["Beta"]);
   });
 
-  describe("open intents tab", () => {
-    beforeEach(() => {
-      useSolversMock.mockReturnValue({
-        solvers: [],
-        isLoading: false,
-        error: undefined,
-      });
-    });
-
-    it("shows a loading skeleton while intents are being fetched", async () => {
-      useOpenIntentsMock.mockReturnValue({
-        intents: [],
-        isLoading: true,
-        error: undefined,
-      });
-      const { container } = render(<SolvePage />);
-      await openIntentsTab();
-      expect(
-        container.querySelectorAll(".animate-pulse").length,
-      ).toBeGreaterThan(0);
-    });
-
-    it("shows an error state when open intents fail to load", async () => {
-      useOpenIntentsMock.mockReturnValue({
-        intents: [],
-        isLoading: false,
-        error: new Error("boom"),
-      });
-      render(<SolvePage />);
-      await openIntentsTab();
-      expect(
-        screen.getByText(/Couldn't load open intents/),
-      ).toBeInTheDocument();
-    });
-
-    it("shows an empty state when there are no open intents", async () => {
-      useOpenIntentsMock.mockReturnValue({
-        intents: [],
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-      await openIntentsTab();
-      expect(screen.getByText(/No open intents right now/)).toBeInTheDocument();
-    });
-
-    it("renders open intents and calls accept() when Accept Intent is clicked", async () => {
-      useOpenIntentsMock.mockReturnValue({
-        intents: openIntents,
-        isLoading: false,
-        error: undefined,
-      });
-      render(<SolvePage />);
-      const user = await openIntentsTab();
-
-      expect(screen.getByText("500 USDC on ethereum")).toBeInTheDocument();
-      expect(
-        screen.getByText((_, el) =>
-          /^Min out: 495 USDC · Expires in \d+m$/.test(el?.textContent ?? ""),
-        ),
-      ).toBeInTheDocument();
-
-      await user.click(screen.getByText("Accept Intent →"));
-      expect(acceptMock).toHaveBeenCalledWith("a1b2");
-    });
-
-    it("disables the button and shows a busy label while accepting", async () => {
-      useOpenIntentsMock.mockReturnValue({
-        intents: openIntents,
-        isLoading: false,
-        error: undefined,
-      });
-      useAcceptIntentMock.mockReturnValue({
-        accept: acceptMock,
-        acceptingId: "a1b2",
-        error: null,
-      });
-      render(<SolvePage />);
-      await openIntentsTab();
-
-      const button = screen.getByText("Accepting…");
-      expect(button).toBeDisabled();
-    });
-
-    it("shows an inline error when accepting fails", async () => {
-      useOpenIntentsMock.mockReturnValue({
-        intents: openIntents,
-        isLoading: false,
-        error: undefined,
-      });
-      useAcceptIntentMock.mockReturnValue({
-        accept: acceptMock,
-        acceptingId: null,
-        error: "Intent already claimed",
-      });
-      render(<SolvePage />);
-      await openIntentsTab();
-
-      expect(screen.getByText("Intent already claimed")).toBeInTheDocument();
-    });
+  it("switches time window and requests window-scoped metrics", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "7d" }));
+    expect(getSearch().get("window")).toBe("7d");
+    expect(fetcherMock).toHaveBeenCalledWith("/solvers?window=7d");
   });
 
-  describe("register tab", () => {
-    beforeEach(() => {
-      useSolversMock.mockReturnValue({
-        solvers: [],
-        isLoading: false,
-        error: undefined,
-      });
-    });
+  it("exports the visible table to CSV", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "Export CSV" }));
+    const [filename, csv] = downloadCsvMock.mock.calls[0] as [string, string];
+    expect(filename).toBe("vortex-solvers-all.csv");
+    expect(csv.split("\n")[0]).toBe("Rank,Solver,Fills,Volume,Success %,Avg fill time,Bond,address");
+    expect(csv).toContain("GBETA");
+  });
 
+  it("switches tabs via the URL", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "Open intents" }));
+    expect(getSearch().get("tab")).toBe("intents");
+    expect(screen.getByRole("tab", { name: "Open intents" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  describe("registration wizard", () => {
     it("disables submit until both fields are valid", async () => {
       render(<SolvePage />);
       const user = await registerTab();
@@ -509,5 +226,138 @@ describe("SolvePage", () => {
 
       expect(screen.getByText("Bond deposit failed")).toBeInTheDocument();
     });
+
+    it("shows a profile link after successful registration", async () => {
+      useSolverRegistrationMock.mockReturnValue({
+        status: "success",
+        error: null,
+        register: registerMock,
+        reset: resetMock,
+      });
+      render(<SolvePage />);
+      const user = await registerTab();
+
+      // Pre-fill the address field so the link has a target
+      await user.type(screen.getByLabelText("Stellar Address"), VALID_ADDRESS);
+
+      const profileLink = screen.getByTestId("solver-profile-link");
+      expect(profileLink).toBeInTheDocument();
+      expect(profileLink).toHaveAttribute("href", `/solve/${VALID_ADDRESS}`);
+      expect(profileLink).toHaveTextContent(/view your solver profile/i);
+    });
+  });
+
+  // ── Registered-solver banner ──────────────────────────────────────────────
+
+  describe("registered solver banner", () => {
+    const REGISTERED_ADDRESS =
+      "GDW4UXK66PDDK4CDDUJGNPFZHBZDWAJNNUE5ZEQYN5S3DISNGXZIVAIV";
+
+    const registeredSolver: Solver = {
+      name: "My Solver",
+      address: REGISTERED_ADDRESS,
+      bondUsd: 1000,
+      fills: 10,
+      failed: 0,
+      volumeUsd: 50_000,
+      avgFillTimeSeconds: 8,
+      successRatePct: 100,
+      chains: ["ethereum"],
+      status: "active",
+    };
+
+    beforeEach(() => {
+      useOpenIntentsMock.mockReturnValue({
+        intents: [],
+        isLoading: false,
+        error: undefined,
+      });
+      useSolverRegistrationMock.mockReturnValue({
+        status: "idle",
+        error: null,
+        register: registerMock,
+        reset: resetMock,
+      });
+    });
+
+    it("shows the banner when the connected wallet is a registered solver", () => {
+      useWalletStore.setState({ address: REGISTERED_ADDRESS } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.getByRole("status", { name: /you are a registered solver/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/My Solver/)).toBeInTheDocument();
+    });
+
+    it("banner links to the solver detail page", () => {
+      useWalletStore.setState({ address: REGISTERED_ADDRESS } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      const link = screen.getByRole("link", { name: /view your profile/i });
+      expect(link).toHaveAttribute("href", `/solve/${REGISTERED_ADDRESS}`);
+    });
+
+    it("hides the banner when the connected wallet is not a registered solver", () => {
+      useWalletStore.setState({ address: "GDIFFERENT000000000000000000000000000000000000000000000000" } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.queryByRole("status", { name: /you are a registered solver/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("hides the banner when no wallet is connected", () => {
+      useWalletStore.setState({ address: null } as any, false);
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.queryByRole("status", { name: /you are a registered solver/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("matches solver address case-insensitively", () => {
+      // Wallet address is lowercase — solver list has uppercase
+      useWalletStore.setState(
+        { address: REGISTERED_ADDRESS.toLowerCase() } as any,
+        false,
+      );
+      useSolversMock.mockReturnValue({
+        solvers: [registeredSolver],
+        isLoading: false,
+        error: undefined,
+      });
+
+      render(<SolvePage />);
+
+      expect(
+        screen.getByRole("status", { name: /you are a registered solver/i }),
+      ).toBeInTheDocument();
+    });
+  });
   });
 });

@@ -136,6 +136,7 @@ describe("useAcceptIntent", () => {
       await result.current.accept("intent-4");
     });
 
+    expect(acceptIntentMock).toHaveBeenCalledTimes(1);
     expect(result.current.error).toBe("Someone else accepted this intent first.");
     expect(result.current.acceptingId).toBeNull();
     expect(openIntentsStore.get(OPEN_INTENTS_KEY)).toEqual([{ id: "intent-1" }, { id: "intent-4" }]);
@@ -146,10 +147,18 @@ describe("useAcceptIntent", () => {
     useWalletStore.setState({ isConnected: true, address: "GABC123" });
     acceptIntentMock.mockRejectedValue(new Error("Intent already claimed"));
 
+    // A non-4xx error is retried with back-off before surfacing; fake timers
+    // skip the 1 s / 2 s / 4 s waits.
+    vi.useFakeTimers();
     const { result } = renderHook(() => useAcceptIntent());
     await act(async () => {
-      await result.current.accept("intent-4");
+      const pending = result.current.accept("intent-4");
+      await vi.runAllTimersAsync();
+      await pending;
     });
+    vi.useRealTimers();
+
+    expect(acceptIntentMock).toHaveBeenCalledTimes(4);
 
     expect(result.current.error).toBe("Intent already claimed");
     expect(result.current.acceptingId).toBeNull();

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { GROUP_ORDER, useCommandRegistry, type CommandDefinition } from "@/lib/commands/registry";
+import { rankByQuery } from "@/lib/commands/fuzzy";
+import { readRecentIntents } from "@/lib/commands/recents";
+import { useTranslation } from "@/lib/i18n/I18nProvider";
 
 // === Static navigation targets
 // The four top-level routes the palette can jump to. Keeping this list here
@@ -30,72 +34,159 @@ function truncateMiddle(value: string): string {
   return value.length <= 14 ? value : `${value.slice(0, 6)}…${value.slice(-6)}`;
 }
 
-function buildCommands(query: string): Command[] {
+type PaletteItem = {
+  id: string;
+  label: string;
+  hint: string;
+  keywords: string[];
+  group: CommandDefinition["group"];
+  dangerous: boolean;
+  run: () => void | Promise<void>;
+  indices: number[];
+};
+
+function buildCommands(
+  query: string,
+  registered: CommandDefinition[],
+  recents: CommandDefinition[],
+  navigate: (href: string) => void,
+): PaletteItem[] {
   const trimmed = query.trim();
-  const lower = trimmed.toLowerCase();
 
-  const routes = ROUTE_COMMANDS.filter(
-    (command) =>
-      lower.length === 0 ||
-      command.label.toLowerCase().includes(lower) ||
-      command.hint.toLowerCase().includes(lower),
+  const routes: CommandDefinition[] = ROUTE_COMMANDS.map((command) => ({
+    id: command.id,
+    title: command.label,
+    hint: command.hint,
+    keywords: [command.hint],
+    group: "Navigation",
+    run: () => navigate(command.href),
+  }));
+  const visible = [...recents, ...routes, ...registered].filter((command) => !command.when || command.when());
+  // With no query, only surface quick jumps; contextual commands appear once the user types.
+  const pool =
+    trimmed.length === 0
+      ? visible.filter((command) => command.group === "Recent" || command.group === "Navigation")
+      : visible;
+
+  const ranked = rankByQuery(
+    pool,
+    trimmed,
+    (command) => command.title,
+    (command) => command.keywords ?? [],
   );
+  // Empty query keeps registration order grouped; typed queries rank by score.
+  const ordered =
+    trimmed.length === 0
+      ? [...ranked].sort((a, b) => GROUP_ORDER.indexOf(a.item.group) - GROUP_ORDER.indexOf(b.item.group))
+      : ranked;
+  const results: PaletteItem[] = ordered.map(({ item, indices }) => ({
+    id: item.id,
+    label: item.title,
+    hint: item.hint ?? item.group,
+    keywords: item.keywords ?? [],
+    group: item.group,
+    dangerous: item.dangerous ?? false,
+    run: item.run,
+    indices,
+  }));
 
-  if (trimmed.length === 0) return routes;
+  if (trimmed.length === 0) return results;
 
-  const lookups: Command[] = [];
+  const lookup = (id: string, label: string, hint: string, href: string): PaletteItem => ({
+    id,
+    label,
+    hint,
+    keywords: [],
+    group: "Navigation",
+    dangerous: false,
+    run: () => navigate(href),
+    indices: [],
+  });
+  const lookups: PaletteItem[] = [];
   if (isValidStellarPublicKey(trimmed)) {
-    lookups.push({
-      id: "lookup-solver",
-      label: `Go to solver ${truncateMiddle(trimmed)}`,
-      hint: "Solver",
-      href: `/solve/${trimmed}`,
-    });
+    lookups.push(lookup("lookup-solver", `Go to solver ${truncateMiddle(trimmed)}`, "Solver", `/solve/${trimmed}`));
   } else if (
-    routes.length === 0 &&
+    results.length === 0 &&
     !trimmed.includes(" ") &&
     trimmed.length >= MIN_ID_LENGTH
   ) {
-    // Only offer a direct intent-id jump when the query matches no route -
+    // Only offer a direct intent-id jump when the query matches no command -
     // otherwise a plain search term like "solve" would sprout a bogus
     // "Open intent solve" row alongside the real route match.
-    lookups.push({
-      id: "lookup-intent",
-      label: `Open intent ${truncateMiddle(trimmed)}`,
-      hint: "Intent",
-      href: `/explore/${trimmed}`,
-    });
+    lookups.push(lookup("lookup-intent", `Open intent ${truncateMiddle(trimmed)}`, "Intent", `/explore/${trimmed}`));
   }
 
-  return [...lookups, ...routes];
+  return [...lookups, ...results];
+}
+
+function Highlighted({ text, indices }: { text: string; indices: number[] }) {
+  if (indices.length === 0) return <>{text}</>;
+  const marked = new Set(indices);
+  return (
+    <>
+      {Array.from(text).map((char, index) =>
+        marked.has(index) ? (
+          <mark key={index} className="bg-transparent font-semibold text-inherit underline">
+            {char}
+          </mark>
+        ) : (
+          <span key={index}>{char}</span>
+        ),
+      )}
+    </>
+  );
 }
 
 export function CommandPalette() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
+  const registry = useCommandRegistry((state) => state.commands);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   // The element focused before the palette opened, so focus can be restored on close.
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
-  const commands = useMemo(() => buildCommands(query), [query]);
+  const recents = useMemo<CommandDefinition[]>(
+    () =>
+      recentIds.map((id) => ({
+        id: `recent-intent-${id}`,
+        title: t("commands.recentIntent", { id: truncateMiddle(id) }),
+        keywords: [id],
+        group: "Recent",
+        run: () => router.push(`/explore/${id}`),
+      })),
+    [recentIds, router, t],
+  );
+
+  const commands = useMemo(
+    () => buildCommands(query, Object.values(registry), recents, (href) => router.push(href)),
+    [query, registry, recents, router],
+  );
 
   const close = useCallback(() => {
     setOpen(false);
     setQuery("");
     setActiveIndex(0);
+    setConfirmId(null);
   }, []);
 
   const runCommand = useCallback(
-    (command: Command | undefined) => {
+    (command: PaletteItem | undefined) => {
       if (!command) return;
+      if (command.dangerous && confirmId !== command.id) {
+        setConfirmId(command.id);
+        return;
+      }
       close();
-      router.push(command.href);
+      void command.run();
     },
-    [close, router],
+    [close, confirmId],
   );
 
   // === Global Cmd/Ctrl+K listener
@@ -113,6 +204,7 @@ export function CommandPalette() {
   // === Focus management
   useEffect(() => {
     if (open) {
+      setRecentIds(readRecentIntents());
       restoreFocusRef.current = document.activeElement as HTMLElement | null;
       inputRef.current?.focus();
     } else {
@@ -130,6 +222,9 @@ export function CommandPalette() {
   const activeOptionId = commands[activeIndex]?.id;
 
   const onListNavKeyDown = (event: React.KeyboardEvent) => {
+    // Let IME composition finish before treating Enter/arrows as palette keys.
+    if (event.nativeEvent.isComposing) return;
+    if (event.key !== "Enter") setConfirmId(null);
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActiveIndex((current) => (commands.length === 0 ? 0 : (current + 1) % commands.length));
@@ -173,6 +268,7 @@ export function CommandPalette() {
           onChange={(event) => {
             setQuery(event.target.value);
             setActiveIndex(0);
+            setConfirmId(null);
           }}
           onKeyDown={onListNavKeyDown}
           className="w-full border-b border-vx-line bg-transparent px-4 py-3 text-sm text-vx-text
@@ -203,12 +299,21 @@ export function CommandPalette() {
                   index === activeIndex ? "bg-vx-sage-bg text-vx-sage" : "text-vx-text"
                 }`}
               >
-                <span>{command.label}</span>
+                <span>
+                  {confirmId === command.id ? (
+                    t("commands.confirm", { title: command.label })
+                  ) : (
+                    <Highlighted text={command.label} indices={command.indices} />
+                  )}
+                </span>
                 <span className="text-[10px] uppercase tracking-wide text-vx-muted">{command.hint}</span>
               </li>
             ))
           )}
         </ul>
+        <div role="status" aria-live="polite" className="sr-only">
+          {t("commands.resultCount", { count: commands.length })}
+        </div>
       </div>
     </div>
   );

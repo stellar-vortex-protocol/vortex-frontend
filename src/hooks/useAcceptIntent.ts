@@ -1,9 +1,23 @@
 import { useCallback, useState } from "react";
 import { mutate } from "swr";
 import { acceptIntent, ApiError } from "@/lib/api";
+import { useRetry } from "@/hooks/useRetry";
 import { useWalletStore } from "@/store/wallet";
 import { useToastStore } from "@/store/toast";
 import type { OpenIntent } from "@/lib/types";
+import { assertWalletReady } from "@/lib/network";
+
+/** Result of an accept attempt, used by the open-intents board row state. */
+export type AcceptOutcome = "accepted" | "taken" | "expired" | "error";
+
+export function classifyAcceptError(err: unknown): Exclude<AcceptOutcome, "accepted"> {
+  if (err instanceof ApiError) {
+    if (err.status === 409) return "taken";
+    if (err.status === 410) return "expired";
+  }
+  if (err instanceof Error && /expired|deadline/i.test(err.message)) return "expired";
+  return "error";
+}
 
 function AcceptErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.status === 409) {
@@ -18,40 +32,56 @@ function AcceptErrorMessage(err: unknown): string {
 /**
  * useAcceptIntent
  *
- * Accepts an open intent on behalf of the connected solver. The `accept()`
- * call is wrapped with `withRetry` from useRetry so transient 5xx errors or
- * brief network blips are automatically retried with exponential back-off,
- * without the solver needing to act again.
+ * Accepts an open intent on behalf of the connected solver, optimistically
+ * removing it from the `/intents/open` SWR cache (rolled back on failure).
+ * Resolves with an `AcceptOutcome` so callers can distinguish a lost race
+ * (409 → "taken") or a passed deadline (410 → "expired") from other errors.
  *
- * Retry policy (from useRetry defaults):
- * - Up to 3 retry attempts.
- * - Exponential back-off: 1 s, 2 s, 4 s.
- * - 4xx errors are NOT retried — they represent a definitive server rejection
- *   (e.g. intent already claimed) and should surface to the user immediately.
- *
- * Signature-requiring flows are intentionally excluded from retry logic —
- * see useRetry.ts for rationale.
+ * 4xx errors are not retried — they are a definitive server rejection
+ * (e.g. intent already claimed) and must surface immediately.
  */
 export function useAcceptIntent() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { withRetry } = useRetry();
 
-  const accept = useCallback(
-    async (intentId: string) => {
-      setError(null);
-      setAcceptingId(intentId);
+  const accept = useCallback(async (intentId: string): Promise<AcceptOutcome> => {
+    setError(null);
+    setAcceptingId(intentId);
 
-      try {
-        let wallet = useWalletStore.getState();
+    try {
+      let wallet = useWalletStore.getState();
+      if (!wallet.isConnected || !wallet.address) {
+        await wallet.connect();
+        wallet = useWalletStore.getState();
         if (!wallet.isConnected || !wallet.address) {
-          await wallet.connect();
-          wallet = useWalletStore.getState();
-          if (!wallet.isConnected || !wallet.address) {
-            throw new Error(wallet.error ?? "Connect a wallet to accept an intent.");
-          }
+          throw new Error(wallet.error ?? "Connect a wallet to accept an intent.");
         }
+        const solverAddress = wallet.address;
+
+        await mutate<OpenIntent[]>(
+          "/intents/open",
+          async (current) => {
+            // Retried on transient failures; 4xx (e.g. a 409 race) surfaces immediately.
+            await withRetry(() => acceptIntent(intentId, solverAddress));
+            return (current ?? []).filter((intent) => intent.id !== intentId);
+          },
+          {
+            optimisticData: (current) => (current ?? []).filter((intent) => intent.id !== intentId),
+            rollbackOnError: true,
+            populateCache: true,
+            revalidate: false,
+          },
+        );
+
+        useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
+      } catch (err) {
+        const message = AcceptErrorMessage(err);
+        setError(message);
+        useToastStore.getState().addToast(message, "error");
+      } finally {
+        setAcceptingId(null);
       }
+      assertWalletReady(process.env.NEXT_PUBLIC_NETWORK ?? "testnet", wallet.network);
       const solverAddress = wallet.address;
 
       await mutate<OpenIntent[]>(
@@ -69,14 +99,18 @@ export function useAcceptIntent() {
       );
 
       useToastStore.getState().addToast("Intent accepted — you have exclusive fill rights.", "success");
+      return "accepted";
     } catch (err) {
       const message = AcceptErrorMessage(err);
       setError(message);
       useToastStore.getState().addToast(message, "error");
+      return classifyAcceptError(err);
     } finally {
       setAcceptingId(null);
     }
-  }, []);
+  },
+  [withRetry],
+);
 
   return { accept, acceptingId, error };
 }

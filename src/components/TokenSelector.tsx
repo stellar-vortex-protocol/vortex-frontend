@@ -1,0 +1,25 @@
+"use client";
+
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import type { Chain, Token } from "@/lib/types";
+import { flattenTokens, rankTokens, type SelectableToken } from "@/lib/tokenSearch";
+
+const STORE_KEY = "vortex:token-selector:v1";
+type Store = { favorites: string[]; recents: string[] };
+function readStore(): Store { try { const value = JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); return { favorites: Array.isArray(value.favorites) ? value.favorites.slice(0, 50) : [], recents: Array.isArray(value.recents) ? value.recents.slice(0, 10) : [] }; } catch { return { favorites: [], recents: [] }; } }
+function writeStore(value: Store) { try { localStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch { /* storage is optional */ } }
+
+export type TokenSelectorProps = { open: boolean; onClose: () => void; chains: Chain[]; srcTokens: Record<string, Token[]>; value: SelectableToken | null; onSelect: (token: SelectableToken) => void };
+
+export default function TokenSelector({ open, onClose, chains, srcTokens, value, onSelect }: TokenSelectorProps) {
+  const [query, setQuery] = useState(""); const [chainId, setChainId] = useState("all"); const [active, setActive] = useState(0); const [store, setStore] = useState<Store>({ favorites: [], recents: [] });
+  const inputRef = useRef<HTMLInputElement>(null); const listId = useId();
+  useEffect(() => { if (open) { setStore(readStore()); setTimeout(() => inputRef.current?.focus(), 0); } }, [open]);
+  const tokens = useMemo(() => flattenTokens(chains, srcTokens).filter((token) => chainId === "all" || token.chainId === chainId), [chains, srcTokens, chainId]);
+  const ranked = useMemo(() => rankTokens(tokens, query).sort((a, b) => Number(store.favorites.includes(b.symbol + ":" + b.chainId)) - Number(store.favorites.includes(a.symbol + ":" + a.chainId))), [query, tokens, store.favorites]);
+  if (!open) return null;
+  const choose = (token: SelectableToken) => { const key = token.symbol + ":" + token.chainId; const next = { ...store, recents: [key, ...store.recents.filter((item) => item !== key)].slice(0, 10) }; setStore(next); writeStore(next); onSelect(token); onClose(); };
+  const toggleFavorite = (token: SelectableToken) => { const key = token.symbol + ":" + token.chainId; const favorites = store.favorites.includes(key) ? store.favorites.filter((item) => item !== key) : [...store.favorites, key].slice(-50); const next = { ...store, favorites }; setStore(next); writeStore(next); };
+  return <div role="dialog" aria-modal="true" aria-label="Select token" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onKeyDown={(event) => { if (event.key === "Escape") onClose(); if (event.key === "ArrowDown") { event.preventDefault(); setActive((index) => Math.min(index + 1, ranked.length - 1)); } if (event.key === "ArrowUp") { event.preventDefault(); setActive((index) => Math.max(index - 1, 0)); } if (event.key === "Home") setActive(0); if (event.key === "End") setActive(ranked.length - 1); if (event.key === "Enter" && ranked[active]) choose(ranked[active]); }}>
+    <div className="w-full max-w-lg rounded-2xl border border-vx-border bg-vx-card p-4 shadow-2xl"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold text-vx-text">Select token</h2><button type="button" onClick={onClose} aria-label="Close">×</button></div><input ref={inputRef} role="combobox" aria-expanded="true" aria-controls={listId} aria-activedescendant={ranked[active] ? `${listId}-${ranked[active].symbol}-${ranked[active].chainId}` : undefined} value={query} onChange={(event) => { setQuery(event.target.value); setActive(0); }} placeholder="Search symbol, name, or contract" className="mt-3 w-full rounded-lg bg-vx-surface px-3 py-2 text-sm text-vx-text" /><div className="mt-3 flex gap-2 overflow-x-auto"><button type="button" onClick={() => setChainId("all")} aria-pressed={chainId === "all"}>All</button>{chains.map((chain) => <button type="button" key={chain.id} onClick={() => setChainId(chain.id)} aria-pressed={chainId === chain.id}>{chain.shortName}</button>)}</div><ul id={listId} role="listbox" className="mt-3 max-h-72 overflow-y-auto">{ranked.map((token, index) => <li id={`${listId}-${token.symbol}-${token.chainId}`} role="option" aria-selected={value?.symbol === token.symbol && value?.chainId === token.chainId} key={`${token.chainId}:${token.symbol}`} className={`flex items-center justify-between rounded-lg px-3 py-2 ${index === active ? "bg-vx-lav/15" : ""}`} onMouseEnter={() => setActive(index)}><button type="button" onClick={() => choose(token)} className="flex-1 text-left"><span className="font-medium text-vx-text">{token.symbol}</span><span className="ml-2 text-xs text-vx-muted">{token.chainName}</span></button><button type="button" onClick={() => toggleFavorite(token)} aria-label={`${store.favorites.includes(token.symbol + ":" + token.chainId) ? "Remove" : "Add"} favorite ${token.symbol}`}>{store.favorites.includes(token.symbol + ":" + token.chainId) ? "★" : "☆"}</button></li>)}</ul></div></div>;
+}

@@ -1,37 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useMyIntents } from "./useMyIntents";
-import { useWebSocket } from "./useWebSocket";
-import type { FeedItem } from "@/lib/types";
-
-const MAX_ITEMS = 200;
-const WS_URL = process.env["NEXT_PUBLIC_WS_URL"] ?? null;
-
-function mergeById(items: FeedItem[]): FeedItem[] {
-  const seen = new Set<string>();
-  const merged: FeedItem[] = [];
-  for (const item of items) {
-    if (seen.has(item.id)) continue;
-    seen.add(item.id);
-    merged.push(item);
-  }
-  return merged.slice(0, MAX_ITEMS);
-}
+import { useLiveIntentView } from "./useLiveIntentView";
+import { useIntentStore, selectMine } from "@/store/intents";
 
 export function useMyLiveIntents(address: string | null) {
   const { intents: restIntents, isLoading, error, mutate } = useMyIntents(address);
-  const { status, lastMessage } = useWebSocket<FeedItem>(address ? WS_URL : null);
-  const [liveItems, setLiveItems] = useState<FeedItem[]>([]);
+  const { isLive, isCatchingUp } = useLiveIntentView(
+    "mine",
+    { items: restIntents, mutate },
+    address !== null,
+  );
+  const intents = useIntentStore(selectMine(address));
 
+  // Optimistic entries belong to the account that submitted them; drop them
+  // when the wallet switches accounts (not on first mount).
+  const prevAddressRef = useRef(address);
   useEffect(() => {
-    if (!lastMessage) return;
-    setLiveItems((prev) => mergeById([lastMessage, ...prev]));
-  }, [lastMessage]);
+    if (prevAddressRef.current !== address) useIntentStore.getState().clearOptimistic();
+    prevAddressRef.current = address;
+  }, [address]);
 
-  return {
-    intents: mergeById([...liveItems, ...restIntents]),
-    isLoading,
-    error,
-    mutate,
-    isLive: status === "open",
-  };
+  return { intents, isLoading, error, mutate, isLive, isCatchingUp };
 }

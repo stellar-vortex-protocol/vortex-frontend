@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
 import { swrRetryConfig } from "@/hooks/useRetry";
@@ -21,12 +22,12 @@ export function useMyIntents(address: string | null) {
     },
   );
 
-  const intents = (data ?? []).filter(() => {
+  const intents = useMemo(() => (data ?? []).filter(() => {
     // FeedItem does not yet expose a userAddress field; when the backend adds
     // it we can filter on i.userAddress === address. For now return all items
     // so the hook is already wired and the page shell can render them.
     return true;
-  });
+  }), [data]);
 
   return { intents, isLoading: address ? isLoading : false, error, mutate };
 }

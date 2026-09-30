@@ -3,35 +3,56 @@
 import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
-import { IntentStatusBadge } from "@/components/IntentStatusBadge";
-import { CopyButton } from "@/components/CopyButton";
+import { useMemo } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { SkeletonCard } from "@/components/Skeleton";
+import { SolverHeaderCard } from "@/components/SolverHeaderCard";
+import { SolverTimeline } from "@/components/SolverTimeline";
+import { SolverPerformance } from "@/components/SolverPerformance";
+import { SolverFillHistory } from "@/components/SolverFillHistory";
+import { SlashEventFeed } from "@/components/SlashEventFeed";
 import { useSolver } from "@/hooks/useSolver";
 import { useIntentFeed } from "@/hooks/useIntentFeed";
-import { useTranslation } from "@/lib/i18n/I18nProvider";
+import { useSlashEvents } from "@/hooks/useSlashEvents";
+import { useTranslation, useLocale } from "@/lib/i18n/I18nProvider";
 import { timeAgo } from "@/lib/time";
 import { CHAINS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { sanitizeDisplayText } from "@/lib/textSafety";
+import { summarizePenalties } from "@/lib/slashEvents";
+import { formatUsdCompact, localeToBcp47 } from "@/lib/format";
 
-const usdCompact = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
+const PENALTY_WINDOW_DAYS = 30;
+
+/** Inline error/not-found state used within this page only. */
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div role="alert" className="card p-8 text-center text-sm text-vx-muted">
+      {message}
+    </div>
+  );
+}
 
 export default function SolverDetailPage({ params }: { params: { address: string } }) {
   const { t } = useTranslation();
+  const locale = useLocale();
+  const bcp47 = localeToBcp47(locale);
   const isValidAddress = isValidStellarPublicKey(params.address);
   const { solver, isLoading, error } = useSolver(isValidAddress ? params.address : null);
   const { items: fillHistory, isLoading: historyLoading, error: historyError } = useIntentFeed();
+  const slash = useSlashEvents(isValidAddress ? params.address : null);
+  const solverFills = useMemo(
+    () => fillHistory.filter((item) => item.solver === solver?.address),
+    [fillHistory, solver?.address],
+  );
+  const penalties = useMemo(
+    () => summarizePenalties(slash.events, PENALTY_WINDOW_DAYS),
+    [slash.events],
+  );
 
   return (
     <div className="min-h-screen">
-      <Nav
-        variant="breadcrumb"
-        label={`Solver ${params.address.slice(0, 8)}`}
-      />
+      <Nav variant="breadcrumb" label={`Solver ${params.address.slice(0, 8)}`} />
 
       <main
         id="main-content"
@@ -46,7 +67,7 @@ export default function SolverDetailPage({ params }: { params: { address: string
         </Link>
 
         {!isValidAddress ? (
-          <EmptyState variant="error" message="Invalid solver address format." />
+          <EmptyState message="Invalid solver address format." />
         ) : isLoading ? (
           <div
             className="card p-6 sm:p-8 space-y-3 animate-pulse"
@@ -54,33 +75,16 @@ export default function SolverDetailPage({ params }: { params: { address: string
           >
             <div className="h-6 w-2/3 bg-vx-surface rounded animate-pulse" />
             <div className="h-4 w-1/3 bg-vx-surface rounded animate-pulse" />
+            <SkeletonCard rows={2} />
           </div>
         ) : error ? (
-          <EmptyState variant="error" message="Couldn't load solver details right now. Try again shortly." />
+          <EmptyState message="Couldn't load solver details right now. Try again shortly." />
         ) : !solver ? (
-          <EmptyState variant="error" message="No solver found at that address." />
+          <EmptyState message="No solver found at that address." />
         ) : (
           <>
             {/* Header card */}
-            <div className="card p-4 sm:p-6 space-y-4 sm:space-y-6 mb-6">
-              <div className="flex items-start justify-between gap-3 sm:gap-4">
-                <div>
-                  <div className="eyebrow mb-1 sm:mb-2 text-xs">Solver</div>
-                  <h1 className="text-lg sm:text-2xl font-bold text-vx-text break-words">
-                    {sanitizeDisplayText(solver.name)}
-                  </h1>
-                </div>
-                <div
-                  className={`flex-shrink-0 px-2 sm:px-3 py-1 rounded-lg text-xs font-semibold border whitespace-nowrap ${
-                    solver.status === "active"
-                      ? "bg-vx-sage-bg text-vx-sage border-vx-sage/30"
-                      : "bg-vx-surface text-vx-muted border-vx-border"
-                  }`}
-                  aria-label={`Solver status: ${solver.status}`}
-                >
-                  {solver.status === "active" ? "Active" : "Inactive"}
-                </div>
-              </div>
+            <SolverHeaderCard solver={solver} />
 
               <div className="text-xs sm:text-sm text-vx-muted font-mono break-all">
                 Address: {params.address}
@@ -94,13 +98,13 @@ export default function SolverDetailPage({ params }: { params: { address: string
                   { label: "Success Rate", value: `${solver.successRatePct}%` },
                   {
                     label: "Total Volume",
-                    value: usdCompact.format(solver.volumeUsd),
+                    value: formatUsdCompact(solver.volumeUsd, bcp47),
                   },
                   {
                     label: "Avg Fill Time",
                     value: `${solver.avgFillTimeSeconds}s`,
                   },
-                  { label: "Bond", value: usdCompact.format(solver.bondUsd) },
+                  { label: "Bond", value: formatUsdCompact(solver.bondUsd, bcp47) },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-vx-surface/40 rounded-lg p-3">
                     <div className="eyebrow text-[10px] sm:text-xs mb-1">
@@ -136,6 +140,7 @@ export default function SolverDetailPage({ params }: { params: { address: string
             </div>
 
             {/* ── Solver Timeline ─────────────────────────────────────────── */}
+
             <div className="mb-6">
               <SolverTimeline
                 solverAddress={solver.address}
@@ -144,67 +149,64 @@ export default function SolverDetailPage({ params }: { params: { address: string
               />
             </div>
 
-            {/* ── Fill history table ──────────────────────────────────────── */}
-            <div className="card overflow-hidden">
-              <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30">
-                <h2 className="text-sm font-semibold text-vx-text">
-                  Recent Fills by Solver
-                </h2>
-              </div>
+            {/* ── Solver Timeline ─────────────────────────────────────────── */}
 
-              {historyLoading && fillHistory.length === 0 ? (
-                <div className="p-4 sm:p-5 space-y-3">
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-16 bg-vx-surface/40 rounded-lg animate-pulse" />
-                  ))}
-                </div>
-              ) : historyError ? (
-                <div
-                  role="alert"
-                  className="p-6 sm:p-8 text-center text-sm text-vx-muted"
-                >
-                  Couldn&apos;t load fill history right now.
-                </div>
-              ) : fillHistory.filter(item => item.solver === solver.address).length === 0 ? (
-                <div className="p-6 sm:p-8 text-center">
-                  <p className="text-sm font-medium text-vx-text mb-1">
-                    {t("solverDetail.fillHistory.empty.title")}
-                  </p>
-                  <p className="text-xs text-vx-muted max-w-xs mx-auto">
-                    {t("solverDetail.fillHistory.empty.message")}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-vx-line">
-                  {fillHistory
-                    .filter((item) => item.solver === solver.address)
-                    .slice(0, 10)
-                    .map(fill => (
-                      <div
-                        key={fill.id}
-                        className="px-4 sm:px-5 py-4 hover:bg-vx-surface/30 transition-colors"
-                      >
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-vx-text truncate">
-                                {fill.srcAmount} {fill.srcToken} →{" "}
-                                {fill.dstToken}
-                              </div>
-                              <div className="text-xs text-vx-muted capitalize">
-                                {fill.srcChain}
-                              </div>
-                            </div>
-                            <span className="text-xs text-vx-muted num flex-shrink-0">
-                              {timeAgo(fill.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
+            <div className="mb-6">
+              <SolverTimeline
+                solverAddress={solver.address}
+                fills={fillHistory}
+                isLoading={historyLoading && fillHistory.length === 0}
+              />
             </div>
+
+            {/* ── Performance, coverage and fill history ────────────────── */}
+            {historyLoading && fillHistory.length === 0 ? (
+              <div className="card p-5 space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-16 bg-vx-surface/40 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : historyError ? (
+              <div role="alert" className="card p-6 sm:p-8 text-center text-sm text-vx-muted">
+                Couldn&apos;t load fill history right now.
+              </div>
+            ) : (
+              <SolverPerformance fills={solverFills} avgFillTimeSeconds={solver.avgFillTimeSeconds} />
+            )}
+
+            {/* ── Penalties ─────────────────────────────────────────────── */}
+            <div className="mt-6 space-y-3">
+              <div className="card p-4 flex flex-wrap items-center gap-4 text-xs" aria-label={t("slash.summary.title")}>
+                <span className="eyebrow">{t("slash.summary.window", { days: PENALTY_WINDOW_DAYS })}</span>
+                <span className="text-vx-text num">{t("slash.summary.count", { count: penalties.count })}</span>
+                <span className="text-vx-text num">{t("slash.summary.total", { amount: penalties.totalUsd })}</span>
+                <span className="text-vx-muted">
+                  <span aria-hidden="true">{penalties.trend === "up" ? "▲ " : penalties.trend === "down" ? "▼ " : "■ "}</span>
+                  {t(`slash.trend.${penalties.trend}`)}
+                </span>
+              </div>
+              <SlashEventFeed
+                events={slash.events}
+                isLoading={slash.isLoading}
+                error={slash.error}
+                hasMore={slash.hasMore}
+                isLoadingMore={slash.isLoadingMore}
+                onLoadMore={slash.loadMore}
+                showSolver={false}
+              />
+            </div>
+
+            <SolverFillHistory solverAddress={solver.address} />
+          </>
+        )}
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
+
+            <SolverFillHistory solverAddress={solver.address} />
           </>
         )}
       </main>

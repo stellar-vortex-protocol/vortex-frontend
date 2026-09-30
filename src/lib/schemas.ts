@@ -1,3 +1,4 @@
+import { sanitizeDisplayText } from "./textSafety";
 import type {
   Quote,
   FeedItem,
@@ -129,3 +130,83 @@ export function isSubmitRegistrationResponse(val: unknown): val is SubmitRegistr
     ["active", "pending"].includes(val.status as string)
   );
 }
+
+// ── WebSocket frame validation (#433) ───────────────────────────────────────
+
+export const MAX_FRAME_BYTES = 64 * 1024;
+const FORBIDDEN_KEYS = ["__proto__", "constructor", "prototype"];
+const FEED_ITEM_KEYS = [
+  "id",
+  "srcChain",
+  "srcToken",
+  "srcAmount",
+  "dstToken",
+  "solver",
+  "status",
+  "createdAt",
+  "deadline",
+  "version",
+  "updatedAt",
+] as const;
+
+function isIsoDate(val: unknown): boolean {
+  return isString(val) && !Number.isNaN(Date.parse(val));
+}
+
+function isAmount(val: unknown): boolean {
+  return isString(val) && /^\d+(\.\d+)?$/.test(val);
+}
+
+export type FrameRejection = "oversized" | "json" | "forbidden-key" | "unknown-type" | "shape";
+
+export type FrameResult =
+  | { ok: true; item: FeedItem }
+  | { ok: false; reason: FrameRejection };
+
+/**
+ * Validate one raw WebSocket frame into a sanitized FeedItem. Frames may be a
+ * bare FeedItem or an envelope `{ type: "intent", data: FeedItem }`; any other
+ * `type` is ignored. Never throws. Unknown fields are stripped and text fields
+ * pass through `sanitizeDisplayText` here, at the boundary.
+ */
+export function validateFeedItemFrame(raw: unknown): FrameResult {
+  if (typeof raw !== "string") return { ok: false, reason: "shape" };
+  if (new Blob([raw]).size > MAX_FRAME_BYTES) return { ok: false, reason: "oversized" };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw, (key, value: unknown) => {
+      if (FORBIDDEN_KEYS.includes(key)) throw new ForbiddenKeyError();
+      return value;
+    });
+  } catch (err) {
+    return { ok: false, reason: err instanceof ForbiddenKeyError ? "forbidden-key" : "json" };
+  }
+
+  let candidate: unknown = parsed;
+  if (isObject(parsed) && "type" in parsed) {
+    if (parsed.type !== "intent") return { ok: false, reason: "unknown-type" };
+    candidate = parsed.data;
+  }
+
+  if (
+    !isFeedItem(candidate) ||
+    !isAmount(candidate.srcAmount) ||
+    !isIsoDate(candidate.createdAt) ||
+    (candidate.deadline !== undefined && !isIsoDate(candidate.deadline)) ||
+    (candidate.updatedAt !== undefined && !isIsoDate(candidate.updatedAt)) ||
+    (candidate.version !== undefined && !isNumber(candidate.version))
+  ) {
+    return { ok: false, reason: "shape" };
+  }
+
+  const item: Record<string, unknown> = {};
+  for (const key of FEED_ITEM_KEYS) {
+    const value = candidate[key];
+    if (value === undefined) continue;
+    item[key] = typeof value === "string" ? sanitizeDisplayText(value) : value;
+  }
+  return { ok: true, item: item as FeedItem };
+}
+
+class ForbiddenKeyError extends Error {}

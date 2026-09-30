@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { FeedItem } from "@/lib/types";
+import { groupByWeek, isoWeekStart } from "@/lib/solverStats";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -18,23 +19,6 @@ export type SolverTimelineProps = {
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-
-/** Group fills by ISO week (YYYY-Wnn). Returns an array of {week, count} sorted oldest→newest. */
-function groupByWeek(items: FeedItem[]): Array<{ week: string; count: number }> {
-  const map = new Map<string, number>();
-  for (const item of items) {
-    const d = new Date(item.createdAt);
-    // ISO week number
-    const dayOfYear = Math.floor(
-      (d.getTime() - new Date(d.getFullYear(), 0, 0).getTime()) / 86_400_000
-    );
-    const week = `${d.getFullYear()}-W${String(Math.ceil(dayOfYear / 7)).padStart(2, "0")}`;
-    map.set(week, (map.get(week) ?? 0) + 1);
-  }
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([week, count]) => ({ week, count }));
-}
 
 const SPARKLINE_W = 280;
 const SPARKLINE_H = 48;
@@ -55,19 +39,13 @@ function toPoints(buckets: Array<{ count: number }>): string {
     .join(" ");
 }
 
-/** Return a short human-readable label for an ISO week string like "2025-W32". */
+/** Short label (UTC Monday) for an ISO week string like "2025-W32". */
 function weekLabel(isoWeek: string): string {
-  // Parse the year and week number to derive the Monday of that week.
-  const [yearStr, weekStr] = isoWeek.split("-W");
-  const year = parseInt(yearStr ?? "2025", 10);
-  const week = parseInt(weekStr ?? "1", 10);
-  // Jan 4 is always in week 1 of its year (ISO 8601).
-  const jan4 = new Date(year, 0, 4);
-  const monday = new Date(jan4.getTime() + (week - 1) * 7 * 86_400_000);
-  // Snap to that week's Monday.
-  const dayOfWeek = monday.getDay(); // 0=Sun
-  monday.setDate(monday.getDate() - ((dayOfWeek + 6) % 7));
-  return monday.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return isoWeekStart(isoWeek).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
