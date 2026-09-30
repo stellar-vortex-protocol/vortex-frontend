@@ -10,7 +10,6 @@ import {
   isSubmitIntentResponse,
   isRegisterSolverResponse,
   isSubmitRegistrationResponse,
-  ValidationError,
 } from "./schemas";
 
 describe("Schema Validators", () => {
@@ -223,7 +222,7 @@ describe("Schema Validators", () => {
       expect(
         isSolver({
           name: "SolverOne",
-          address: "addr",
+          address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
           bondUsd: 1000,
           fills: 100,
           failed: 5,
@@ -240,7 +239,7 @@ describe("Schema Validators", () => {
       expect(
         isSolver({
           name: "SolverOne",
-          address: "addr",
+          address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
           bondUsd: 1000,
           fills: 100,
           failed: 5,
@@ -259,7 +258,7 @@ describe("Schema Validators", () => {
       const valid = [
         {
           name: "Solver1",
-          address: "addr1",
+          address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
           bondUsd: 1000,
           fills: 100,
           failed: 5,
@@ -271,7 +270,7 @@ describe("Schema Validators", () => {
         },
         {
           name: "Solver2",
-          address: "addr2",
+          address: "GCRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
           bondUsd: 2000,
           fills: 200,
           failed: 10,
@@ -294,7 +293,7 @@ describe("Schema Validators", () => {
         isSolverArray([
           {
             name: "Solver1",
-            address: "addr1",
+            address: "GBRPYHIL2CI3WHZDTOOQFC6EB4RBWDUYCV45VQ3XMJLYPUFZTBMHK323",
             bondUsd: "not a number",
             fills: 100,
             failed: 5,

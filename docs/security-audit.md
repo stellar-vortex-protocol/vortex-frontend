@@ -77,7 +77,7 @@ Error: Failed to submit intent
 When logging data in this application:
 
 1. **Never log raw sensitive data** to console without redaction
-2. **Always use `secureLogger`** instead of `console` for any data that might contain:
+2. **Always use `secureLogger`** instead of `console` — `no-console` is an ESLint error in `src/**` (only `src/lib/secureLogging.ts` and tests are exempt), so CI fails on stray `console.*` calls. This especially covers data that might contain:
    - User wallet addresses
    - Transaction details
    - API responses with sensitive fields
@@ -156,24 +156,11 @@ enforcePublicEnvValidation(process.env);
 
 ### Build Integration
 
-The validation can be integrated into the build process by calling `enforcePublicEnvValidation()` in:
-
-- Pre-build scripts
-- Next.js config hooks
-- CI/CD pipelines
-- Pre-commit hooks
-
-### Example: next.config.js
-
-```javascript
-const { enforcePublicEnvValidation } = require('./src/lib/envValidation');
-
-enforcePublicEnvValidation(process.env);
-
-module.exports = {
-  // ... rest of Next.js config
-};
-```
+The same patterns (`SUSPICIOUS_PATTERNS` in `src/lib/env-schema.mjs`) are checked
+by `scripts/check-env-vars.mjs`, which runs on `npm run check:env` in CI and at
+the start of every `npm run build`. A `NEXT_PUBLIC_*` variable whose name
+matches one of them fails the build. See `docs/configuration.md` for the full
+set of environment checks.
 
 ## Test Coverage
 
@@ -291,3 +278,172 @@ No unsafe rendering sinks were found. The codebase does not use `dangerouslySetI
 - **Stellar address note:** Stellar public keys are fixed-format 56-character base32 G-strkeys validated structurally by `isValidStellarPublicKey` before any display or form submission. Confusable-character risk is inherently limited there. No address-adjacent free-text field (such as a future memo field) currently bypasses validation, but any future memo or label field must route through `sanitizeDisplayText` before display — this is the expected pattern established by this change.
 
 **Tests:** `src/lib/textSafety.test.ts` — real Unicode attack fixtures for every bidi control (U+202A–U+202E, U+2066–U+2069), every zero-width character (U+200B–U+200D, U+FEFF, U+00AD), combined payloads, safe ASCII/non-Latin strings asserted unchanged.
+
+---
+
+# Security Audit
+
+## Security Mitigations (Issues #479, #482, #483, #486)
+
+### #479 — Contributors page under a strict CSP
+
+- The browser no longer calls `api.github.com`. `/contributors` fetches the same-origin `/api/contributors` route (`src/app/api/contributors/route.ts`), which calls GitHub server-side via `src/lib/contributors.ts`.
+- The fetcher has a 5 s timeout, a 1 MB body cap and schema validation. Logins must match GitHub's login rules, bots are dropped, and the avatar and profile URLs are rebuilt from the login instead of trusted from upstream. It never takes user-controlled URLs.
+- Caching: `revalidate = 3600` plus `Cache-Control: s-maxage=3600, stale-while-revalidate=86400, stale-if-error=86400`. When GitHub fails (rate limit, 5xx, malformed body), the route serves the last good in-memory response, then a bundled snapshot (`src/lib/contributors.fallback.json`). The page shows a "cached list" notice instead of an error.
+- `GITHUB_TOKEN` is optional and server-only. It is not `NEXT_PUBLIC_*`, so `envValidation` never inlines or flags it.
+- Avatars render through `next/image`, with `images.remotePatterns` restricted to `https://avatars.githubusercontent.com/*`. The optimizer fetches them server-side and serves them from `/_next/image`, so CSP `img-src` and `connect-src` are **unchanged** (see the note in `next.config.mjs`).
+- Verified by `e2e/contributors-csp.spec.ts`, which asserts no CSP violations and no browser requests to GitHub hosts.
+
+### #482 — `secureLogger` everywhere, hardened redaction
+
+- ESLint `no-console: error` applies across `src/**`, with an override only for `src/lib/secureLogging.ts` and tests/stories. Existing call sites (route error boundaries, `useGlobalErrorCapture`) were migrated.
+- The redactor is a pluggable rule list (`DEFAULT_RULES`: `{name, pattern, test?, replace?}`). It covers:
+  - SEP-0023 strkeys `G/S/M/C/T/X/P`, checksum-validated. `S…` seeds are redacted on shape alone, so truncated or mistyped seeds are still caught. A 56-char uppercase string that fails the checksum is left alone.
+  - XDR blobs and generic base64 blobs, checked by length, charset and a mixed-character-class plausibility test.
+  - `Bearer` tokens (the scheme is kept) and JWTs.
+  - Hex strings of 40+ characters.
+  - 12–24-word mnemonics. A prose stop-word heuristic avoids redacting ordinary sentences.
+- Allowlist: `createRedactor({ allowlist: [/…/] })` exempts known-benign ids such as intent ids.
+- Redaction is deep: objects, arrays, `Error` (`message`, `stack`, `cause`), circular refs and sensitive key names (`password`, `seed`, `signedXdr`, …). It is bounded (depth 8, 200 keys, 64 KB per string, then truncated) and never throws. A 10 MB payload is handled in under 100 ms.
+- Tests (`src/lib/secureLogging.test.ts`) include 200 seeded fuzz runs over every sensitive format, 500 benign-string runs, and a performance check.
+
+### #483 — Confusable-address (address-poisoning) detection
+
+- `src/lib/addressRisk.ts` → `assessAddress(candidate, known)` returns `{risk: none|low|high, reasons[], lookalike?}`. It uses a memoised prefix/suffix index (no O(n²) scans; bucket scans capped at 64) and takes under 5 ms against 2,000 known addresses.
+- **False-positive policy:** identical addresses (including the user's own) never flag. `high` (blocking, dismissible) means the same first 4 **and** last 4 characters, or a Hamming distance of 4 or less. `low` means only the prefix or only the suffix matches; it is informational only because random collisions are expected. Comparison is case-insensitive.
+- Known set (`src/lib/knownAddresses.ts`, local only, max 2,000, 90-day retention): the connected wallet, destinations used in SwapCard, and solver addresses viewed.
+- Labels: `assessLabel` compares homoglyph skeletons (`confusableSkeleton` in `textSafety.ts`: NFKC, invisible-char stripping, Cyrillic/Greek lookalike mapping) and flags mixed scripts.
+- UI: the SwapCard destination field shows a blocking-but-dismissible `role="alert"` warning. `AddressDiff` compares the addresses side by side, highlights differing characters and gives a screen-reader text alternative listing the positions. The app has no delegation flow yet; any future one must call `assessAddress` in the same way.
+
+### #486 — Privacy & local-data center
+
+See [`docs/privacy-and-local-data.md`](./privacy-and-local-data.md).
+
+---
+
+# Input-Boundary Audit (Issue #485)
+
+## Overview
+
+This table inventories every place external input enters the app and maps it to the central validator that gates it. All validators are defined in `src/lib/inputs.ts` and return branded types so unvalidated strings cannot reach API helpers or path-interpolation sites.
+
+## Audit Table
+
+| # | Input Source | Location | Raw Value | Validator | Branded Type | Test Coverage |
+|---|-------------|----------|-----------|-----------|-------------|---------------|
+| 1 | Explore intent ID (dynamic route) | `src/app/explore/[id]/page.tsx` | `params.id` | `parseIntentId` | `IntentId` | `inputs.test.ts` |
+| 2 | Solver address (dynamic route) | `src/app/solve/[address]/page.tsx` | `params.address` | `parseStrKey` | `StrKey` | `inputs.test.ts` |
+| 3 | Governance proposal ID (dynamic route) | `src/app/governance/[id]/page.tsx` | `params.id` | `parseIntentId` | `IntentId` | `inputs.test.ts` |
+| 4 | Intent ID in API path interpolation | `src/lib/api.ts` | `intentId` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 5 | Solver address in API path interpolation | `src/lib/api.ts` | `address` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 6 | Intent ID in SWR key | `src/hooks/useIntent.ts` | `id` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 7 | Solver address in SWR key | `src/hooks/useSolver.ts` | `address` | `encodeURIComponent` | — (runtime) | `api.test.ts` |
+| 8 | Toast href (internal) | `src/store/toast.ts` | `href` | `parseInternalHref` | `InternalHref` | `toast.test.ts` |
+| 9 | Toast href (external) | `src/store/toast.ts` | `href` | `parseExternalUrl` | `ExternalUrl` | `toast.test.ts` |
+| 10 | Solver address in CommandPalette | `src/components/CommandPalette.tsx` | user input | `parseStrKey` | `StrKey` | `inputs.test.ts` |
+| 11 | Intent ID in CommandPalette | `src/components/CommandPalette.tsx` | user input | `parseIntentId` | `IntentId` | `inputs.test.ts` |
+| 12 | Explore page searchParams (status/chain/sort) | `src/app/explore/ExplorePageClient.tsx` | `searchParams` | inline `Set.has` + `includes` | — | `ExplorePageClient.test.tsx` |
+| 13 | Home page prefill (searchParams) | `src/app/page.tsx` | `searchParams` | inline checks | — | `page.test.tsx` |
+
+## Validator Reference (`src/lib/inputs.ts`)
+
+### `parseIntentId(value: string): IntentId | null`
+- **Grammar:** ASCII alphanumeric, hyphens, underscores only; 1–64 chars.
+- **Rejects:** `..`, `/`, `?`, `#`, `&`, `=`, Unicode, empty string, >64 chars.
+- **Branded type:** `IntentId` — cannot be passed to functions expecting raw `string` without explicit cast.
+
+### `parseStrKey(value: string): StrKey | null`
+- **Grammar:** 56-char Stellar G-strkey with valid base32 encoding and CRC-16 checksum.
+- **Rejects:** wrong length, wrong prefix, invalid base32, bad checksum.
+- **Branded type:** `StrKey`.
+
+### `parseChainId(value: string): ChainId | null`
+- **Grammar:** Must be one of the known chain IDs: `ethereum`, `base`, `polygon`, `arbitrum`, `optimism`, `avalanche`.
+- **Rejects:** any string not in the known set.
+- **Branded type:** `ChainId`.
+
+### `parseInternalHref(value: string): InternalHref | null`
+- **Grammar:** Starts with `/`, no `//` prefix, no `..` segments, no backslashes, ≤256 chars.
+- **Rejects:** absolute URLs, protocol-relative URLs, path traversal, query injection.
+- **Branded type:** `InternalHref`.
+
+### `parseExternalUrl(value: string, allowedOrigins?: string[]): ExternalUrl | null`
+- **Grammar:** Valid URL with `https:` or `http:` protocol, origin in the allowed whitelist, ≤2048 chars.
+- **Rejects:** `javascript:`, `data:`, `vbscript:` protocols, non-whitelisted origins, malformed URLs.
+- **Branded type:** `ExternalUrl`.
+
+## Toast Href Policy
+
+`useToastStore.addToast` validates the `href` parameter before storing it:
+1. First tries `parseInternalHref` — accepts relative paths like `/explore/abc123`.
+2. Falls back to `parseExternalUrl` — accepts only whitelisted external origins.
+3. If neither validates, the href is dropped and a dev warning is emitted via `secureLogger.warn`.
+
+## External Link Component (`src/components/ExternalLink.tsx`)
+
+- Always renders `target="_blank"` and `rel="noopener noreferrer"`.
+- Validates `href` with `parseExternalUrl`; invalid hrefs render children as plain text (no `<a>` element).
+- Optionally shows the destination host label when `showHostLabel` is true.
+- Uses `secureLogger.warn` for invalid hrefs in development.
+
+## Path Safety in `api.ts`
+
+All API path interpolations now use `encodeURIComponent`:
+- `submitIntent`: `/intents/${encodeURIComponent(intentId)}/submit`
+- `acceptIntent`: `/intents/${encodeURIComponent(intentId)}/accept`
+- `submitSolverRegistration`: `/solvers/${encodeURIComponent(registrationId)}/submit`
+- `useIntent` hook: `/intents/${encodeURIComponent(id)}`
+- `useSolver` hook: `/solvers/${encodeURIComponent(address)}`
+
+This prevents `../` or `?` in IDs from altering the API path.
+
+## Test Coverage
+
+- `src/lib/inputs.test.ts` — table-driven and fuzz tests for every validator; ≥95% coverage of `inputs.ts`.
+- `src/lib/api.test.ts` — path-safety tests proving `../` or `?` in IDs cannot alter the API path.
+- `src/store/toast.test.ts` — href validation tests for internal and external toasts.
+
+## Intent export center (#445)
+
+- Exports (CSV/JSON) are serialised in a Web Worker
+  (`src/lib/export/export.worker.ts`) in 500-row chunks and assembled as Blob
+  parts; the worker is terminated on cancel. If a worker can't be created the
+  same runner (`src/lib/export/runner.ts`) runs in-thread, yielding between chunks.
+- CSV cells keep the `escapeCsv` formula-injection neutralisation from
+  `src/lib/csv.ts`; files start with a UTF-8 BOM for Excel.
+- JSON exports carry `schemaVersion`, `network` and `generatedAt` and contain only
+  whitelisted public `FeedItem` columns - no XDR, keys or signatures.
+- The relay has no paginated history endpoint, so only loaded intents are
+  exported; the dialog says so explicitly.
+- CSP gains `worker-src 'self' blob:` (`next.config.mjs`) for the export worker.
+- Object URLs are revoked right after the download click.
+
+---
+
+### Solver domain verification proxy — threat model (`/api/verify-solver`)
+
+**Feature:** solvers may claim a home domain. The app fetches `https://<domain>/.well-known/stellar.toml` (SEP-0001) server-side and shows a *verified* badge when the file's `ACCOUNTS` list contains the solver's address. Implemented in `src/app/api/verify-solver/route.ts`, `src/lib/server/safeFetch.ts`, `src/lib/stellarToml.ts`, `src/lib/solverIdentity.ts`, `src/hooks/useSolverIdentity.ts`.
+
+**Trust boundary:** the domain string comes from solver-controlled data, so the proxy is an attacker-steerable server-side HTTP client (SSRF surface). The TOML body is attacker-controlled content.
+
+| Threat | Mitigation |
+| --- | --- |
+| SSRF to internal services / cloud metadata (`169.254.169.254`, `10.0.0.0/8`, `::1`, …) | `safeFetch` resolves DNS itself and rejects the request if **any** resolved address is loopback, private, link-local, CGNAT, multicast, reserved, documentation, IPv4-mapped/NAT64-embedded private, or unspecified. IP-literal hosts, non-443 ports, credentials in the URL and non-https schemes are refused before resolution. |
+| DNS rebinding (public IP at check time, private IP at connect time) | Validation runs inside the socket's own `lookup` hook and the validated address is the one connected to — there is no second resolution between check and use. |
+| Redirect to an internal host or another domain | Redirects are followed manually (max 3), each hop is re-validated, and only same-host https redirects are allowed. |
+| Resource exhaustion (huge / slow responses) | 100 KB body cap (declared `Content-Length` and streamed bytes), 3 s overall timeout, per-IP token bucket (burst 10, 1 req / 6 s) on uncached lookups, bounded in-memory caches (1 000 entries). Results — including failures — are cached for 1 h. |
+| Malformed or hostile TOML | Strict-subset parser: only top-level `ACCOUNTS` and `[DOCUMENTATION] ORG_NAME / ORG_URL` are read; line, string-length and account-count caps; non-G-strkey accounts dropped; non-https `ORG_URL` dropped. No `eval`, no general TOML library. |
+| Name spoofing / homographs | Org name passes through `sanitizeDisplayText`. IDN domains are normalised to punycode for fetching; the badge tooltip shows both the Unicode and punycode forms when they differ. |
+| Arbitrary-origin images | `ORG_LOGO` is **deliberately ignored** — logos are never loaded, so the CSP (`img-src 'self' data:`) is unchanged and no image proxy is needed. |
+| Verification used as an authorization signal | Identity state is **display-only**. It is never sent to the relay, never gates accepting intents, registering, or any transaction. Tooltip copy says "not an endorsement". |
+
+**Residual risks:** the rate limiter and cache are per server instance (not shared across serverless instances); a solver can serve different TOML to the proxy than to users (only affects its own badge); domain ownership proves control of the domain, not real-world identity.
+
+**Related same-origin proxy:** `/api/account-status?address=` (registration wizard funding check) only calls the fixed Horizon URL for the configured network with a validated G-address, so it is not an SSRF vector; it exists so the browser CSP `connect-src` stays unchanged.
+
+**Tests:** `src/lib/server/safeFetch.test.ts` (blocked ranges, mixed DNS answers, redirects, size/timeout caps, domain normalisation, token bucket), `src/app/api/verify-solver/route.test.ts`, `src/lib/stellarToml.test.ts`.
+
+An address-adjacent free-text field (such as a future memo field) currently bypasses validation, but any future memo or label field must route through `sanitizeDisplayText` before display — this is the expected pattern established by this change.
+
+**Tests:** `src/lib/textSafety.test.ts` — real Unicode attack fixtures for every bidi control (U+202A–U+202E, U+2066–U+2069), every zero-width character (U+200B–U+200D, U+FEFF, U+00AD), combined payloads, safe ASCII/non-Latin strings asserted unchanged.
+

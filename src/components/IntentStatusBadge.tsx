@@ -37,35 +37,9 @@ const STATUS_ICONS: Record<IntentStatus, string> = {
   cancelled: '\u2298',
 };
 
-const STATUS_LABELS: Record<IntentStatus, string> = {
-  pending: 'Pending',
-  processing: 'Processing',
-  success: 'Success',
-  error: 'Error',
-  cancelled: 'Cancelled',
-};
-
-/**
- * Status badge that conveys state through an icon and text label in addition
- * to colour, so it remains legible in forced-colors / high-contrast modes.
- * The processing indicator is only animated when motion is allowed.
- */
-export function IntentStatusBadge({
-  status,
-  label,
-  className = '',
-}: IntentStatusBadgeProps) {
-  const { prefersReducedMotion } = useMotionPreference();
-
-  const text = label ?? STATUS_LABELS[status];
-  const icon = STATUS_ICONS[status];
-
-  const iconClassName = useMemo(() => {
-    if (status !== 'processing' || prefersReducedMotion) {
-      return 'inline-block';
-    }
-    return 'inline-block motion-safe:animate-spin';
-  }, [status, prefersReducedMotion]);
+      <span aria-hidden="true" className={iconClassName}>
+        {icon}
+      </span>
 
   return (
     <span
@@ -81,10 +55,15 @@ export function IntentStatusBadge({
         .filter(Boolean)
         .join(' ')}
     >
-      <span aria-hidden="true" className={iconClassName}>
-        {icon}
-      </span>
-      <span>{text}</span>
+      <svg
+        aria-hidden="true"
+        className="w-2.5 h-2.5 flex-shrink-0"
+        viewBox="0 0 12 12"
+        fill="none"
+      >
+        {STATUS_ICONS[status]}
+      </svg>
+      {status}{verified && <span aria-label="verified on chain" title="Verified on chain">✓ verified</span>}
     </span>
   );
 }

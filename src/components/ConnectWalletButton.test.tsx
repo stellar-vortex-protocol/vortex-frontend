@@ -25,7 +25,7 @@ vi.mock("@/store/toast", () => ({
 }));
 
 import { useWalletStore } from "@/store/wallet";
-import { ConnectWalletButton } from "./ConnectWalletButton";
+import { ConnectWalletButton, freighterInstallUrl } from "./ConnectWalletButton";
 
 const initialState = useWalletStore.getState();
 
@@ -121,7 +121,10 @@ describe("ConnectWalletButton", () => {
     await user.click(screen.getByText("Connect Freighter"));
 
     await waitFor(() => {
-      expect(addToastMock).toHaveBeenCalledWith("User declined access", "error");
+      expect(addToastMock).toHaveBeenCalledWith(
+        "The request was declined in Freighter.",
+        "error",
+      );
     });
     // Regression guard for the original bug: the toast text must never be the
     // string "undefined" (from a missing translation key or an undeclared var).
@@ -131,7 +134,7 @@ describe("ConnectWalletButton", () => {
     }
   });
 
-  it("puts the underlying failure text in the retry button's tooltip", async () => {
+  it("puts the localised failure text in the retry button's tooltip", async () => {
     isConnectedMock.mockResolvedValue(true);
     requestAccessMock.mockRejectedValue(new Error("User declined access"));
 
@@ -140,7 +143,10 @@ describe("ConnectWalletButton", () => {
     await user.click(screen.getByText("Connect Freighter"));
 
     const retry = await screen.findByText("Retry Connection");
-    expect(retry.closest("button")).toHaveAttribute("title", "User declined access");
+    expect(retry.closest("button")).toHaveAttribute(
+      "title",
+      "The request was declined in Freighter.",
+    );
   });
 
   // ── Issue #1: network-mismatch warning ───────────────────────────────────
@@ -209,5 +215,46 @@ describe("ConnectWalletButton", () => {
     expect(
       screen.queryByRole("link", { name: /install.*freighter/i }),
     ).not.toBeInTheDocument();
+  });
+
+  // ── #417: kind-specific recovery guidance ────────────────────────────────
+
+  it.each([
+    ["locked", "Freighter is locked.", "I've unlocked it — retry"],
+    ["user-rejected", "The request was declined in Freighter.", "Retry Connection"],
+    ["timeout", "Freighter didn't respond in time.", "Retry Connection"],
+    ["unsupported-method", "This version of Freighter doesn't support this action.", "Retry Connection"],
+    ["unknown", "Failed to connect wallet.", "Retry Connection"],
+  ] as const)("renders %s guidance in an alert with a retry action", (kind, message, action) => {
+    useWalletStore.setState({
+      errorKind: kind,
+      errorKey: `wallet.error.${kind}`,
+      error: message,
+    });
+    renderButton();
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByRole("button", { name: action })).toBeInTheDocument();
+  });
+
+  it("renders localised (es) guidance for a locked wallet", () => {
+    useWalletStore.setState({
+      errorKind: "locked",
+      errorKey: "wallet.error.locked",
+      error: "Freighter is locked.",
+    });
+    renderButton("es");
+    expect(screen.getByRole("alert")).toHaveTextContent("Freighter está bloqueado.");
+  });
+
+  it("points the install link at the right store for the browser", () => {
+    expect(freighterInstallUrl("Mozilla/5.0 (X11) Gecko/20100101 Firefox/130.0")).toMatch(
+      /addons\.mozilla\.org/,
+    );
+    expect(
+      freighterInstallUrl("Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/128.0 Safari/537.36"),
+    ).toMatch(/chromewebstore/);
+    expect(
+      freighterInstallUrl("Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1"),
+    ).toBe("https://www.freighter.app/");
   });
 });

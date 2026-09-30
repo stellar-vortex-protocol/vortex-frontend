@@ -84,7 +84,7 @@ describe("envValidation", () => {
 
       const errors = validatePublicEnvVariables(env);
       expect(errors).toHaveLength(1);
-      expect(errors[0].variable).toBe("NEXT_PUBLIC_SECRET_KEY");
+      expect(errors[0]?.variable).toBe("NEXT_PUBLIC_SECRET_KEY");
     });
 
     it("should ignore non-NEXT_PUBLIC variables", () => {
@@ -115,9 +115,9 @@ describe("envValidation", () => {
       };
 
       const errors = validatePublicEnvVariables(env);
-      expect(errors[0].message).toContain("NEXT_PUBLIC_API_SECRET");
-      expect(errors[0].message).toContain("sensitive data");
-      expect(errors[0].message).toContain("bundled into the client");
+      expect(errors[0]?.message).toContain("NEXT_PUBLIC_API_SECRET");
+      expect(errors[0]?.message).toContain("sensitive data");
+      expect(errors[0]?.message).toContain("bundled into the client");
     });
   });
 

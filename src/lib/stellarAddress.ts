@@ -72,3 +72,115 @@ export function isValidStellarPublicKey(address: string): boolean {
     checksum[1] === expectedChecksum >>> 8
   );
 }
+
+/**
+ * Normalises a Stellar address for comparison: trims surrounding whitespace and
+ * upper-cases it. Stellar strkeys are case-insensitive base32, so two addresses
+ * that differ only in case refer to the same account. Used by the delegation
+ * flow to detect self-delegation and to compare a pasted address against the
+ * current delegate without false negatives.
+ */
+export function normalizeStellarAddress(address: string): string {
+  return address.trim().toUpperCase();
+}
+
+/**
+ * Returns true when two Stellar addresses refer to the same account, ignoring
+ * surrounding whitespace and case. Returns false if either input is empty so
+ * that an unset delegate never compares equal to a real address.
+ */
+export function isSameStellarAddress(a: string, b: string): boolean {
+  const left = normalizeStellarAddress(a);
+  const right = normalizeStellarAddress(b);
+  if (!left || !right) return false;
+  return left === right;
+}
+
+/**
+ * Detects visually confusable Stellar addresses — the address-poisoning vector
+ * where an attacker crafts an address that shares a long prefix/suffix with a
+ * legitimate one so a truncated display looks identical.
+ *
+ * Returns the number of leading and trailing characters the two addresses have
+ * in common (case-insensitive). Callers decide the threshold at which to warn;
+ * this helper only measures the overlap so the policy stays in the UI layer.
+ */
+export function addressConfusableOverlap(
+  a: string,
+  b: string
+): { prefix: number; suffix: number } {
+  const left = normalizeStellarAddress(a);
+  const right = normalizeStellarAddress(b);
+  if (!left || !right) return { prefix: 0, suffix: 0 };
+
+  const max = Math.min(left.length, right.length);
+
+  let prefix = 0;
+  while (prefix < max && left[prefix] === right[prefix]) prefix++;
+
+  let suffix = 0;
+  while (
+    suffix < max - prefix &&
+    left[left.length - 1 - suffix] === right[right.length - 1 - suffix]
+  ) {
+    suffix++;
+  }
+
+  return { prefix, suffix };
+}
+
+/**
+ * Convenience predicate for the delegation confirmation step: flags a candidate
+ * address as confusable with a reference address when it shares at least
+ * `minOverlap` leading or trailing characters. Defaults to 4, matching the
+ * default `truncateAddress` prefix/suffix so anything that would render
+ * identically when truncated is caught.
+ */
+export function isConfusableAddress(
+  candidate: string,
+  reference: string,
+  minOverlap = 4
+): boolean {
+  if (isSameStellarAddress(candidate, reference)) return false;
+  const { prefix, suffix } = addressConfusableOverlap(candidate, reference);
+  return prefix >= minOverlap || suffix >= minOverlap;
+}
+
+/** Strkey prefixes from the SEP-0023 version-byte table. */
+export type StrKeyPrefix = "G" | "S" | "M" | "C" | "T" | "X" | "P";
+
+// Decoded byte lengths (version + payload + 2-byte CRC) per prefix. Signed
+// payloads ("P") carry a variable-length payload, so any length is accepted.
+const STRKEY_DECODED_LENGTHS: Record<StrKeyPrefix, readonly number[] | null> = {
+  G: [35],
+  S: [35],
+  C: [35],
+  T: [35],
+  X: [35],
+  M: [43],
+  P: null,
+};
+
+/**
+ * Checksum-validates any SEP-0023 strkey (account, seed, muxed, contract,
+ * pre-auth tx, hash-x or signed payload). Never throws.
+ */
+export function isValidStrKey(value: string): boolean {
+  const prefix = value[0] as StrKeyPrefix | undefined;
+  if (!prefix || !(prefix in STRKEY_DECODED_LENGTHS)) return false;
+
+  const decoded = base32Decode(value);
+  if (!decoded || decoded.length < 3) return false;
+
+  const lengths = STRKEY_DECODED_LENGTHS[prefix];
+  if (lengths && !lengths.includes(decoded.length)) return false;
+  if (decoded[0]! >>> 3 !== BASE32_ALPHABET.indexOf(prefix)) return false;
+
+  const expectedChecksum = crc16xmodem(decoded.slice(0, -2));
+  return (
+    decoded[decoded.length - 2] === (expectedChecksum & 0xff) &&
+    decoded[decoded.length - 1] === expectedChecksum >>> 8
+  );
+}
+
+}

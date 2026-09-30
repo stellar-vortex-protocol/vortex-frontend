@@ -171,8 +171,12 @@
     background-image: linear-gradient(160deg, color-mix(in srgb, var(--vx-sage) 2.5%, transparent) 0%, transparent 50%);
   }
 
+  /* The vx-* colours are CSS variables, so Tailwind can't apply an opacity
+     modifier to them (`bg-vx-surface/60` fails the build); translucent
+     variants below use color-mix() instead. */
   .card-sm {
-    @apply bg-vx-surface/60 border border-vx-border rounded-lg;
+    @apply border border-vx-border rounded-lg;
+    background-color: color-mix(in srgb, var(--vx-surface) 60%, transparent);
   }
 
   .eyebrow {
@@ -189,19 +193,29 @@
   }
 
   .input-swap {
-    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg placeholder-vx-dim/60 caret-vx-sage focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
+    @apply w-full bg-transparent text-3xl font-light text-vx-text rounded-lg caret-vx-sage focus:outline-none focus:ring-2 focus:ring-vx-sage focus:ring-offset-2 focus:ring-offset-vx-card;
+  }
+
+  .input-swap::placeholder {
+    color: color-mix(in srgb, var(--vx-dim) 60%, transparent);
   }
 
   .token-btn {
-    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg border border-vx-border hover:border-vx-border hover:bg-vx-card/80 transition-all duration-150 cursor-pointer select-none;
+    @apply flex items-center gap-2 px-3 py-2 bg-vx-surface rounded-lg border border-vx-border hover:border-vx-border transition-all duration-150 cursor-pointer select-none;
+  }
+
+  .token-btn:hover {
+    background-color: color-mix(in srgb, var(--vx-card) 80%, transparent);
   }
 
   .chain-badge {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-lav-bg text-vx-lav border border-vx-lav/20;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-lav-bg text-vx-lav border;
+    border-color: color-mix(in srgb, var(--vx-lav) 20%, transparent);
   }
 
   .stellar-badge {
-    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-sage-bg text-vx-sage border border-vx-sage/20;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-vx-sage-bg text-vx-sage border;
+    border-color: color-mix(in srgb, var(--vx-sage) 20%, transparent);
   }
 
   .state-dot {
@@ -336,5 +350,55 @@ html[data-motion="reduce"] *::after {
 
   body {
     background-image: none;
+  }
+}
+
+/* ── Print (#447) ─────────────────────────────────────────────────────────
+ * Printed receipts/records always use a light palette regardless of the
+ * user's theme, and drop navigation and interactive chrome.
+ */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  :root,
+  :root[data-theme] {
+    --vx-ink: #ffffff;
+    --vx-base: #ffffff;
+    --vx-surface: #f5f5f5;
+    --vx-card: #ffffff;
+    --vx-border: rgba(0, 0, 0, 0.2);
+    --vx-line: rgba(0, 0, 0, 0.1);
+    --vx-text: #111111;
+    --vx-muted: #444444;
+    --vx-dim: #666666;
+    --vx-sage: #1b6b49;
+    --vx-body-bg: #ffffff;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  nav,
+  footer {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  .receipt dd {
+    word-break: break-all;
+  }
+
+  .receipt dl > div {
+    break-inside: avoid;
   }
 }

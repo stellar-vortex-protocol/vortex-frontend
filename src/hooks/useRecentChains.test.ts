@@ -74,7 +74,7 @@ describe("useRecentChains", () => {
     const { result } = renderHook(() => useRecentChains());
     act(() => result.current.addRecentChain("ethereum"));
     act(() => result.current.addRecentChain("base"));
-    expect(result.current.recentChains[0].id).toBe("base");
+    expect(result.current.recentChains[0]?.id).toBe("base");
   });
 
   it("deduplicates — re-selecting a chain moves it to the top", () => {
