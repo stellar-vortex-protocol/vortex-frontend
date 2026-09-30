@@ -16,7 +16,7 @@ vi.mock("@/store/wallet", () => ({
 import { WalletHydrator } from "./WalletHydrator";
 
 function fireStorage(key: string | null, newValue: string | null) {
-  window.dispatchEvent(new StorageEvent("storage", { key: key ?? undefined, newValue }));
+  window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
 }
 
 describe("WalletHydrator", () => {

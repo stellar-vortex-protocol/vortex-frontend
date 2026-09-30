@@ -8,6 +8,7 @@ const {
   addToastMock,
   decodeXdrMock,
   validateSwapXdrMock,
+  verifySignedXdrMatchesMock,
 } = vi.hoisted(() => ({
   signTransactionMock: vi.fn(),
   createIntentMock: vi.fn(),
@@ -15,6 +16,7 @@ const {
   addToastMock: vi.fn(),
   decodeXdrMock: vi.fn(),
   validateSwapXdrMock: vi.fn(),
+  verifySignedXdrMatchesMock: vi.fn(),
 }));
 
 vi.mock("@stellar/freighter-api", () => ({
@@ -29,10 +31,6 @@ vi.mock("@/lib/api", async (importOriginal) => {
     submitIntent: submitIntentMock,
   };
 });
-
-vi.mock("@/lib/xdrReview", () => ({
-  verifySignedXdrMatches: verifySignedXdrMatchesMock,
-}));
 
 vi.mock("@/store/toast", () => ({
   useToastStore: { getState: () => ({ addToast: addToastMock }) },
@@ -49,11 +47,13 @@ vi.mock("@/lib/xdrReview", () => {
   return {
     decodeXdr: decodeXdrMock,
     validateSwapXdr: validateSwapXdrMock,
+    verifySignedXdrMatches: verifySignedXdrMatchesMock,
     XdrMismatchError,
   };
 });
 
 import { useWalletStore } from "@/store/wallet";
+import { ApiError, TimeoutError } from "@/lib/api";
 import { classifySwapError, useSwapSubmission } from "./useSwapSubmission";
 
 const params = {
@@ -84,6 +84,7 @@ describe("useSwapSubmission", () => {
     vi.clearAllMocks();
     decodeXdrMock.mockReturnValue(DECODED_STUB);
     validateSwapXdrMock.mockReturnValue(undefined); // passes by default
+    verifySignedXdrMatchesMock.mockReturnValue({ valid: true });
   });
 
   afterEach(() => {
@@ -295,3 +296,22 @@ describe("useSwapSubmission", () => {
     expect(addToastMock).toHaveBeenCalledWith(expect.stringMatching(/verification failed/i), "error");
   });
 });
+
+describe("classifySwapError", () => {
+  it.each([
+    ["a TimeoutError", new TimeoutError(), "network"],
+    ["a 409 conflict", new ApiError("conflict", 409), "no-solver"],
+    ["a no-solver response body", new ApiError("No solver available", 503), "no-solver"],
+    ["an insufficient-balance 400", new ApiError("insufficient balance", 400), "balance"],
+    ["a funds 422", new ApiError("not enough funds", 422), "balance"],
+    ["any other ApiError", new ApiError("internal error", 500), "generic"],
+    ["a declined signature", new Error("User declined access"), "user-rejected"],
+    ["a cancelled request", new Error("Request cancelled"), "user-rejected"],
+    ["a network failure", new Error("Failed to fetch"), "network"],
+    ["an unrecognised Error", new Error("something odd"), "generic"],
+    ["a non-Error value", "boom", "generic"],
+  ] as const)("classifies %s as %s", (_label, err, kind) => {
+    expect(classifySwapError(err)).toBe(kind);
+  });
+});
+

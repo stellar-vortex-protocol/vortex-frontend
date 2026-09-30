@@ -226,9 +226,8 @@ describe("MyIntentsPage", () => {
 
   it("shows error state with retry button when fetch fails", async () => {
     const mutateMock = vi.fn();
-    const user = userEvent.setup();
     mockWallet({ address: "GABC123", isConnected: true });
-    useMyLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: new Error("boom") });
+    useMyLiveIntentsMock.mockReturnValue({ intents: [], isLoading: false, error: new Error("boom"), mutate: mutateMock });
     const user = userEvent.setup();
     render(<MyIntentsPage />);
 
@@ -237,7 +236,7 @@ describe("MyIntentsPage", () => {
     expect(retryButton).toBeInTheDocument();
 
     await user.click(retryButton);
-    expect(useMyLiveIntentsMock).toHaveBeenCalled();
+    expect(mutateMock).toHaveBeenCalled();
   });
 
   it("shows intent count", () => {

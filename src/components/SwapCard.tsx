@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useQuote } from "@/hooks/useQuote";
-import { useSwapSubmission } from "@/hooks/useSwapSubmission";
+import { SWAP_ERROR_GUIDANCE, useSwapSubmission } from "@/hooks/useSwapSubmission";
 import { useRecentChains } from "@/hooks/useRecentChains";
 import { useTrustline } from "@/hooks/useTrustline";
 import { useMarketRegistry } from "@/hooks/useMarketRegistry";
@@ -13,20 +13,19 @@ import { useWalletStore } from "@/store/wallet";
 import { walletAdapter } from "@/lib/wallet";
 import { buildChangeTrustXdr } from "@/lib/chain/trustline";
 import { validateChangeTrustXdr } from "@/lib/xdrReview";
-import { CHAINS, DST_TOKENS, SRC_TOKENS } from "@/lib/marketData";
+import { CHAINS, DST_TOKENS, PRICES_AS_OF, SRC_TOKENS } from "@/lib/marketData";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
-import { formatTokenAmount } from "@/lib/format";
-import { useTranslation } from "@/lib/i18n/I18nProvider";
+import { formatTokenAmount, formatCurrency, localeToBcp47 } from "@/lib/format";
+import { useTranslation, useLocale } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
 import type { Quote, QuoteRequest } from "@/lib/types";
-
-export const DEFAULT_SLIPPAGE_PCT = 0.5;
-export const HIGH_PRICE_IMPACT_THRESHOLD_PCT = 3;
-export const STALE_QUOTE_THRESHOLD_MS = 30_000;
-
-// How long the "quote changed" delta indicator stays on screen after a refresh.
-const QUOTE_DELTA_TTL_MS = 4000;
-const PRICES_AS_OF = "bundled snapshot";
+import {
+  DEFAULT_SLIPPAGE_PCT,
+  HIGH_PRICE_IMPACT_THRESHOLD_PCT,
+  QUOTE_DELTA_TTL_MS,
+  QUOTE_EXPIRY_WARNING_SECONDS,
+  quoteFreshness,
+} from "@/lib/swapConstants";
 
 const SUBMISSION_LABEL_KEY: Record<string, MessageKey> = {
   connecting: "swap.submit.connecting",
@@ -67,6 +66,24 @@ function QuoteDelta({
   );
 }
 
+/**
+ * `true` below the `md` breakpoint. The sticky mobile action bar is only
+ * mounted there, so desktop (and jsdom, which has no matchMedia) renders a
+ * single submit button.
+ */
+function useIsMobileViewport(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
+
 export type SwapCardProps = {
   initialAmount?: string;
   /** Pre-select the source chain (must be a valid CHAINS id; falls back to "ethereum"). */
@@ -81,9 +98,11 @@ export type SwapCardProps = {
 
 export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: SwapCardProps = {}) {
   const { t } = useTranslation();
+  const locale = useLocale();
+  const bcp47 = localeToBcp47(locale);
 
   const [srcChain, setSrcChain] = useState("ethereum");
-  const [srcToken, setSrcToken] = useState(SRC_TOKENS.ethereum![0]!);
+  const [srcToken, setSrcToken] = useState(SRC_TOKENS["ethereum"]![0]!);
   const [dstToken, setDstToken] = useState(DST_TOKENS[0]!);
   const [srcAmount, setSrcAmount] = useState(initialAmount);
   const [dstAddress, setDstAddress] = useState("");
@@ -97,11 +116,13 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   const { registry } = useMarketRegistry();
   const { address: walletAddress } = useWalletStore();
   const [trustlineSubmitting, setTrustlineSubmitting] = useState(false);
+  const isMobileViewport = useIsMobileViewport();
 
   const chainToggleRef = useRef<HTMLButtonElement>(null);
   const chainPickerRef = useRef<HTMLDivElement>(null);
   const tokenToggleRef = useRef<HTMLButtonElement>(null);
   const tokenPickerRef = useRef<HTMLDivElement>(null);
+  const dstAddressInputRef = useRef<HTMLInputElement>(null);
 
   const chain = CHAINS.find(c => c.id === srcChain) ?? CHAINS[0]!;
 
@@ -134,6 +155,37 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     }
   };
 
+  // Arrow/Home/End move focus between chain options; Enter/Space select via
+  // the option button's own click.
+  const handleChainListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const options = Array.from(
+      e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'),
+    );
+    if (options.length === 0) return;
+    const current = options.indexOf(document.activeElement as HTMLButtonElement);
+    let next: number;
+    switch (e.key) {
+      case "ArrowDown":
+      case "ArrowRight":
+        next = current < 0 ? 0 : Math.min(options.length - 1, current + 1);
+        break;
+      case "ArrowUp":
+      case "ArrowLeft":
+        next = current < 0 ? 0 : Math.max(0, current - 1);
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = options.length - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    options[next]?.focus();
+  };
+
   const handleSelectChain = (chainId: string) => {
     setSrcChain(chainId);
     const nextToken = registry.srcTokens[chainId]?.[0] ?? SRC_TOKENS[chainId]?.[0];
@@ -154,9 +206,57 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     }
   }, [showChainPicker]);
 
+  /** Select a chain from either the recent-chains row or the full grid. */
+  const handleSelectChain = (chainId: string) => {
+    setSrcChain(chainId);
+    const nextToken = SRC_TOKENS[chainId]?.[0];
+    if (nextToken) setSrcToken(nextToken);
+    addRecentChain(chainId);
+    closeChainPicker();
+  };
+
+  // ── Token picker helpers ───────────────────────────────────────────────────
+  const closeTokenPicker = () => {
+    setShowTokenPicker(false);
+    tokenToggleRef.current?.focus();
+  };
+
+  // Move focus into the token picker when it opens.
+  useEffect(() => {
+    if (!showTokenPicker) return;
+    tokenPickerRef.current?.querySelector<HTMLElement>("button")?.focus();
+  }, [showTokenPicker]);
+
+  // Trap Tab focus inside the token picker; Escape closes it.
+  const handleTokenPickerKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      closeTokenPicker();
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const focusable = tokenPickerRef.current?.querySelectorAll<HTMLButtonElement>("button");
+    if (!focusable || focusable.length === 0) return;
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   const debouncedAmount = useDebouncedValue(srcAmount, 500);
   const hasAmount = Boolean(debouncedAmount) && parseFloat(debouncedAmount) > 0;
-  const { quote: fetchedQuote, isLoading: quoteIsLoading, error: quoteError, quoteFetchedAt, phase: quotePhaseState, secondsRemaining: quoteExpiresInSeconds, refreshQuote, lockQuote } = useQuote(
+  const {
+    quote: fetchedQuote,
+    isLoading: quoteIsLoading,
+    quoteErrorType,
+    quoteFetchedAt,
+    refresh: refreshQuote,
+  } = useQuote(
     hasAmount && !previewQuote
       ? {
           srcChain,
@@ -169,7 +269,29 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
 
   const quote = previewQuote ?? fetchedQuote;
   const quoting = previewQuote ? false : quoteIsLoading;
-  const quoteIsStale = quotePhaseState === "stale";
+  // Re-render once a second so the stale-quote countdown stays accurate, but
+  // don't tick while the tab is hidden.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!quoteFetchedAt || previewQuote) return;
+    const tick = () => setNow(Date.now());
+    const interval = setInterval(() => {
+      if (!document.hidden) tick();
+    }, 1000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [quoteFetchedAt, previewQuote]);
+
+  const { isStale: quoteIsStale, expiresInSeconds: quoteExpiresInSeconds } = quoteFreshness(
+    previewQuote ? null : quoteFetchedAt,
+    now,
+  );
   const trustline = useTrustline(dstAddress || walletAddress, dstToken);
 
   // === "Quote changed" delta indicator (#297)
@@ -221,7 +343,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   const minOut = dstAmount > 0 ? (dstAmount * (1 - parsedSlippagePct / 100)).toFixed(dstToken.symbol === "XLM" ? 2 : 4) : "0";
   const hasHighPriceImpact = quote ? quote.priceImpactPct > HIGH_PRICE_IMPACT_THRESHOLD_PCT : false;
 
-  const quoteErrorType = quoteError ? { kind: /no[_ ]solver/i.test(quoteError.message ?? "") ? "no-solver" : "generic" } : null;
+  // #285 – flag a price-derived USD value (no live quote yet) as an estimate.
+  const showPriceEstimateNotice = !quote && srcValueUSD > 0;
 
   // ── Submission ─────────────────────────────────────────────────────────────
   const submission = useSwapSubmission();
@@ -231,7 +354,9 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
     parseFloat(srcAmount) > 0 &&
     !quoting &&
     !isSubmitting &&
-    !dstAddressError && trustline.state !== "missing" && !quoteIsStale;
+    !dstAddressError &&
+    trustline.state !== "missing" &&
+    !quoteIsStale;
 
   function truncateToDecimals(value: string, decimals: number): string {
     const dotIndex = value.indexOf(".");
@@ -285,7 +410,6 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
   };
 
   const handleSubmit = () => {
-    setHasAttemptedSubmit(true);
     if (onPreviewSubmit) {
       onPreviewSubmit({
         srcChain,
@@ -337,6 +461,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           role="dialog"
           aria-modal="true"
           aria-label={t("swap.chainPicker.title")}
+          onKeyDown={handleChainPickerKeyDown}
           className="absolute top-0 left-0 right-0 z-20 bg-vx-card border border-vx-border rounded-xl p-3 shadow-2xl animate-fade-up"
         >
           <div className="eyebrow mb-3 px-1">{t("swap.chainPicker.title")}</div>
@@ -374,17 +499,19 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           )}
 
           {/* Full grid (always visible) */}
-          <div className="grid grid-cols-2 gap-2">
+          <div
+            role="listbox"
+            aria-label={t("swap.chainPicker.title")}
+            onKeyDown={handleChainListKeyDown}
+            className="grid grid-cols-2 gap-2"
+          >
             {CHAINS.map((c) => (
               <button
                 key={c.id}
                 type="button"
-                onClick={() => {
-                  setSrcChain(c.id);
-                  const nextToken = SRC_TOKENS[c.id]?.[0];
-                  if (nextToken) setSrcToken(nextToken);
-                  closeChainPicker();
-                }}
+                role="option"
+                aria-selected={srcChain === c.id}
+                onClick={() => handleSelectChain(c.id)}
                 className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border transition-all ${
                   srcChain === c.id
                     ? "border-vx-sage/40 bg-vx-sage-bg text-vx-sage"
@@ -435,9 +562,11 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             </label>
             <input
               id="src-amount"
-              type="number"
+              type="text"
+              inputMode="decimal"
+              tabIndex={hiddenTabIndex}
               value={srcAmount}
-              onChange={e => setSrcAmount(e.target.value)}
+              onChange={e => handleAmountChange(e.target.value)}
               placeholder={t("swap.from.amountPlaceholder")}
               className="input-swap flex-1"
             />
@@ -492,7 +621,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                   tabIndex={hiddenTabIndex}
                   onClick={() => {
                     setSrcToken(token);
-                    setShowTokenPicker(false);
+                    closeTokenPicker();
                   }}
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
                     token.symbol === srcToken.symbol ? "bg-vx-lav-bg text-vx-lav" : "hover:bg-vx-surface text-vx-muted hover:text-vx-text"
@@ -508,7 +637,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           {srcValueUSD > 0 && (
             <div className="num text-xs text-vx-muted">
               {t("swap.from.approxValue", {
-                value: srcValueUSD.toLocaleString("en-US", {
+                value: formatCurrency(srcValueUSD, bcp47, {
                   maximumFractionDigits: 2,
                 }),
               })}
@@ -572,7 +701,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                 <div className="flex items-baseline gap-2">
                   <div className="text-3xl font-light text-vx-text num">
                     {dstAmount > 0
-                      ? formatTokenAmount(dstAmount, undefined, {
+                      ? formatTokenAmount(dstAmount, bcp47, {
                           maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
                         })
                       : "0"}
@@ -583,7 +712,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                       betterWhenHigher
                       label={t("swap.to.label")}
                       format={(n) =>
-                        formatTokenAmount(n, undefined, {
+                        formatTokenAmount(n, bcp47, {
                           maximumFractionDigits: dstToken.symbol === "XLM" ? 2 : 4,
                         })
                       }
@@ -652,7 +781,33 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
             aria-describedby={dstAddressError ? "dst-address-error" : undefined}
             className="w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:border-vx-sage/50 transition-colors"
           />
-          {dstAddressError && <p id="dst-address-error" role="alert" className="text-[11px] text-red-400">{dstAddressError}</p>}
+          {showPasteConfirmation && pastedAddress && (
+            <div className="mt-2 p-3 bg-amber-500/10 border border-amber-400/30 rounded-lg space-y-2">
+              <p className="text-xs text-amber-400/90">{t("swap.destination.pasteConfirm")}</p>
+              <p className="text-xs font-mono text-vx-text break-all bg-vx-surface/50 p-2 rounded">
+                {pastedAddress}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmPastedAddress}
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-sage"
+                >
+                  {t("swap.destination.pasteConfirmCta")}
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissPasteConfirmation}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-vx-border hover:border-vx-sage/40 text-vx-muted hover:text-vx-text text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-sage"
+                >
+                  {t("swap.destination.pasteDismissCta")}
+                </button>
+              </div>
+            </div>
+          )}
+          {dstAddressError && !showPasteConfirmation && (
+            <p id="dst-address-error" role="alert" className="text-[11px] text-red-400">{dstAddressError}</p>
+          )}
         </div>
 
         {quote && srcAmount && (
@@ -680,8 +835,10 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
                 {t("swap.quote.highPriceImpactWarning", { threshold: HIGH_PRICE_IMPACT_THRESHOLD_PCT })}
               </p>
             )}
-            {quoteFetchedAt && !quoteIsStale && quoteExpiresInSeconds !== null && quoteExpiresInSeconds <= 5 && (
-              <p role="timer" aria-live="polite" className="text-xs text-amber-300">Quote expires in {quoteExpiresInSeconds}s</p>
+            {quoteFetchedAt && !quoteIsStale && quoteExpiresInSeconds !== null && quoteExpiresInSeconds <= QUOTE_EXPIRY_WARNING_SECONDS && (
+              <p role="status" aria-live="polite" className="text-xs text-amber-300">
+                {t("swap.quote.expiresIn", { seconds: quoteExpiresInSeconds })}
+              </p>
             )}
             {quoteFetchedAt && quoteExpiresInSeconds > 5 && <p role="timer" className="text-xs text-vx-muted">Quote valid for {quoteExpiresInSeconds}s</p>}
             {quoteIsStale && (
@@ -707,16 +864,40 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           </div>
         )}
 
-        {quoteError && hasAmount && !quoting && (
+        {quoteErrorType && hasAmount && !quoting && (
           <p role="status" className="text-center text-[11px] text-amber-400/90 px-1">
             {quoteErrorType?.kind === "no-solver" ? t("swap.quote.noSolver") : t("swap.quote.unavailable")}
           </p>
         )}
 
         {submission.status === "error" && (
-          <p role="alert" className="text-center text-[11px] text-red-400 px-1">
-            {submission.error}
+          <div className="text-[11px] px-1 space-y-1">
+            <p role="alert" className="text-center text-red-400">{submission.error}</p>
+            {submission.errorKind && submission.errorKind !== "generic" ? (
+              
+          <p role="status" className="text-center text-[11px] text-amber-400/90 px-1">
+            {quoteErrorType?.kind === "no-solver" ? t("swap.quote.noSolver") : t("swap.quote.unavailable")}
           </p>
+        )}
+
+        {submission.status === "error" && (
+          <div className="text-[11px] px-1 space-y-1">
+            <p role="alert" className="text-center text-red-400">{submission.error}</p>
+            {submission.errorKind && submission.errorKind !== "generic" ? (
+              <p className="text-center text-vx-muted">{SWAP_ERROR_GUIDANCE[submission.errorKind]}</p>
+            ) : (
+              <details className="text-vx-muted">
+                <summary className="cursor-pointer text-center hover:text-vx-text">
+                  {t("swap.error.troubleshoot.title")}
+                </summary>
+                <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                  <li>{t("swap.error.troubleshoot.balance")}</li>
+                  <li>{t("swap.error.troubleshoot.network")}</li>
+                  <li>{t("swap.error.troubleshoot.retry")}</li>
+                </ul>
+              </details>
+            )}
+          </div>
         )}
 
         <button
@@ -782,7 +963,8 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
         <p className="text-center text-[11px] text-vx-muted/70">{t("swap.disclaimer")}</p>
       </div>
 
-      {/* Mobile sticky action bar — only visible below md breakpoint */}
+      {/* Mobile sticky action bar — only mounted below the md breakpoint */}
+      {isMobileViewport && (
       <div
         className="md:hidden fixed bottom-0 left-0 right-0 z-30
                    bg-vx-card/95 backdrop-blur-sm
@@ -859,6 +1041,7 @@ export function SwapCard({ initialAmount = "", previewQuote, onPreviewSubmit }: 
           )}
         </button>
       </div>
+      )}
     </div>
   );
 }

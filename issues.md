@@ -9,6 +9,37 @@ This document tracks all 125 contributor issues for the Vortex Protocol Drips Wa
 
 ---
 
+## Good First Issues
+
+New to this codebase? These open issues are a good place to start. Each one is
+marked `Good first issue: yes` in its entry below (and can be filtered on in the
+contributors dashboard). An issue is only labelled when it meets **all** of:
+
+1. **Open** — not already completed or in progress.
+2. **Small footprint** — touches about two files, usually one component plus a
+   test, or one small hook.
+3. **Clear of the intricate subsystems** — doesn't require understanding the
+   wallet-signing flow (intent creation, XDR review, Freighter signing) or the
+   WebSocket live-data layering.
+4. **Bounded** — the expected result is concrete and easy to verify.
+
+When in doubt, an issue stays unlabelled: complexity tier alone isn't the test
+(some Trivial issues touch the signing path, and nothing here is labelled just
+to fill a quota).
+
+- Issue #14: Swap Sound Effects and Micro-interactions — self-contained UI feedback on existing swap events
+- Issue #19: Maximum Slippage Exceeded Warning Banner — one condition on the existing slippage input, one banner
+- Issue #20: Favorites Token Quick Selection Pills — follows the existing recent-chains pattern (`useRecentChains`)
+- Issue #28: Active Solver Uptime Indicator — display-only badge on the solver detail page
+- Issue #33: Solver Minimum Bond Dynamic Threshold Check — a validation rule in the registration form
+- Issue #43: Proposal Timelock Execution Indicator — display-only badge on the proposal detail page
+
+Deliberately not labelled despite being small: #10, #11 and #13 change what gets
+signed or when a quote is used; #29, #34 and #44 need new data sources or wallet
+state; #45 spans the proposal list and store.
+
+---
+
 ## Core Swap UI
 - #1 Implement Swap Form Base Component (Complexity: High, Points: 200, Status: Completed, Contributor: GABC1122334455667788990011223344556677889900112233445566)
 - #2 Add Token Selection Dropdown with Price Feeds (Complexity: Medium, Points: 150, Status: Completed, Contributor: GDEF2233445566778899001122334455667788990011223344556677)
@@ -23,13 +54,13 @@ This document tracks all 125 contributor issues for the Vortex Protocol Drips Wa
 - #11 Auto-refresh Quotes on Expiry Timer (Complexity: Medium, Points: 150, Status: Open, Contributor: None)
 - #12 Swap Route Comparison View (Complexity: High, Points: 200, Status: Open, Contributor: None)
 - #13 Implement Swap Deadline Controls (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
-- #14 Swap Sound Effects and Micro-interactions (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
+- #14 Swap Sound Effects and Micro-interactions (Complexity: Trivial, Points: 50, Status: Open, Contributor: None, Good first issue: yes)
 - #15 Swap Card Skeleton Loading Animations (Complexity: Trivial, Points: 50, Status: Completed, Contributor: GNOP5566778899001122334455667788990011223344556677889900)
 - #16 Registered Solver Detection on Swap (Complexity: Medium, Points: 150, Status: Completed, Contributor: GABC1122334455667788990011223344556677889900112233445566)
 - #17 Multi-token Output Selection (Complexity: High, Points: 200, Status: Open, Contributor: None)
 - #18 Swap Execution Status Toast Notifications (Complexity: Medium, Points: 150, Status: Completed, Contributor: GDEF2233445566778899001122334455667788990011223344556677)
-- #19 Maximum Slippage Exceeded Warning Banner (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
-- #20 Favorites Token Quick Selection Pills (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
+- #19 Maximum Slippage Exceeded Warning Banner (Complexity: Trivial, Points: 50, Status: Open, Contributor: None, Good first issue: yes)
+- #20 Favorites Token Quick Selection Pills (Complexity: Trivial, Points: 50, Status: Open, Contributor: None, Good first issue: yes)
 
 ## Solver Network
 - #21 Solver Leaderboard Component (Complexity: High, Points: 200, Status: Completed, Contributor: GKLM4455667788990011223344556677889900112233445566778899)
@@ -39,12 +70,12 @@ This document tracks all 125 contributor issues for the Vortex Protocol Drips Wa
 - #25 Solver Profile Details View (Complexity: Medium, Points: 150, Status: Completed, Contributor: GHIJ3344556677889900112233445566778899001122334455667788)
 - #26 Solver Bond Withdrawal Request Flow (Complexity: High, Points: 200, Status: In Progress, Contributor: GKLM4455667788990011223344556677889900112233445566778899)
 - #27 Accept Intent Execution Handler (Complexity: High, Points: 200, Status: Completed, Contributor: GNOP5566778899001122334455667788990011223344556677889900)
-- #28 Active Solver Uptime Indicator (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
+- #28 Active Solver Uptime Indicator (Complexity: Trivial, Points: 50, Status: Open, Contributor: None, Good first issue: yes)
 - #29 Solver Performance Graph (Complexity: Medium, Points: 150, Status: Open, Contributor: None)
 - #30 Solver Chain Capability Tags (Complexity: Trivial, Points: 50, Status: Completed, Contributor: GABC1122334455667788990011223344556677889900112233445566)
 - #31 Solver Success Rate Percentage Badge (Complexity: Trivial, Points: 50, Status: Completed, Contributor: GDEF2233445566778899001122334455667788990011223344556677)
 - #32 Solver Fill Time Averages Calculator (Complexity: Medium, Points: 150, Status: Completed, Contributor: GHIJ3344556677889900112233445566778899001122334455667788)
-- #33 Solver Minimum Bond Dynamic Threshold Check (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
+- #33 Solver Minimum Bond Dynamic Threshold Check (Complexity: Trivial, Points: 50, Status: Open, Contributor: None, Good first issue: yes)
 - #34 Solver Slashed Event Log Feed (Complexity: Medium, Points: 150, Status: Open, Contributor: None)
 - #35 Solver Ranking Sorting Controls (Complexity: Trivial, Points: 50, Status: Completed, Contributor: GKLM4455667788990011223344556677889900112233445566778899)
 - #339 Add a public solver onboarding checklist and readiness self-assessment (Complexity: High, Points: 200, Status: Completed, Contributor: GABC1122334455667788990011223344556677889900112233445566)
@@ -55,7 +86,7 @@ This document tracks all 125 contributor issues for the Vortex Protocol Drips Wa
 - #40 Proposal Quorum Progress Bar (Complexity: Medium, Points: 150, Status: In Progress, Contributor: GDEF2233445566778899001122334455667788990011223344556677)
 - #41 Voter Delegation Flow (Complexity: High, Points: 200, Status: Open, Contributor: None)
 - #42 Governance Proposal Creation Form (Complexity: High, Points: 200, Status: Open, Contributor: None)
-- #43 Proposal Timelock Execution Indicator (Complexity: Trivial, Points: 50, Status: Open, Contributor: None)
+- #43 Proposal Timelock Execution Indicator (Complexity: Trivial, Points: 50, Status: Open, Contributor: None, Good first issue: yes)
 - #44 Governance Voting Power Hydration (Complexity: Medium, Points: 150, Status: Open, Contributor: None)
 - #45 Governance Historical Archive (Complexity: Medium, Points: 150, Status: Open, Contributor: None)
 - #338 Build a proposal discussion comment thread for governance UI (Complexity: High, Points: 200, Status: Completed, Contributor: GDEF2233445566778899001122334455667788990011223344556677)

@@ -105,5 +105,21 @@ export function useQuote(params: QuoteRequest | null) {
 
   const quoteError = error ? classifyQuoteError(error) : null;
 
-  return { quote: lockedQuote ?? data, liveQuote: data, lockedQuote, lockQuote, quoteFetchedAt, expiresAt, phase, secondsRemaining: expiresAt ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : 0, refreshQuote, refreshFailure, isLoading, error, quoteErrorType: quoteError };
+  return {
+    quote: lockedQuote ?? data,
+    liveQuote: data,
+    lockedQuote,
+    lockQuote,
+    quoteFetchedAt,
+    expiresAt,
+    phase,
+    secondsRemaining: expiresAt ? Math.max(0, Math.ceil((expiresAt - now) / 1000)) : 0,
+    refreshQuote,
+    refreshFailure,
+    isLoading,
+    error,
+    quoteErrorType: quoteError,
+    /** Re-fetch the current quote (e.g. after it went stale). */
+    refresh: () => mutate(),
+  };
 }
