@@ -155,12 +155,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: 'npm'
@@ -204,7 +204,7 @@ jobs:
 
       - name: Upload Playwright traces on failure
         if: steps.smoke.outputs.smoke-failed == 'true' || failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces-${{ github.event.pull_request.number }}
           path: |
@@ -243,7 +243,7 @@ jobs:
 
       - name: Upload visual diff bundle
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visual-diff-${{ github.event.pull_request.number }}
           path: visual-diff/
@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload Lighthouse report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lighthouse-report-${{ github.event.pull_request.number }}
           path: lighthouse-report/
@@ -261,7 +261,7 @@ jobs:
 
       - name: Build consolidated report and upsert sticky comment
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           PREVIEW_URL: ${{ needs.deploy-preview.outputs.deployment-url }}
           SMOKE_FAILED: ${{ steps.smoke.outputs.smoke-failed }}
