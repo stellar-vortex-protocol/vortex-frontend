@@ -25,3 +25,18 @@ export function useSolvers(window: TimeWindow = "all") {
 
   return { solvers: data ?? [], isLoading, error };
 }
+
+// The directory needs the full solver set (including inactive solvers) so it
+// can offer an "inactive solvers" toggle and build the chain-capability
+// matrix without re-fetching per filter change. `includeInactive` is passed
+// through to the relay; the response is cached under a distinct key so the
+// leaderboard's active-only list is not polluted.
+export function useSolverDirectory(includeInactive = false) {
+  const key = includeInactive ? "/solvers?includeInactive=true" : "/solvers";
+  const { data, error, isLoading } = useSWR<Solver[]>(key, fetcher, {
+    refreshInterval: 30_000,
+    dedupingInterval: 30_000,
+  });
+
+  return { solvers: data ?? [], isLoading, error };
+}
