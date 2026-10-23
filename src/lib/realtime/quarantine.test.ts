@@ -54,3 +54,16 @@ describe("parseFeedItemFrame", () => {
     expect(getQuarantineDiagnostics().recent.length).toBeLessThanOrEqual(20);
   });
 });
+
+describe("parseFeedItemFrame — hostile frames", () => {
+  it.each([
+    ["oversized field", JSON.stringify({ ...valid, solver: "a".repeat(300) })],
+    ["deep nesting", `{"type":"intent","data":${"[".repeat(50)}${"]".repeat(50)}}`],
+    ["null", "null"],
+    ["array", "[]"],
+    ["type-confused id", JSON.stringify({ ...valid, id: { a: 1 } })],
+  ])("quarantines %s", (_l, raw) => {
+    expect(parseFeedItemFrame(raw)).toBeNull();
+    expect(getQuarantineDiagnostics().invalidCount).toBe(1);
+  });
+});

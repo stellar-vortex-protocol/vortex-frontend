@@ -182,5 +182,3 @@ export function isValidStrKey(value: string): boolean {
     decoded[decoded.length - 1] === expectedChecksum >>> 8
   );
 }
-
-}

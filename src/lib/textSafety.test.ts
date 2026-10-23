@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeDisplayText, containsDangerousUnicode } from "./textSafety";
+import { sanitizeDisplayText, containsDangerousUnicode, confusableSkeleton, hasMixedScripts } from "./textSafety";
 
 // ─── sanitizeDisplayText ──────────────────────────────────────────────────────
 
@@ -57,11 +57,7 @@ describe("sanitizeDisplayText — zero-width and invisible characters", () => {
   });
 
   it("strips ZERO WIDTH JOINER (U+200D)", () => {
-    // BUG INJECTED for fuzz-harness demonstration: U+200D is no
-    // longer stripped by sanitizeDisplayText.  The fuzz test in
-    // textSafety.fuzz.test.ts independently checks for dangerous
-    // code points and will catch this regression.
-    expect(sanitizeDisplayText("a\u200Db")).toBe("a\u200Db");
+    expect(sanitizeDisplayText("a\u200Db")).toBe("ab");
   });
 
   it("strips ZERO WIDTH NO-BREAK SPACE / BOM (U+FEFF)", () => {
@@ -136,5 +132,17 @@ describe("containsDangerousUnicode", () => {
     expect(
       containsDangerousUnicode("GBZH7S5NC57XNHKHJ75C5DGMI3SP6ZFJLIKW74K6OSMA5UI5KU5XW7S")
     ).toBe(false);
+  });
+});
+
+describe("confusableSkeleton / hasMixedScripts", () => {
+  it("maps Cyrillic lookalikes to the same skeleton as Latin", () => {
+    expect(confusableSkeleton("pаypal")).toBe(confusableSkeleton("paypal"));
+  });
+
+  it("flags mixed Latin/Cyrillic labels but not single-script ones", () => {
+    expect(hasMixedScripts("pаypal")).toBe(true);
+    expect(hasMixedScripts("paypal")).toBe(false);
+    expect(hasMixedScripts("Решение")).toBe(false);
   });
 });

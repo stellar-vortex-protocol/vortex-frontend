@@ -1,5 +1,27 @@
 import { NextResponse } from "next/server";
-import dns from "node:dns/promises";
+import { safeFetch } from "@/lib/server/safeFetch";
 
-function privateAddress(address: string) { return address === "127.0.0.1" || address === "::1" || address.startsWith("10.") || address.startsWith("192.168.") || /^172\.(1[6-9]|2\d|3[01])\./.test(address) || address.startsWith("169.254.") || address.startsWith("fc") || address.startsWith("fd"); }
-export async function GET(request: Request) { const alias = new URL(request.url).searchParams.get("address") ?? ""; if (!/^[^\s*@]+\*[^\s*@]+$/.test(alias)) return NextResponse.json({ error: "invalid address" }, { status: 400 }); const [name, domain] = alias.split("*"); if (!name || !domain || domain.length > 253 || !/^[a-z0-9.-]+$/i.test(domain) || domain.endsWith(".") || domain === "localhost") return NextResponse.json({ error: "invalid domain" }, { status: 400 }); try { const records = await dns.lookup(domain, { all: true }); if (!records.length || records.some((record) => privateAddress(record.address))) return NextResponse.json({ error: "blocked domain" }, { status: 403 }); } catch { return NextResponse.json({ error: "domain unavailable" }, { status: 502 }); } const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 4000); try { const response = await fetch(`https://${domain}/federation?type=name&q=${encodeURIComponent(name)}`, { signal: controller.signal, redirect: "error", headers: { accept: "application/json" } }); if (!response.ok) return NextResponse.json({ error: "federation unavailable" }, { status: 502 }); return NextResponse.json(await response.json()); } catch { return NextResponse.json({ error: "federation unavailable" }, { status: 502 }); } finally { clearTimeout(timeout); } }
+export const runtime = "nodejs";
+
+export async function GET(request: Request) {
+  const alias = new URL(request.url).searchParams.get("address") ?? "";
+  if (!/^[^\s*@]+\*[^\s*@]+$/.test(alias)) return NextResponse.json({ error: "invalid address" }, { status: 400 });
+  const [name, domain] = alias.split("*");
+  if (!name || !domain || domain.length > 253 || !/^[a-z0-9.-]+$/i.test(domain) || domain.endsWith(".") || domain === "localhost") {
+    return NextResponse.json({ error: "invalid domain" }, { status: 400 });
+  }
+  try {
+    // safeFetch validates every resolved address inside the socket's own lookup,
+    // so there is no second DNS resolution between check and connect (no rebinding).
+    const response = await safeFetch(`https://${domain}/federation?type=name&q=${encodeURIComponent(name)}`, {
+      timeoutMs: 4000,
+      maxRedirects: 0,
+    });
+    return NextResponse.json(JSON.parse(response.body));
+  } catch (err) {
+    if ((err as { code?: string }).code === "blocked-address" || (err as { code?: string }).code === "invalid-url") {
+      return NextResponse.json({ error: "blocked domain" }, { status: 403 });
+    }
+    return NextResponse.json({ error: "federation unavailable" }, { status: 502 });
+  }
+}
