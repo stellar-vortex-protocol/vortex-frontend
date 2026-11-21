@@ -2,6 +2,7 @@
 // as `en`; `npm run check:i18n` enforces parity.
 export const es = {
   "compare.copyLink": "Copiar enlace de comparación",
+  "compare.copied": "Copiado",
   "compare.linkCopied": "Enlace de comparación copiado",
   "solverDashboard.active.expiringBadge": "{count} por vencer",
   "chart.showTable": "Ver como tabla",

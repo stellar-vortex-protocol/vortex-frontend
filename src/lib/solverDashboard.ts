@@ -99,6 +99,12 @@ export function solverDashboardCsv(data: SolverDashboardExport): string {
 
 export type InactiveReason = "status" | "bondBelowMinimum";
 
+/** Amount (USD) a solver must add to reach the minimum bond; 0 when already at or above it. */
+export function bondShortfall(solver: Solver, minBondUsd: number = MIN_BOND_USD): number {
+  const shortfall = minBondUsd - solver.bondUsd;
+  return shortfall > 0 ? Math.round(shortfall * 100) / 100 : 0;
+}
+
 export function inactiveReasons(solver: Solver, minBondUsd: number = MIN_BOND_USD): InactiveReason[] {
   const reasons: InactiveReason[] = [];
   if (solver.status === "inactive") reasons.push("status");

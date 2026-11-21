@@ -19,6 +19,7 @@ import {
   MIN_BOND_USD,
   activeIntents,
   bondHealth,
+  bondShortfall,
   buildSolverDashboardExport,
   expiringSoon,
   fillCounts,
@@ -160,7 +161,17 @@ export default function SolverDashboardPage() {
             <p className="font-semibold mb-1">{t("solverDashboard.inactive.title")}</p>
             <ul className="list-disc ml-5 text-xs text-vx-muted">
               {reasons.map((r) => (
-                <li key={r}>{t(`solverDashboard.inactive.${r}`, { minBond: MIN_BOND_USD })}</li>
+                <li key={r}>
+                  {t(`solverDashboard.inactive.${r}`, { minBond: MIN_BOND_USD })}
+                  {r === "bondBelowMinimum" && (
+                    <Link
+                      href={`/solve/manage?topUp=${bondShortfall(solver)}`}
+                      className={`ml-2 font-semibold text-vx-sage hover:underline rounded ${FOCUS_RING}`}
+                    >
+                      {t("solverDashboard.inactive.topUpBond", { shortfall: bondShortfall(solver) })}
+                    </Link>
+                  )}
+                </li>
               ))}
             </ul>
           </div>

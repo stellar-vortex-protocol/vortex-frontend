@@ -2,6 +2,7 @@
 // may contain {placeholder} tokens that are filled in at render time.
 export const en = {
   "compare.copyLink": "Copy comparison link",
+  "compare.copied": "Copied",
   "compare.linkCopied": "Comparison link copied",
   "solverDashboard.active.expiringBadge": "{count} expiring soon",
   "chart.showTable": "View as table",
