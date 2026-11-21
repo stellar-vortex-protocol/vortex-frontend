@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import { createElement } from "react";
 import ContributorsPage from "./page";
@@ -91,6 +91,19 @@ describe("ContributorsPage", () => {
     const { unmount } = renderPage();
 
     expect(await screen.findByText(/2 contributors — listed alphabetically/)).toBeInTheDocument();
+    unmount();
+  });
+
+  it("filters the cached list client-side without refetching", async () => {
+    const { unmount } = renderPage();
+    expect(await screen.findByText("@first-user")).toBeInTheDocument();
+    const callsAfterMount = vi.mocked(global.fetch).mock.calls.length;
+
+    fireEvent.change(screen.getByLabelText("Filter by username"), { target: { value: "first" } });
+
+    expect(screen.getByText("@first-user")).toBeInTheDocument();
+    expect(screen.queryByText("@second-user")).not.toBeInTheDocument();
+    expect(vi.mocked(global.fetch).mock.calls.length).toBe(callsAfterMount);
     unmount();
   });
 
