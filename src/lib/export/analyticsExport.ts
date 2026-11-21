@@ -171,11 +171,20 @@ export function buildShareUrl(state: AnalyticsShareState): string {
 
 /**
  * Read share state from the current URL (client-side only).
- * Returns null when not in a browser context or param is absent/invalid.
+ * Accepts an optional search query (`?av=...`) or full URL for testing/SSR;
+ * defaults to `window.location.search`. Returns null when the param is
+ * absent/invalid or no browser context is available.
  */
-export function readShareStateFromUrl(): AnalyticsShareState | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
+export function readShareStateFromUrl(search?: string): AnalyticsShareState | null {
+  let query: string;
+  if (typeof search === "string") {
+    query = search;
+  } else if (typeof window !== "undefined") {
+    query = window.location.search;
+  } else {
+    return null;
+  }
+  const params = new URLSearchParams(query);
   return decodeShareState(params.get(SHARE_PARAM));
 }
 
