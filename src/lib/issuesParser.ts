@@ -48,6 +48,32 @@ export type ContributorTally = {
   pointsEarned: number;
 };
 
+/** Per-contributor tally for one category, computed from that contributor's issues. */
+export type ContributorCategoryBreakdown = {
+  category: string;
+  completedCount: number;
+  pointsEarned: number;
+};
+
+/** Per-contributor tally for one complexity tier. */
+export type ContributorComplexityBreakdown = {
+  complexity: ComplexityTier;
+  completedCount: number;
+  pointsEarned: number;
+};
+
+/**
+ * Contributor-scoped breakdown. `completedCount` and `pointsEarned` are the
+ * contributor's totals; the category/tier tallies sum to exactly those values.
+ */
+export type ContributorBreakdown = {
+  contributor: string;
+  completedCount: number;
+  pointsEarned: number;
+  categories: ContributorCategoryBreakdown[];
+  complexities: ContributorComplexityBreakdown[];
+};
+
 export type WaveMetrics = {
   totalIssues: number;
   completedIssues: number;
@@ -158,6 +184,51 @@ function parseEntry(body: string, category: string): EntryResult {
       mentor,
     },
     problems,
+  };
+}
+
+/**
+ * Computes a contributor-scoped breakdown from an already-filtered issue list.
+ * Only completed issues assigned to `contributor` are tallied, so the category
+ * and complexity tallies always sum to the returned totals.
+ */
+export function computeContributorBreakdown(
+  issues: readonly WaveIssue[],
+  contributor: string,
+): ContributorBreakdown {
+  const categoryMap: Record<string, ContributorCategoryBreakdown> = {};
+  const complexityMap: Record<ComplexityTier, ContributorComplexityBreakdown> = {
+    Trivial: { complexity: "Trivial", completedCount: 0, pointsEarned: 0 },
+    Medium: { complexity: "Medium", completedCount: 0, pointsEarned: 0 },
+    High: { complexity: "High", completedCount: 0, pointsEarned: 0 },
+  };
+  let completedCount = 0;
+  let pointsEarned = 0;
+
+  for (const issue of issues) {
+    if (issue.contributor !== contributor || issue.status !== "Completed") continue;
+
+    completedCount++;
+    pointsEarned += issue.points;
+
+    const cat = (categoryMap[issue.category] ??= {
+      category: issue.category,
+      completedCount: 0,
+      pointsEarned: 0,
+    });
+    cat.completedCount++;
+    cat.pointsEarned += issue.points;
+
+    complexityMap[issue.complexity].completedCount++;
+    complexityMap[issue.complexity].pointsEarned += issue.points;
+  }
+
+  return {
+    contributor,
+    completedCount,
+    pointsEarned,
+    categories: Object.values(categoryMap).sort((a, b) => b.pointsEarned - a.pointsEarned),
+    complexities: Object.values(complexityMap),
   };
 }
 
