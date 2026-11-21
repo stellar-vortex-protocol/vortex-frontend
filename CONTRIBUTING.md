@@ -51,7 +51,7 @@ No `vortex-backend` running? The app still builds and renders, but live data cal
 Mirrors the baseline Definition of Done. Every PR should pass:
 
 - [ ] One PR contains code, tests and docs, and references the issue (`Closes #N`)
-- [ ] `npm run lint`, `npm run typecheck`, `npm test`, `npm run check:i18n` and `npm run check:editorconfig` pass
+- [ ] `npm run lint`, `npm run typecheck`, `npm run test`, `npm run check:i18n` and `npm run check:editorconfig` pass
 - [ ] No new `any`, no `@ts-ignore` / `eslint-disable` without a justification comment, no new `console.*` (use `secureLogger`)
 - [ ] New user-facing strings are in both `src/lib/i18n/messages/en.ts` and `es.ts`
 - [ ] New interactive UI is keyboard-operable, has visible focus and ARIA semantics, and works in dark and light palettes (`src/app/globals.css`)
