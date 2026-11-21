@@ -15,6 +15,7 @@ export const LEADERBOARD_SORT_KEYS = [
   "successRate",
   "avgFillTimeSeconds",
   "bondUsd",
+  "verified",
 ] as const;
 export type LeaderboardSortKey = (typeof LEADERBOARD_SORT_KEYS)[number];
 
@@ -72,7 +73,10 @@ export function rankSolvers(
 }
 
 function sortValue(row: RankedSolver, key: LeaderboardSortKey): number | string {
-  return key === "name" ? row.name.toLocaleLowerCase() : row[key];
+  if (key === "name") return row.name.toLocaleLowerCase();
+  // Verified is a boolean dimension: 1 = verified, 0 = unverified.
+  if (key === "verified") return row.verified === true ? 1 : 0;
+  return row[key];
 }
 
 /** Multi-key sort; falls back to rank so ties stay stable. */
