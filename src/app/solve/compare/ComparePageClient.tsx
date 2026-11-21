@@ -17,7 +17,6 @@ import {
   compareSolvers,
   coverageOverlap,
   groupByWeek,
-  compareHref,
   normalizeAddress,
   parseCompareParams,
   type CompareMetric,
@@ -53,11 +52,10 @@ export function ComparePageClient() {
   );
   const { solvers: all, isLoading, error } = useSolvers();
   const { items } = useIntentFeed();
-  const { copy } = useCopyToClipboard();
+  const { copy, copied } = useCopyToClipboard();
 
-  // Selection lives entirely in the a/b/c params, so the canonical href built
-  // from the validated addresses is a complete, shareable snapshot.
-  const copyLink = () => copy(new URL(compareHref(addresses), window.location.origin).toString(), t("compare.linkCopied"));
+  // Copies the current URL as-is; richer share-state encoding is out of scope (#26).
+  const copyLink = () => copy(window.location.href, t("compare.linkCopied"));
 
   const solvers: Array<Solver | null> = useMemo(
     () => addresses.map((a) => all.find((s) => normalizeAddress(s.address) === a) ?? null),
@@ -190,9 +188,10 @@ export function ComparePageClient() {
             <button
               type="button"
               onClick={copyLink}
+              aria-live="polite"
               className="text-xs text-vx-sage hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-vx-sage"
             >
-              {t("compare.copyLink")}
+              {copied ? t("compare.copied") : t("compare.copyLink")}
             </button>
           )}
         </div>
