@@ -7,7 +7,13 @@
 import { escapeCsv } from "@/lib/csv";
 import { looksLikeSensitiveBlob } from "@/lib/secureLogging";
 import { isValidStrKey } from "@/lib/stellarAddress";
-import type { AnalyticsSummary, AnalyticsVolumePoint, AnalyticsRouteEntry } from "@/lib/analytics";
+import type {
+  AnalyticsSummary,
+  AnalyticsVolumePoint,
+  AnalyticsRouteEntry,
+  ConcentrationResult,
+  TopMover,
+} from "@/lib/analytics";
 
 // ─── CSV export ────────────────────────────────────────────────────────────────
 
@@ -68,13 +74,63 @@ function kpisCsv(summary: AnalyticsSummary): string {
   return [header, ...rows].join("\n");
 }
 
+function slaCsv(slaPanel: AnalyticsSummary["slaPanel"]): string {
+  const header = "metric,value";
+  const { percentiles, sla } = slaPanel;
+  const rows = [
+    `p50Seconds,${escapeCsv(percentiles.p50.toFixed(2))}`,
+    `p90Seconds,${escapeCsv(percentiles.p90.toFixed(2))}`,
+    `p99Seconds,${escapeCsv(percentiles.p99.toFixed(2))}`,
+    `p50SlaMet,${sla.p50}`,
+    `p90SlaMet,${sla.p90}`,
+    `p99SlaMet,${sla.p99}`,
+    `filledCount,${slaPanel.filledCount}`,
+    `pendingCount,${slaPanel.pendingCount}`,
+    `clampedCount,${slaPanel.clampedCount}`,
+  ];
+  return [header, ...rows].join("\n");
+}
+
+function concentrationCsv(concentration: ConcentrationResult): string {
+  const header = "label,sharePercent";
+  const summaryRows = [
+    `# HHI,${escapeCsv(String(concentration.hhi))}`,
+    `# Top1SharePercent,${escapeCsv(concentration.top1SharePct.toFixed(2))}`,
+    `# Top3SharePercent,${escapeCsv(concentration.top3SharePct.toFixed(2))}`,
+    `# Level,${escapeCsv(concentration.level)}`,
+  ];
+  const rows = concentration.entities.map(
+    (e) => `${escapeCsv(e.label)},${escapeCsv(e.sharePct.toFixed(2))}`,
+  );
+  return [...summaryRows, header, ...rows].join("\n");
+}
+
+function topMoversCsv(movers: TopMover[]): string {
+  const header =
+    "label,currentSharePercent,previousSharePercent,deltaSharePercent";
+  const rows = movers.map((m) =>
+    [
+      escapeCsv(m.label),
+      escapeCsv(m.currentSharePct.toFixed(2)),
+      escapeCsv(m.previousSharePct.toFixed(2)),
+      escapeCsv(m.deltaSharePct.toFixed(2)),
+    ].join(","),
+  );
+  return [header, ...rows].join("\n");
+}
+
 /**
  * Build a multi-section CSV bundle for analytics export.
  * Sections are separated by blank lines with section headers.
+ *
+ * `concentration` and `topMovers` are optional so existing callers keep
+ * working; when omitted the corresponding sections are skipped.
  */
 export function buildAnalyticsCsvBundle(
   summary: AnalyticsSummary,
   meta: ExportMeta,
+  concentration?: ConcentrationResult,
+  topMovers?: TopMover[],
 ): string {
   const sections = [
     buildMetaRows(meta),
@@ -83,7 +139,15 @@ export function buildAnalyticsCsvBundle(
     "## Volume Series\n" + volumeSeriesCsv(summary.volumeOverTime),
     "",
     "## Routes\n" + routesCsv(summary.routeBreakdown),
+    "",
+    "## SLA\n" + slaCsv(summary.slaPanel),
   ];
+  if (concentration) {
+    sections.push("", "## Concentration\n" + concentrationCsv(concentration));
+  }
+  if (topMovers) {
+    sections.push("", "## Top Movers\n" + topMoversCsv(topMovers));
+  }
   return sections.join("\n");
 }
 
@@ -171,11 +235,20 @@ export function buildShareUrl(state: AnalyticsShareState): string {
 
 /**
  * Read share state from the current URL (client-side only).
- * Returns null when not in a browser context or param is absent/invalid.
+ * Accepts an optional search query (`?av=...`) or full URL for testing/SSR;
+ * defaults to `window.location.search`. Returns null when the param is
+ * absent/invalid or no browser context is available.
  */
-export function readShareStateFromUrl(): AnalyticsShareState | null {
-  if (typeof window === "undefined") return null;
-  const params = new URLSearchParams(window.location.search);
+export function readShareStateFromUrl(search?: string): AnalyticsShareState | null {
+  let query: string;
+  if (typeof search === "string") {
+    query = search;
+  } else if (typeof window !== "undefined") {
+    query = window.location.search;
+  } else {
+    return null;
+  }
+  const params = new URLSearchParams(query);
   return decodeShareState(params.get(SHARE_PARAM));
 }
 

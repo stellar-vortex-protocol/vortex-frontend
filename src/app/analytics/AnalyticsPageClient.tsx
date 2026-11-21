@@ -22,7 +22,12 @@ import {
   type SlaPanelData,
 } from "@/lib/analytics";
 import { CHAINS } from "@/lib/marketData";
-import { buildAnalyticsCsvBundle, buildShareUrl } from "@/lib/export/analyticsExport";
+import {
+  buildAnalyticsCsvBundle,
+  buildShareUrl,
+  readShareStateFromUrl,
+  type AnalyticsShareState,
+} from "@/lib/export/analyticsExport";
 import { downloadBlob, svgToPng } from "@/lib/export/svgToPng";
 import { downloadCsv } from "@/lib/csv";
 import { secureLogger } from "@/lib/secureLogging";
