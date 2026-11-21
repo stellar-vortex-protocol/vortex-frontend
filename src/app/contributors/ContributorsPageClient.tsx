@@ -6,6 +6,7 @@ import { Nav } from "@/components/Nav";
 import type { ComplexityTier, IssueStatus, WaveMetrics } from "@/lib/issuesParser";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
+import { GitHubContributorsWall } from "@/components/contributors/GitHubContributorsWall";
 
 const STATUS_LABEL_KEY: Record<IssueStatus, MessageKey> = {
   Completed: "wave.status.completed",
@@ -234,6 +235,9 @@ export default function ContributorsPageClient({ metrics }: { metrics: WaveMetri
             </div>
           </div>
         </div>
+
+        {/* GitHub contributors wall (fetched from /api/contributors) */}
+        <GitHubContributorsWall />
 
         {/* Contributor Leaderboard */}
         <div className="card overflow-hidden mb-10">
