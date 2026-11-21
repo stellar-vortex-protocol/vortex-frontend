@@ -3,7 +3,9 @@
  * check-i18n-parity.mjs
  *
  * Enforces i18n consistency for the single catalog in src/lib/i18n/messages/:
- * 1. Every locale has exactly the English key set.
+ * 1. Every locale has exactly the English key set (each missing or extra key
+ *    path is printed, prefixed with the locale it is missing from), except
+ *    entries in scripts/i18n-literal-allowlist.json.
  * 2. Every translation uses the same {placeholder} tokens as English.
  * 3. Every literal t("key") in src/ exists in the English catalog, and no
  *    t() call builds its key from a template string (those can't be checked
@@ -53,18 +55,26 @@ export function placeholders(message) {
   return [...message.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 }
 
-/** Parity errors between the English catalog and every other locale. */
-export function checkCatalogs(catalogs) {
+/**
+ * Parity errors between the English catalog and every other locale.
+ * `allowlist` (scripts/i18n-literal-allowlist.json) may list intentional
+ * exceptions in `keys` as "<locale>:<key path>" or "<key path>" (any locale).
+ */
+export function checkCatalogs(catalogs, allowlist = {}) {
   const errors = [];
   const en = catalogs.en;
+  const allowedKeys = new Set(allowlist.keys ?? []);
+  const isAllowed = (locale, key) => allowedKeys.has(`${locale}:${key}`) || allowedKeys.has(key);
   for (const [locale, catalog] of Object.entries(catalogs)) {
     if (locale === "en") continue;
     for (const key of en.keys()) {
-      if (!catalog.has(key)) errors.push(`${locale}: missing key "${key}"`);
+      if (!catalog.has(key) && !isAllowed(locale, key)) {
+        errors.push(`${locale}: missing key "${key}"`);
+      }
     }
     for (const [key, value] of catalog) {
       if (!en.has(key)) {
-        errors.push(`${locale}: key "${key}" is not in the English catalog`);
+        if (!isAllowed(locale, key)) errors.push(`${locale}: key "${key}" is not in the English catalog`);
         continue;
       }
       const expected = placeholders(en.get(key)).join(",");
@@ -144,7 +154,7 @@ function main() {
   const allowlist = JSON.parse(readFileSync(join(root, "scripts/i18n-literal-allowlist.json"), "utf8"));
   const allowed = new Set(allowlist.strings);
 
-  const errors = checkCatalogs(catalogs);
+  const errors = checkCatalogs(catalogs, allowlist);
   const literals = [];
 
   for (const file of listFiles(join(root, "src"))) {

@@ -16,7 +16,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-const CONFLICT_MARKER = /^(<{7}|={7}|>{7})(\s|$)/;
+// Anchored to the start of a line and requires the full seven-character marker,
+// so prose or comments mentioning "conflict" (or a shorter run of <, =, >) are ignored.
+const CONFLICT_MARKER = /^(?:<{7}|={7}|>{7})(?:\s|$)/;
 const JSON_EXT = new Set(['.json']);
 const TS_EXT = new Set(['.ts', '.tsx', '.mts', '.cts']);
 const SKIP_DIRS = /(^|\/)(node_modules|dist|build|\.next|coverage|out)(\/|$)/;
@@ -201,7 +203,10 @@ function checkTsDuplicateDeclarations(file, text) {
 }
 
 function main() {
-  const files = trackedFiles();
+  // Optional explicit file list (e.g. `node scripts/check-merge-debris.mjs a.ts b.ts`),
+  // used by the pre-commit hook and for fixture-based checks.
+  const args = process.argv.slice(2);
+  const files = args.length > 0 ? args : trackedFiles();
   for (const file of files) {
     if (SKIP_DIRS.test(file)) continue;
     const ext = path.extname(file);

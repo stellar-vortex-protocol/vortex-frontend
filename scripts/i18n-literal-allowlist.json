@@ -1,5 +1,6 @@
 {
-  "$comment": "Strings (exact, whitespace-collapsed) and files the i18n check lets through. Only brand/product names, token and chain names, and symbols belong in `strings`. `files`: src/app/opengraph-image.tsx renders the static social-preview PNG at build time, which has no locale context.",
+  "$comment": "Strings (exact, whitespace-collapsed) and files the i18n check lets through. Only brand/product names, token and chain names, and symbols belong in `strings`. `files`: src/app/opengraph-image.tsx renders the static social-preview PNG at build time, which has no locale context. `keys`: intentional catalog exceptions, as \"<locale>:<key path>\" or \"<key path>\" for any locale.",
   "strings": ["Vortex", "Stellar", "Freighter", "GitHub", "Discord", "USDC", "XLM"],
-  "files": ["src/app/opengraph-image.tsx"]
+  "files": ["src/app/opengraph-image.tsx"],
+  "keys": []
 }
