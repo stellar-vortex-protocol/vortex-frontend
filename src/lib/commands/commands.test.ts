@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { debounce } from "./debounce";
 import { fuzzyMatch, rankByQuery } from "./fuzzy";
 import { registerCommand, useCommandRegistry } from "./registry";
 import { MAX_RECENT_INTENTS, pushRecentIntent, readRecentIntents } from "./recents";
@@ -30,6 +31,38 @@ describe("rankByQuery", () => {
     const [hit] = rankByQuery(items, "idioma", (i) => i.title, (i) => i.keywords);
     expect(hit?.item.title).toBe("Switch language");
     expect(hit?.indices).toEqual([]);
+  });
+});
+
+describe("debounce", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("runs the matcher once for several rapid query changes", () => {
+    vi.useFakeTimers();
+    const matcher = vi.fn();
+    const debounced = debounce(matcher, 100);
+
+    for (const query of ["c", "co", "con", "conn"]) debounced.schedule(query);
+    expect(matcher).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(99);
+    expect(matcher).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(matcher).toHaveBeenCalledTimes(1);
+    expect(matcher).toHaveBeenCalledWith("conn");
+  });
+
+  it("drops a pending run when cancelled", () => {
+    vi.useFakeTimers();
+    const matcher = vi.fn();
+    const debounced = debounce(matcher, 100);
+
+    debounced.schedule("conn");
+    debounced.cancel();
+    vi.advanceTimersByTime(200);
+
+    expect(matcher).not.toHaveBeenCalled();
   });
 });
 
