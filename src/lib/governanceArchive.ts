@@ -44,23 +44,26 @@ function parseDate(value?: string): number | null {
   return Number.isNaN(ts) ? null : ts;
 }
 
+/** Date bounds for the fetch; unparseable values are ignored (no bound). */
+export function archiveDateRange(params: ArchiveSearchParams): { from?: string; to?: string } {
+  const range: { from?: string; to?: string } = {};
+  if (parseDate(params.from) !== null) range.from = params.from;
+  if (parseDate(params.to) !== null) range.to = params.to;
+  return range;
+}
+
 export function filterArchiveProposals(
   all: readonly GovernanceProposal[],
   params: ArchiveSearchParams,
 ): GovernanceProposal[] {
   const status = parseStatus(params.status);
   const category = params.category?.trim() || "all";
-  const from = parseDate(params.from);
-  const to = parseDate(params.to);
   const query = params.q?.trim().toLowerCase() ?? "";
   const sort = params.sort === "oldest" ? "oldest" : "newest";
 
   const filtered = all.filter((p) => {
     if (status !== "all" && p.status !== status) return false;
     if (category !== "all" && p.category !== category) return false;
-    const created = p.createdAt ? Date.parse(p.createdAt) : null;
-    if (from !== null && created !== null && created < from) return false;
-    if (to !== null && created !== null && created > to) return false;
     if (query && !`${p.title} ${p.description ?? ""}`.toLowerCase().includes(query)) return false;
     return true;
   });
