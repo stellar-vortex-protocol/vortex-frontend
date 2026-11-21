@@ -95,7 +95,7 @@ Use this for a critical advisory on a runtime dependency, or any advisory being 
 
 1. **Triage (same day).** Confirm the affected version range and whether our code path reaches the vulnerable function. Record the findings in a `security` issue. Do not put exploit details in a public PR.
 2. **Patch branch.** Branch from `main`. Bump only the affected package to the first fixed version, with `npm install <pkg>@<version>`. Do not run `npm audit fix` across the tree.
-3. **Verify.** Run `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`. Check the lockfile diff for unrelated changes.
+3. **Verify.** Run `npm run lint`, `npm run typecheck`, `npm run test` and `npm run build`. Check the lockfile diff for unrelated changes.
 4. **Expedited review.** Open the PR with the `dependencies:review-required` label and ask a CODEOWNERS maintainer for review. Mention the security issue in the description.
 5. **Release.** Merge once approved and CI is green. Deploy using the normal pipeline.
 6. **Follow up.** Close the security issue with the fixed version. If the fix was blocked, record the mitigation and the date to revisit.

@@ -27,6 +27,8 @@ export const es = {
     "Bajar la fianza mínima de {current} a {proposed} haría elegibles a {gain} solvers más, de un total de {total} solvers activos.",
   "governance.impact.unchanged": "La fianza mínima propuesta ({proposed}) es igual al valor actual, por lo que nada cambia.",
   "governance.impact.basis": "Basado en {total} solvers activos y sus fianzas actuales.",
+  "governance.archive.export.invalidDate": "Introduce una fecha de inicio y una fecha de fin válidas para exportar el archivo.",
+  "governance.archive.export.invertedRange": "La fecha de inicio debe ser anterior o igual a la fecha de fin.",
 
   "wave.breadcrumb": "Seguimiento de Wave",
   "wave.eyebrow": "Drips Wave",

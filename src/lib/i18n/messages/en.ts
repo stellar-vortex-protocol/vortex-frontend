@@ -27,6 +27,8 @@ export const en = {
     "Lowering the minimum bond from {current} to {proposed} would make {gain} more solvers eligible, out of {total} active solvers.",
   "governance.impact.unchanged": "The proposed minimum bond ({proposed}) equals the current value, so nothing changes.",
   "governance.impact.basis": "Based on {total} active solvers and their current bonds.",
+  "governance.archive.export.invalidDate": "Enter a valid start and end date to export the archive.",
+  "governance.archive.export.invertedRange": "The start date must be on or before the end date.",
 
   "wave.breadcrumb": "Wave Tracker",
   "wave.eyebrow": "Drips Wave",

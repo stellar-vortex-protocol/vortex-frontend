@@ -7,7 +7,7 @@ coverage ratchet that rejects decreases greater than 0.5 percentage points.
 Run `npm run check:orphan-tests` to catch test-like files Vitest will not
 discover, and `npm run check:docs` validates documented source paths.
 
-- **Test runner:** Vitest (`vitest run`, `vitest run --coverage`)
+- **Test runner:** Vitest (`npm run test`, `npm run test:coverage`)
 - **Environment:** jsdom (`vitest.config.ts`)
 - **Assertions & helpers:** `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`
 - **Config:** `vitest.setup.ts` imports `@testing-library/jest-dom/vitest`
@@ -201,19 +201,19 @@ describe("escapeCsv — fuzz properties", () => {
 
 ### Corpus
 
-When a fuzz test fails, the failing input is saved to `src/test/fuzz-corpus/` as a JSON file.  On the next `npm test` run the corpus-replay block in each `.fuzz.test.ts` file loads those entries and replays them as ordinary unit tests, ensuring regressions are caught even without the fuzz runner.
+When a fuzz test fails, the failing input is saved to `src/test/fuzz-corpus/` as a JSON file.  On the next `npm run test` run the corpus-replay block in each `.fuzz.test.ts` file loads those entries and replays them as ordinary unit tests, ensuring regressions are caught even without the fuzz runner.
 
 ### Running Fuzz Tests Locally
 
 ```bash
 # Short run (100 iterations, fast feedback)
-npm test
+npm run test
 
 # Extended run (10 000 iterations, useful for CI-like depth)
-FUZZ_RUNS=10000 npm test
+FUZZ_RUNS=10000 npm run test
 
 # Reproducible run with a fixed seed
-FUZZ_RUNS=10000 FUZZ_SEED=42 npm test
+FUZZ_RUNS=10000 FUZZ_SEED=42 npm run test
 ```
 
 ### CI

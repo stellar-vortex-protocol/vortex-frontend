@@ -19,6 +19,7 @@ import { join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 import { ENV_SCHEMA, parseEnv } from "../src/lib/env-schema.mjs";
+import { checkEnvironment } from "./env-manifest.mjs";
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const DEV_PORT = 3000;
@@ -53,18 +54,36 @@ export function checkNodeVersion({ root = ROOT, nodeVersion = process.versions.n
   };
 }
 
+/** Load config/environments/<name>.json, or null when it is absent/unreadable. */
+function readManifest(root, environment) {
+  const file = join(root, "config", "environments", `${environment}.json`);
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
 /** @returns {{ name: string, status: string, fix?: string }} */
 export function checkEnv({ root = ROOT, env = process.env } = {}) {
   const name = "Environment (.env.local)";
   const file = join(root, ".env.local");
   const fromFile = existsSync(file) ? parseDotenvValues(readFileSync(file, "utf8")) : {};
   const production = env.NODE_ENV === "production";
-  const { errors } = parseEnv({ ...fromFile, ...env }, { production });
-  if (!existsSync(file) && errors.length === 0) {
+  // .env.local wins over the ambient shell, matching Next.js load order.
+  const merged = { ...env, ...fromFile };
+  const { errors } = parseEnv(merged, { production });
+  // Same manifest rules as `npm run check:env`, so doctor names the keys the
+  // app needs instead of passing while `npm run dev` fails on first boot.
+  const manifest = readManifest(root, production ? "production" : "development");
+  const manifestErrors = manifest ? checkEnvironment(manifest, merged) : [];
+  if (!existsSync(file) && errors.length === 0 && manifestErrors.length === 0) {
     return { name, status: "warn", fix: "Run: cp .env.example .env.local (the devcontainer does this for you)." };
   }
-  if (errors.length > 0) {
-    return { name: `${name}: ${errors.length} invalid`, status: "fail", fix: `Fix these in .env.local:\n    - ${errors.join("\n    - ")}` };
+  if (errors.length > 0 || manifestErrors.length > 0) {
+    const problems = [...errors, ...manifestErrors];
+    return { name: `${name}: ${problems.length} invalid`, status: "fail", fix: `Fix these in .env.local:\n    - ${problems.join("\n    - ")}` };
   }
   const known = new Set(ENV_SCHEMA.map((v) => v.name));
   const unknown = Object.keys(fromFile).filter((k) => !known.has(k));
@@ -174,7 +193,11 @@ async function main() {
 
   const blocking = results.filter((r) => r.status === "fail").length;
   const warnings = results.filter((r) => r.status === "warn").length;
-  process.stdout.write(`\n${blocking} blocking, ${warnings} warning(s)\n`);
+  const envResult = results.find((r) => r.name.startsWith("Environment (.env.local)"));
+  const envBlocking = envResult?.status === "fail";
+  process.stdout.write(
+    `\n${blocking} blocking, ${warnings} warning(s)${envBlocking ? " — .env.local is missing or has invalid required keys" : ""}\n`,
+  );
   process.exitCode = blocking > 0 ? 1 : 0;
 }
 
