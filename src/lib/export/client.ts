@@ -9,6 +9,8 @@ type WorkerLike = {
   postMessage: (msg: ExportRequest) => void;
   terminate: () => void;
   onmessage: ((e: MessageEvent<ExportResponse>) => void) | null;
+  onerror?: ((e: ErrorEvent) => void) | null;
+  onmessageerror?: ((e: MessageEvent) => void) | null;
 };
 
 function createWorker(): WorkerLike | null {
@@ -42,25 +44,52 @@ export function startExport(
   });
 
   const type = options.format === "csv" ? "text/csv;charset=utf-8" : "application/json";
+  let settled = false;
   const onMessage = (msg: ExportResponse) => {
-    if (msg.jobId !== jobId) return;
+    if (msg.jobId !== jobId || settled) return;
     if (msg.type === "progress") onProgress(msg.done, msg.total);
-    else if (msg.type === "complete") settle(new Blob(msg.parts, { type }));
-    else if (msg.type === "cancelled") settle(null);
-    else fail(new Error(msg.message));
+    else if (msg.type === "complete") {
+      settled = true;
+      settle(new Blob(msg.parts, { type }));
+    } else if (msg.type === "cancelled") {
+      settled = true;
+      settle(null);
+    } else {
+      settled = true;
+      fail(new Error(msg.message));
+    }
     if (msg.type !== "progress") worker?.terminate();
+  };
+
+  // A worker-level failure (uncaught throw, failed import, OOM) never posts a
+  // protocol message, so reject here rather than leaving the promise pending
+  // or resolving partial output as success.
+  const onWorkerError = (event: ErrorEvent | MessageEvent) => {
+    if (settled) return;
+    settled = true;
+    const message = "message" in event && typeof event.message === "string" && event.message ? event.message : "Export worker failed";
+    fail(new Error(message));
+    worker?.terminate();
   };
 
   if (worker) {
     worker.onmessage = (e) => onMessage(e.data);
+    worker.onerror = onWorkerError;
+    worker.onmessageerror = onWorkerError;
     worker.postMessage({ type: "start", jobId, items, options });
   } else {
-    void handleExportMessage({ type: "start", jobId, items, options }, cancelledLocal, onMessage);
+    void handleExportMessage({ type: "start", jobId, items, options }, cancelledLocal, onMessage).catch((e: unknown) => {
+      if (settled) return;
+      settled = true;
+      fail(e instanceof Error ? e : new Error("Export failed"));
+    });
   }
 
   return {
     promise,
     cancel: () => {
+      if (settled) return;
+      settled = true;
       if (worker) {
         worker.terminate();
         settle(null);

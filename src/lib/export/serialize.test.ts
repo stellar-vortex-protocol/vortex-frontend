@@ -99,4 +99,17 @@ describe("worker protocol runner", () => {
     await run;
     expect(msgs.at(-1)?.type).toBe("cancelled");
   });
+
+  it("reports failure when the worker throws after the first chunk", async () => {
+    const msgs: ExportResponse[] = [];
+    const post = (m: ExportResponse) => {
+      msgs.push(m);
+      if (m.type === "progress") throw new Error("worker crashed");
+    };
+    await expect(
+      handleExportMessage({ type: "start", jobId: "j", items: [item(), item({ id: "i2" })], options: opts }, new Set(), post),
+    ).rejects.toThrow("worker crashed");
+    expect(msgs.some((m) => m.type === "complete")).toBe(false);
+    expect(msgs.at(-1)?.type).toBe("error");
+  });
 });

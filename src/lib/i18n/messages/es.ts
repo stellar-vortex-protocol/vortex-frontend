@@ -77,6 +77,13 @@ export const es = {
   "wave.issues.viewPr": "Ver PR #{number}",
   "wave.issues.col.contributor": "Colaborador",
 
+  "contributors.wall.title": "Colaboradores de GitHub",
+  "contributors.wall.contributions": "{count} contribuciones",
+  "contributors.wall.unavailable": "Los datos de colaboradores de GitHub no están disponibles ahora. Inténtalo más tarde.",
+  "contributors.source.live": "En vivo",
+  "contributors.source.cache": "En caché",
+  "contributors.source.fallback": "Instantánea",
+
   "calls.title": "Notas de las llamadas de la comunidad",
   "calls.description": "Notas, decisiones y grabaciones de llamadas anteriores de la comunidad y de gobernanza.",
   "calls.empty": "Todavía no se han publicado notas de llamadas.",
