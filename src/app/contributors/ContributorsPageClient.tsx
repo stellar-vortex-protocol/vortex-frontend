@@ -34,6 +34,18 @@ function truncateAddress(addr: string): string {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 }
 
+/**
+ * Completed issues attributed to a single contributor address.
+ * Mirrors the leaderboard tally in `parseWaveMetrics` (status === "Completed"
+ * and matching contributor) so counts and points stay in exact parity.
+ */
+export function completedIssuesForContributor(
+  issues: WaveMetrics["issues"],
+  address: string,
+): WaveMetrics["issues"] {
+  return issues.filter((issue) => issue.status === "Completed" && issue.contributor === address);
+}
+
 export default function ContributorsPageClient({ metrics }: { metrics: WaveMetrics }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -55,6 +67,7 @@ export default function ContributorsPageClient({ metrics }: { metrics: WaveMetri
   const [searchQuery, setSearchQuery] = useState<string>(() => searchParams?.get("q") ?? "");
   const [goodFirstOnly, setGoodFirstOnly] = useState(() => searchParams?.get("goodFirstOnly") === "1");
   const [prLinks, setPrLinks] = useState<Record<number, string>>({});
+  const [expandedContributor, setExpandedContributor] = useState<string | null>(null);
 
   // Fail soft: if the lookup is unavailable, issues render without a PR link.
   useEffect(() => {
