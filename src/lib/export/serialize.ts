@@ -1,4 +1,4 @@
-import { CSV_HEADERS, escapeCsv } from "@/lib/csv";
+import { CSV_HEADERS } from "@/lib/csv";
 import type { FeedItem } from "@/lib/types";
 
 export const EXPORT_SCHEMA_VERSION = 1;
@@ -43,9 +43,18 @@ export function applyFilenameTemplate(template: string, format: ExportFormat, no
   return `${base}.${format}`;
 }
 
+/**
+ * RFC 4180 field escaping: fields containing a comma, double-quote, newline or
+ * carriage return are wrapped in double quotes with inner quotes doubled.
+ * Plain fields are returned unchanged.
+ */
+export function escapeCsvField(value: string): string {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
 /** Header part(s) emitted before any rows. */
 export function serializeHead(opts: ExportOptions): string {
-  if (opts.format === "csv") return `${UTF8_BOM}${opts.columns.join(",")}\n`;
+  if (opts.format === "csv") return `${UTF8_BOM}${opts.columns.map(escapeCsvField).join(",")}\n`;
   const meta = JSON.stringify({ schemaVersion: EXPORT_SCHEMA_VERSION, ...opts.meta, columns: opts.columns });
   // Open the document; rows are appended into `intents`.
   return `${meta.slice(0, -1)},"intents":[`;
@@ -55,7 +64,7 @@ export function serializeHead(opts: ExportOptions): string {
 export function serializeChunk(items: readonly FeedItem[], opts: ExportOptions, first: boolean): string {
   if (opts.format === "csv") {
     return items
-      .map((item) => opts.columns.map((c) => escapeCsv(String(item[c] ?? ""))).join(",") + "\n")
+      .map((item) => opts.columns.map((c) => escapeCsvField(String(item[c] ?? ""))).join(",") + "\n")
       .join("");
   }
   const body = items.map((item) => JSON.stringify(pick(item, opts.columns))).join(",");
