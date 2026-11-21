@@ -18,11 +18,12 @@ export const FLOW_STEPS = [
 ] as const;
 
 export type FlowStep = (typeof FLOW_STEPS)[number];
-export type FlowStatus = "idle" | FlowStep | "success" | "error";
+export type FlowStatus = "idle" | FlowStep | "success" | "error" | "rejected";
 
 export type FlowErrorKind =
   | "network"
   | "user-rejected"
+  | "rejected"
   | "balance"
   | "no-solver"
   | "validation"
@@ -43,6 +44,7 @@ export type FlowEvent =
   | { type: "ADVANCE"; runId: number; step: FlowStep }
   | { type: "SUCCEED"; runId: number }
   | { type: "FAIL"; runId: number; error: string; errorKind: FlowErrorKind }
+  | { type: "REJECT"; runId: number; error?: string }
   | { type: "CANCEL" }
   | { type: "RESET" };
 
@@ -89,6 +91,17 @@ export function flowReducer(state: FlowSnapshot, event: FlowEvent): FlowSnapshot
         status: "error",
         error: event.error,
         errorKind: event.errorKind,
+        errorStep: state.status,
+      };
+    case "REJECT":
+      // Wallet signature cancellation: a distinct resting state so the UI can
+      // show a neutral "cancelled" message instead of an error toast.
+      if (event.runId !== state.runId || !isPendingStatus(state.status)) return state;
+      return {
+        ...state,
+        status: "rejected",
+        error: event.error ?? null,
+        errorKind: "rejected",
         errorStep: state.status,
       };
     case "CANCEL":
