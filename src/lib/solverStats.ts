@@ -48,6 +48,26 @@ export function groupByWeek(items: Pick<FeedItem, "createdAt">[]): Array<{ week:
     .map(([week, count]) => ({ week, count }));
 }
 
+/**
+ * Weekly fill-volume series for one solver, ready for a sparkline: ISO weeks
+ * (UTC) oldest → newest, zero-filled across gaps so the line has no holes.
+ */
+export function weeklyFillVolume(
+  items: Pick<FeedItem, "createdAt">[],
+  weeks = 8,
+): Array<{ week: string; count: number }> {
+  const buckets = groupByWeek(items);
+  if (buckets.length === 0) return [];
+  const byWeek = new Map(buckets.map((b) => [b.week, b.count]));
+  const last = isoWeekStart(buckets[buckets.length - 1]!.week).getTime();
+  const out: Array<{ week: string; count: number }> = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const week = isoWeekKey(new Date(last - i * 7 * DAY_MS));
+    out.push({ week, count: byWeek.get(week) ?? 0 });
+  }
+  return out;
+}
+
 export type StatsBucket = {
   /** ISO date (YYYY-MM-DD, UTC) of the bucket start. */
   start: string;

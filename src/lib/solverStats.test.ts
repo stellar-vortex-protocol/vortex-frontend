@@ -13,6 +13,7 @@ import {
   parseCompareParams,
   parseDecimal,
   formatDecimal,
+  weeklyFillVolume,
 } from "./solverStats";
 import type { FeedItem, Solver } from "./types";
 
@@ -82,6 +83,30 @@ describe("groupByWeek", () => {
       { week: "2024-W51", count: 1 },
       { week: "2025-W01", count: 2 },
     ]);
+  });
+});
+
+describe("weeklyFillVolume", () => {
+  it("buckets a solver's fills per ISO week, zero-filling gaps", () => {
+    const result = weeklyFillVolume(
+      [
+        { createdAt: "2025-06-10T10:00:00Z" }, // 2025-W24
+        { createdAt: "2025-06-11T10:00:00Z" }, // 2025-W24
+        { createdAt: "2025-05-27T10:00:00Z" }, // 2025-W22
+        { createdAt: "not-a-date" },
+      ],
+      4,
+    );
+    expect(result).toEqual([
+      { week: "2025-W21", count: 0 },
+      { week: "2025-W22", count: 1 },
+      { week: "2025-W23", count: 0 },
+      { week: "2025-W24", count: 2 },
+    ]);
+  });
+
+  it("returns an empty series when there are no fills", () => {
+    expect(weeklyFillVolume([])).toEqual([]);
   });
 });
 
