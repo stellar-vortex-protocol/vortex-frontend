@@ -40,9 +40,9 @@ export async function GET(req: NextRequest) {
       signal: AbortSignal.timeout(5_000),
       cache: "no-store",
     });
-    if (res.status === 404) return NextResponse.json({ funded: false });
+    if (res.status === 404) return NextResponse.json({ funded: false }, { status: 200 });
     if (!res.ok) return NextResponse.json({ error: "unavailable" }, { status: 502 });
-    return NextResponse.json({ funded: true });
+    return NextResponse.json({ funded: true }, { status: 200 });
   } catch {
     return NextResponse.json({ error: "unavailable" }, { status: 502 });
   }
