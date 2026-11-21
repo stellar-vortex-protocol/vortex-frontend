@@ -32,6 +32,13 @@ export async function handleExportMessage(
     }
     post({ type: "complete", jobId, parts });
   } catch (e) {
-    post({ type: "error", jobId, message: e instanceof Error ? e.message : "Export failed" });
+    const message = e instanceof Error ? e.message : "Export failed";
+    try {
+      post({ type: "error", jobId, message });
+    } catch {
+      // Worker channel is gone; nothing more we can report from here.
+    }
+    // Reject so a mid-stream failure is never mistaken for success.
+    throw e instanceof Error ? e : new Error(message);
   }
 }
