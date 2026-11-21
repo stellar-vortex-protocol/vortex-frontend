@@ -18,6 +18,31 @@ import {
   type SubmitError,
 } from "@/lib/supportRequestStore";
 
+export type RequestSort = "upvotes" | "newest" | "name";
+
+const SORT_OPTIONS: RequestSort[] = ["upvotes", "newest", "name"];
+
+function compareRequests(a: SupportRequest, b: SupportRequest, sort: RequestSort): number {
+  if (sort === "upvotes") {
+    const diff = b.upvoters.length - a.upvoters.length;
+    if (diff !== 0) return diff;
+  } else if (sort === "newest") {
+    const diff = Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    if (diff !== 0) return diff;
+  } else {
+    const diff = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    if (diff !== 0) return diff;
+  }
+  // Stable tie-breaker: newest first, then id.
+  const created = Date.parse(b.createdAt) - Date.parse(a.createdAt);
+  if (created !== 0) return created;
+  return a.id.localeCompare(b.id);
+}
+
+export function sortRequests(requests: SupportRequest[], sort: RequestSort): SupportRequest[] {
+  return [...requests].sort((a, b) => compareRequests(a, b, sort));
+}
+
 type SubmitState =
   | { status: "idle" }
   | { status: "submitting" }
