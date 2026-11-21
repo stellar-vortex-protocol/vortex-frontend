@@ -5,13 +5,13 @@
     "no-console": "error",
     "no-restricted-globals": [
       "error",
-      { "name": "localStorage", "message": "Use the storage facade in src/lib/storage.ts (see STORAGE_KEYS)." },
-      { "name": "sessionStorage", "message": "Use the storage facade in src/lib/storage.ts (see STORAGE_KEYS)." }
+      { "name": "localStorage", "message": "Do not use localStorage directly. Register the key in STORAGE_KEYS and use the storage facade in src/lib/storage.ts (see docs/persisted-state.md#registering-a-storage-key)." },
+      { "name": "sessionStorage", "message": "Do not use sessionStorage directly. Register the key in STORAGE_KEYS and use the storage facade in src/lib/storage.ts (see docs/persisted-state.md#registering-a-storage-key)." }
     ],
     "no-restricted-properties": [
       "error",
-      { "object": "window", "property": "localStorage", "message": "Use the storage facade in src/lib/storage.ts." },
-      { "object": "window", "property": "sessionStorage", "message": "Use the storage facade in src/lib/storage.ts." }
+      { "object": "window", "property": "localStorage", "message": "Do not use window.localStorage directly. Register the key in STORAGE_KEYS and use the storage facade in src/lib/storage.ts (see docs/persisted-state.md#registering-a-storage-key)." },
+      { "object": "window", "property": "sessionStorage", "message": "Do not use window.sessionStorage directly. Register the key in STORAGE_KEYS and use the storage facade in src/lib/storage.ts (see docs/persisted-state.md#registering-a-storage-key)." }
     ]
   },
   "overrides": [

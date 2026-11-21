@@ -1,2 +1,34 @@
 #!/usr/bin/env sh
+
+# Determine the base to diff against: the upstream tracking branch if set,
+# otherwise the remote default branch.
+base=""
+if upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null); then
+  base="$upstream"
+elif git rev-parse --verify --quiet origin/main >/dev/null; then
+  base="origin/main"
+elif git rev-parse --verify --quiet origin/master >/dev/null; then
+  base="origin/master"
+fi
+
+docs_only=1
+if [ -z "$base" ]; then
+  # No base available (e.g. first push): treat as non-docs so the full suite runs.
+  docs_only=0
+else
+  changed=$(git diff --name-only "$base"...HEAD)
+  for file in $changed; do
+    case "$file" in
+      docs/*|*.md|CHANGELOG.md) ;;
+      *) docs_only=0; break ;;
+    esac
+  done
+fi
+
+if [ "$docs_only" -eq 1 ]; then
+  echo "pre-push: docs-only changes detected, skipping heavy checks."
+  npm run check:editorconfig
+  exit $?
+fi
+
 npm run typecheck

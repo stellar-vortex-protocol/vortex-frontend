@@ -24,6 +24,82 @@ calling `persist` directly. It adds:
 Draft content (`useLocalStorageDraft`) is intentionally **not** synced across
 tabs.
 
+## Registering a storage key
+
+Every key the app persists must be declared in `STORAGE_KEYS` in
+`src/lib/storage.ts` and read/written through the `storage` facade. Direct
+`localStorage` / `sessionStorage` access is rejected by the
+`no-restricted-globals` and `no-restricted-properties` rules in
+`.eslintrc.json`, whose message points back to this section.
+
+A `STORAGE_KEYS` entry is a `StorageKeyDef`:
+
+| Field         | Meaning                                                                 |
+| ------------- | ----------------------------------------------------------------------- |
+| `key`         | Exact storage key, or key prefix when `prefix: true`.                   |
+| `prefix`      | Set when `key` is a prefix (e.g. per-address drafts).                   |
+| `purpose`     | i18n key (`privacy.purpose.*`) explaining why the value is stored.      |
+| `sensitivity` | `"preference"` (kept on disk) or `"personal"` (moved to sessionStorage in private mode). |
+| `retentionMs` | Max age before the value is purged on load; `null` keeps it until cleared. |
+| `owner`       | Module that reads/writes the key.                                       |
+
+Registration also feeds the privacy inventory (`listEntries`), retention
+enforcement, last-updated metadata, and the private-mode purge.
+
+### Before
+
+```ts
+// src/hooks/useRecentChains.ts
+const KEY = "vortex:recentChains";
+
+export function readRecentChains(): string[] {
+  const raw = localStorage.getItem(KEY); // lint error: use the storage facade
+  return raw ? (JSON.parse(raw) as string[]) : [];
+}
+
+export function writeRecentChains(chains: string[]): void {
+  localStorage.setItem(KEY, JSON.stringify(chains)); // lint error
+}
+```
+
+### After
+
+```ts
+// src/lib/storage.ts — declare the key once
+export const STORAGE_KEYS = {
+  // …
+  recentChains: {
+    key: "vortex:recentChains",
+    purpose: "privacy.purpose.recentChains",
+    sensitivity: "personal",
+    retentionMs: 30 * DAY,
+    owner: "src/hooks/useRecentChains.ts",
+  },
+} as const;
+
+// src/hooks/useRecentChains.ts — go through the facade
+import { STORAGE_KEYS, storage } from "@/lib/storage";
+
+export function readRecentChains(): string[] {
+  return storage.getJSON<string[]>(STORAGE_KEYS.recentChains.key) ?? [];
+}
+
+export function writeRecentChains(chains: string[]): void {
+  storage.setJSON(STORAGE_KEYS.recentChains.key, chains);
+}
+```
+
+Checklist when adding a key:
+
+1. Add the entry to `STORAGE_KEYS` with a `purpose` i18n key present in both
+   `en.ts` and `es.ts`.
+2. Pick `sensitivity` and `retentionMs` deliberately — personal data must be
+   purgeable and must not outlive its retention window.
+3. Use `storage.getItem` / `setItem` / `getJSON` / `setJSON` (or
+   `useLocalStorageDraft` for drafts) instead of touching `window` storage.
+4. Run `npm run lint`; a direct storage call now fails with a message naming
+   `STORAGE_KEYS` and linking this section.
+
 ## Changing a persisted shape
 
 1. Update the persisted type and its `validate` function.

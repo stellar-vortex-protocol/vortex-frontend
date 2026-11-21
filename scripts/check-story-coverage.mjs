@@ -43,8 +43,9 @@ const covered = total - missing.length;
 const percent = total === 0 ? 100 : Math.round((covered / total) * 100);
 
 console.log(`Story coverage: ${covered}/${total} shared components (${percent}%)`);
-for (const file of missing) console.log(`  missing story: ${file}`);
 
 if (missing.length > 0) {
+  console.error(`Missing stories for ${missing.length} component(s):`);
+  for (const file of missing) console.error(file);
   process.exitCode = 1;
 }
