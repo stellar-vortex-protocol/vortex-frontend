@@ -6,7 +6,7 @@ export type FuzzyMatch = { score: number; indices: number[] };
  */
 export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
   const q = query.trim().toLowerCase();
-  if (!q) return { score: 0, indices: [] };
+  if (!q) return null;
   const t = text.toLowerCase();
   const indices: number[] = [];
   let score = 0;
@@ -34,6 +34,7 @@ export function rankByQuery<T>(
   getTitle: (item: T) => string,
   getKeywords: (item: T) => string[] = () => [],
 ): RankedItem<T>[] {
+  if (!query.trim()) return [];
   const ranked: (RankedItem<T> & { order: number })[] = [];
   items.forEach((item, order) => {
     const titleMatch = fuzzyMatch(query, getTitle(item));
