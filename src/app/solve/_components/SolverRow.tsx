@@ -1,3 +1,4 @@
+import { memo } from "react";
 import Link from "next/link";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { usdCompact } from "@/lib/format";
@@ -13,7 +14,7 @@ function Stat({ value, label, className = "text-vx-text" }: { value: string; lab
   );
 }
 
-export function SolverRow({ solver, rank }: { solver: Solver; rank: number }) {
+export const SolverRow = memo(function SolverRow({ solver, rank }: { solver: Solver; rank: number }) {
   const { t } = useTranslation();
   return (
     <Link
@@ -50,4 +51,4 @@ export function SolverRow({ solver, rank }: { solver: Solver; rank: number }) {
       </div>
     </Link>
   );
-}
+});

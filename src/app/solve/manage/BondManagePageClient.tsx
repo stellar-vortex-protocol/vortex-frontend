@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { useBondManagement } from "@/hooks/useBondManagement";
@@ -25,6 +25,27 @@ function formatCountdown(ms: number): string {
   const m = Math.floor((total % 3600) / 60);
   const s = String(total % 60).padStart(2, "0");
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
+
+/**
+ * Display values derived from bond data only. Memoised on the bond object so
+ * typing in the amount form never re-derives them.
+ */
+function useBondDisplay(bond: BondState | null | undefined) {
+  return useMemo(() => {
+    if (!bond) return null;
+    return {
+      stats: [
+        ["bond.stat.bond", bond.bond],
+        ["bond.stat.locked", bond.locked],
+        ["bond.stat.available", bond.available],
+        ["bond.stat.minimum", bond.minimumBond],
+      ] as const,
+      status: thresholdStatus(bond),
+      cooldownMinutes: Math.ceil(bond.cooldownSeconds / 60),
+      pending: bond.pendingWithdrawals,
+    };
+  }, [bond]);
 }
 
 function AmountForm({
@@ -119,6 +140,7 @@ export default function BondManagePageClient() {
   const now = useLiveRelativeTime(1000);
   const busy = !["idle", "success", "error"].includes(manager.status);
   const bond = manager.bond;
+  const display = useBondDisplay(bond);
 
   return (
     <div className="min-h-screen">
@@ -137,7 +159,7 @@ export default function BondManagePageClient() {
           <div role="alert" className="card p-6 text-sm text-vx-muted">
             {t("bond.loadError")}
           </div>
-        ) : !bond ? (
+        ) : !bond || !display ? (
           <div className="card p-6 h-32 animate-pulse" aria-busy="true" />
         ) : (
           <>
@@ -147,14 +169,7 @@ export default function BondManagePageClient() {
               </p>
             )}
             <dl className="card p-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {(
-                [
-                  ["bond.stat.bond", bond.bond],
-                  ["bond.stat.locked", bond.locked],
-                  ["bond.stat.available", bond.available],
-                  ["bond.stat.minimum", bond.minimumBond],
-                ] as const
-              ).map(([label, value]) => (
+              {display.stats.map(([label, value]) => (
                 <div key={label}>
                   <dt className="eyebrow text-[10px]">{t(label)}</dt>
                   <dd className="num text-sm font-semibold text-vx-text">{value} USDC</dd>
@@ -163,10 +178,10 @@ export default function BondManagePageClient() {
               <div className="col-span-full">
                 <span
                   className={`chip text-[11px] ${
-                    thresholdStatus(bond) === "ok" ? "bg-vx-sage-bg text-vx-sage" : "bg-vx-amber/10 text-vx-amber"
+                    display.status === "ok" ? "bg-vx-sage-bg text-vx-sage" : "bg-vx-amber/10 text-vx-amber"
                   }`}
                 >
-                  {t(thresholdStatus(bond) === "ok" ? "bond.status.ok" : "bond.status.belowMin")}
+                  {t(display.status === "ok" ? "bond.status.ok" : "bond.status.belowMin")}
                 </span>
               </div>
             </dl>
@@ -175,11 +190,11 @@ export default function BondManagePageClient() {
               <h2 id="pending-withdrawals" className="text-sm font-semibold text-vx-text">
                 {t("bond.pending.title")}
               </h2>
-              {bond.pendingWithdrawals.length === 0 ? (
+              {display.pending.length === 0 ? (
                 <p className="text-xs text-vx-muted">{t("bond.pending.empty")}</p>
               ) : (
                 <ul className="divide-y divide-vx-line">
-                  {bond.pendingWithdrawals.map((w) => {
+                  {display.pending.map((w) => {
                     const remaining = new Date(w.availableAt).getTime() - now;
                     return (
                       <li key={w.id} className="flex items-center justify-between py-2 text-xs">
@@ -203,8 +218,20 @@ export default function BondManagePageClient() {
             )}
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <AmountForm kind="top-up" bond={bond} busy={busy || networkMismatch} onSubmit={manager.topUp} />
-              <AmountForm kind="withdrawal" bond={bond} busy={busy || networkMismatch} onSubmit={manager.requestWithdrawal} />
+              <AmountForm
+                kind="top-up"
+                bond={bond}
+                cooldownMinutes={display.cooldownMinutes}
+                busy={busy || networkMismatch}
+                onSubmit={manager.topUp}
+              />
+              <AmountForm
+                kind="withdrawal"
+                bond={bond}
+                cooldownMinutes={display.cooldownMinutes}
+                busy={busy || networkMismatch}
+                onSubmit={manager.requestWithdrawal}
+              />
             </div>
           </>
         )}

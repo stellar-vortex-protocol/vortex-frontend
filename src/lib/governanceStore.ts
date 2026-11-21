@@ -199,8 +199,33 @@ const INITIAL_COMMENTS: Record<string, ProposalComment[]> = {
 
 let commentsStore: Record<string, ProposalComment[]> = { ...INITIAL_COMMENTS };
 
-export function getGovernanceProposals(): GovernanceProposal[] {
-  return INITIAL_PROPOSALS;
+export type GovernanceProposalQuery = {
+  /** Inclusive lower bound on `createdAt` (ISO 8601). */
+  from?: string | undefined;
+  /** Inclusive upper bound on `createdAt` (ISO 8601). */
+  to?: string | undefined;
+};
+
+function parseBound(value?: string): number | null {
+  if (!value) return null;
+  const ts = Date.parse(value);
+  return Number.isNaN(ts) ? null : ts;
+}
+
+/**
+ * PENDING_BACKEND_ENDPOINTS: GET /api/governance/proposals?from=&to=.
+ * The date range is applied at fetch time so callers never load the full set.
+ */
+export function getGovernanceProposals(query: GovernanceProposalQuery = {}): GovernanceProposal[] {
+  const from = parseBound(query.from);
+  const to = parseBound(query.to);
+  if (from === null && to === null) return INITIAL_PROPOSALS;
+  return INITIAL_PROPOSALS.filter((p) => {
+    const created = p.createdAt ? Date.parse(p.createdAt) : null;
+    if (from !== null && created !== null && created < from) return false;
+    if (to !== null && created !== null && created > to) return false;
+    return true;
+  });
 }
 
 export function getGovernanceProposalById(id: string): GovernanceProposal | undefined {
