@@ -16,6 +16,7 @@ const ERROR_KEY: Record<BondAmountError, MessageKey> = {
   zero: "bond.error.zero",
   tooLarge: "bond.error.tooLarge",
   exceedsAvailable: "bond.error.exceedsAvailable",
+  notFinite: "bond.error.notFinite",
 };
 
 function formatCountdown(ms: number): string {

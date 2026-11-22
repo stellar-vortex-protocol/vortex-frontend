@@ -1,5 +1,16 @@
 import { formatAmount, parseAmount, ZERO } from "@/lib/decimal";
+import { checkTrustline, type TrustlineLookup } from "@/lib/chain/trustline";
+import type { Token } from "@/lib/types";
 import type { BondOperationKind, BondState } from "./types";
+
+/** Bond operations require a USDC trustline; a failed lookup is retryable, not "add trustline". */
+export async function checkBondTrustline(
+  address: string,
+  asset: Token,
+  fetchImpl: typeof fetch = fetch,
+): Promise<TrustlineLookup> {
+  return checkTrustline(address, asset, fetchImpl);
+}
 
 /** Expected state after an operation; used for optimistic updates and the mock adapter. */
 export function applyBondOperation(state: BondState, kind: BondOperationKind, amount: string): BondState {

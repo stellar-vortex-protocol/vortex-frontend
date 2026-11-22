@@ -28,6 +28,12 @@ export const en = {
   "governance.impact.unchanged": "The proposed minimum bond ({proposed}) equals the current value, so nothing changes.",
   "governance.impact.basis": "Based on {total} active solvers and their current bonds.",
 
+  "bond.error.invalid": "Enter a valid amount.",
+  "bond.error.notFinite": "Enter a finite amount — NaN and Infinity are not allowed.",
+  "bond.error.zero": "Amount must be greater than zero.",
+  "bond.error.tooLarge": "Amount exceeds the maximum top-up of {max}.",
+  "bond.error.exceedsAvailable": "Amount exceeds your available bond.",
+
   "wave.breadcrumb": "Wave Tracker",
   "wave.eyebrow": "Drips Wave",
   "wave.title": "Wave Tracker",

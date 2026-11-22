@@ -4,7 +4,7 @@ import type { BondOperationKind, BondState } from "./types";
 /** Upper bound for a single top-up, guarding against fat-finger inputs. */
 export const MAX_TOP_UP = "1000000";
 
-export type BondAmountError = "invalid" | "zero" | "tooLarge" | "exceedsAvailable";
+export type BondAmountError = "invalid" | "notFinite" | "zero" | "tooLarge" | "exceedsAvailable";
 
 export type BondAmountCheck = {
   error: BondAmountError | null;
@@ -15,6 +15,7 @@ export type BondAmountCheck = {
 export function checkBondAmount(kind: BondOperationKind, input: string, state: BondState): BondAmountCheck {
   const amount = parseAmount(input);
   if (amount === null) return { error: "invalid", dropsBelowMinimum: false };
+  if (!Number.isFinite(Number(amount))) return { error: "notFinite", dropsBelowMinimum: false };
   if (amount === ZERO) return { error: "zero", dropsBelowMinimum: false };
   if (kind === "top-up") {
     return { error: amount > (parseAmount(MAX_TOP_UP) ?? ZERO) ? "tooLarge" : null, dropsBelowMinimum: false };

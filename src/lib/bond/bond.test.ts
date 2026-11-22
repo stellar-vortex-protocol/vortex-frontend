@@ -32,6 +32,12 @@ describe("checkBondAmount", () => {
     expect(checkBondAmount("withdrawal", "80.0000001", state).error).toBe("exceedsAvailable");
   });
 
+  it("rejects NaN, Infinity and -Infinity", () => {
+    expect(checkBondAmount("top-up", "NaN", state).error).toBe("notFinite");
+    expect(checkBondAmount("top-up", "Infinity", state).error).toBe("notFinite");
+    expect(checkBondAmount("top-up", "-Infinity", state).error).toBe("notFinite");
+  });
+
   it("flags withdrawals that drop the bond below the minimum", () => {
     expect(checkBondAmount("withdrawal", "50", state).dropsBelowMinimum).toBe(false);
     expect(checkBondAmount("withdrawal", "50.0000001", state).dropsBelowMinimum).toBe(true);

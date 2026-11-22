@@ -28,6 +28,12 @@ export const es = {
   "governance.impact.unchanged": "La fianza mínima propuesta ({proposed}) es igual al valor actual, por lo que nada cambia.",
   "governance.impact.basis": "Basado en {total} solvers activos y sus fianzas actuales.",
 
+  "bond.error.invalid": "Introduce una cantidad válida.",
+  "bond.error.notFinite": "Introduce una cantidad finita: NaN e Infinity no están permitidos.",
+  "bond.error.zero": "La cantidad debe ser mayor que cero.",
+  "bond.error.tooLarge": "La cantidad supera la recarga máxima de {max}.",
+  "bond.error.exceedsAvailable": "La cantidad supera tu fianza disponible.",
+
   "wave.breadcrumb": "Seguimiento de Wave",
   "wave.eyebrow": "Drips Wave",
   "wave.title": "Seguimiento de Wave",

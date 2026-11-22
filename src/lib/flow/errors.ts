@@ -23,7 +23,7 @@ export function classifyFlowError(err: unknown): FlowErrorKind {
   // rejection from their message text.
   if (err.name === "WalletError") {
     const kind = (err as { kind?: unknown }).kind;
-    if (kind === "user-rejected") return "user-rejected";
+    if (kind === "user-rejected") return "rejected";
     if (kind === "timeout") return "network";
     return "generic";
   }
@@ -52,7 +52,7 @@ export function classifyFlowError(err: unknown): FlowErrorKind {
     body.includes("cancelled") ||
     body.includes("canceled")
   ) {
-    return "user-rejected";
+    return "rejected";
   }
   if (body.includes("network") || body.includes("timeout") || body.includes("failed to fetch")) {
     return "network";
@@ -64,6 +64,7 @@ export function classifyFlowError(err: unknown): FlowErrorKind {
 export const FLOW_ERROR_GUIDANCE_KEY: Record<FlowErrorKind, MessageKey | null> = {
   network: "flow.error.network",
   "user-rejected": "flow.error.userRejected",
+  rejected: "flow.error.rejected",
   balance: "flow.error.balance",
   "no-solver": "flow.error.noSolver",
   validation: "flow.error.validation",
