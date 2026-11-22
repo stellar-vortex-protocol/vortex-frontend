@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { fetchHorizonAccount, HorizonError } from "@/lib/chain/horizon";
 import { clientIp } from "@/lib/server/clientIp";
 import { createTokenBucket } from "@/lib/server/rateLimit";
+import { secureLogger } from "@/lib/secureLogging";
 import { isValidStellarPublicKey } from "@/lib/stellarAddress";
 
 export const runtime = "nodejs";
@@ -22,7 +24,8 @@ const takeToken = createTokenBucket(30, 1 / 2);
  * Same-origin proxy to the (fixed, trusted) Horizon instance for the
  * configured network, so the browser CSP `connect-src` stays unchanged.
  * Returns `{ funded: boolean }` — an account that does not exist on the
- * ledger (Horizon 404) is unfunded.
+ * ledger (Horizon 404) is unfunded. Horizon 5xx/timeout yields 502 with a
+ * distinct error code; the raw upstream body is logged server-side only.
  */
 export async function GET(req: NextRequest) {
   if (!takeToken(clientIp(req))) {
@@ -36,14 +39,16 @@ export async function GET(req: NextRequest) {
   const horizon = HORIZON_BY_NETWORK[network] ?? "https://horizon-testnet.stellar.org";
 
   try {
-    const res = await fetch(`${horizon}/accounts/${address}`, {
-      signal: AbortSignal.timeout(5_000),
-      cache: "no-store",
-    });
-    if (res.status === 404) return NextResponse.json({ funded: false });
-    if (!res.ok) return NextResponse.json({ error: "unavailable" }, { status: 502 });
+    await fetchHorizonAccount(address, fetch, horizon);
     return NextResponse.json({ funded: true });
-  } catch {
-    return NextResponse.json({ error: "unavailable" }, { status: 502 });
+  } catch (error) {
+    if (error instanceof HorizonError) {
+      if (error.status === 404) return NextResponse.json({ funded: false });
+      // Raw upstream body stays server-side only.
+      secureLogger.error("Horizon account lookup failed", { status: error.status, body: error.body });
+      return NextResponse.json({ error: "horizon-error" }, { status: 502 });
+    }
+    secureLogger.error("Horizon account lookup unavailable", { error: String(error) });
+    return NextResponse.json({ error: "horizon-unavailable" }, { status: 502 });
   }
 }

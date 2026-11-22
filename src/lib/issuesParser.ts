@@ -13,6 +13,8 @@ export type WaveIssue = {
   goodFirstIssue: boolean;
   /** Optional GitHub handle (no leading `@`) from `Mentor: handle` in issues.md. */
   mentor: string | null;
+  /** Optional ISO completion date (`YYYY-MM-DD`) from `Completed: …` in issues.md. */
+  completedAt: string | null;
 };
 
 /**
@@ -46,6 +48,45 @@ export type ContributorTally = {
   contributor: string;
   completedCount: number;
   pointsEarned: number;
+  /** Points earned on issues with a `Completed:` date. */
+  datedPoints: number;
+  /** Number of completed issues carrying a `Completed:` date. */
+  datedCount: number;
+  /** Earliest `Completed:` date across this contributor's issues, if any. */
+  firstCompletedAt: string | null;
+  /** Latest `Completed:` date across this contributor's issues, if any. */
+  lastCompletedAt: string | null;
+  /**
+   * Points per week over the contributor's dated completion span (at least one
+   * week). `null` when the contributor has no dated completions.
+   */
+  velocity: number | null;
+};
+
+/** Per-contributor tally for one category, computed from that contributor's issues. */
+export type ContributorCategoryBreakdown = {
+  category: string;
+  completedCount: number;
+  pointsEarned: number;
+};
+
+/** Per-contributor tally for one complexity tier. */
+export type ContributorComplexityBreakdown = {
+  complexity: ComplexityTier;
+  completedCount: number;
+  pointsEarned: number;
+};
+
+/**
+ * Contributor-scoped breakdown. `completedCount` and `pointsEarned` are the
+ * contributor's totals; the category/tier tallies sum to exactly those values.
+ */
+export type ContributorBreakdown = {
+  contributor: string;
+  completedCount: number;
+  pointsEarned: number;
+  categories: ContributorCategoryBreakdown[];
+  complexities: ContributorComplexityBreakdown[];
 };
 
 export type WaveMetrics = {
@@ -74,7 +115,40 @@ const STRKEY_RE = /^G[A-Z2-7]{55}$/;
 // The metadata block is the last parenthesised group with no nested parens,
 // so titles such as "Fix (urgent) parser" keep their own parentheses.
 const METADATA_RE = /^(.*?)\s*\(([^()]*)\)$/;
-const KNOWN_FIELDS = ["complexity", "points", "status", "contributor", "good first issue", "mentor"];
+const KNOWN_FIELDS = [
+  "complexity",
+  "points",
+  "status",
+  "contributor",
+  "good first issue",
+  "mentor",
+  "completed",
+];
+
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+/** Parses `YYYY-MM-DD` (or a full ISO timestamp) into epoch ms; `null` if invalid. */
+function parseCompletedDate(value: string): number | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const time = Date.UTC(Number(year), Number(month) - 1, Number(day));
+  const date = new Date(time);
+  if (
+    date.getUTCFullYear() !== Number(year) ||
+    date.getUTCMonth() !== Number(month) - 1 ||
+    date.getUTCDate() !== Number(day)
+  ) {
+    return null;
+  }
+  return time;
+}
+
+/** Points per week across the dated completion span, floored at one week. */
+export function computeVelocity(datedPoints: number, firstMs: number, lastMs: number): number {
+  const weeks = Math.max(1, (lastMs - firstMs) / MS_PER_WEEK);
+  return datedPoints / weeks;
+}
 
 function isTier(value: string | undefined): value is ComplexityTier {
   return value === "Trivial" || value === "Medium" || value === "High";
@@ -145,6 +219,17 @@ function parseEntry(body: string, category: string): EntryResult {
   const rawMentor = fields.get("mentor")?.replace(/^@/, "");
   const mentor = rawMentor && rawMentor !== "None" ? rawMentor : null;
 
+  let completedAt: string | null = null;
+  const declaredCompleted = fields.get("completed");
+  if (declaredCompleted !== undefined && declaredCompleted !== "None") {
+    const time = parseCompletedDate(declaredCompleted);
+    if (time === null) {
+      problems.push(`Completed must be a YYYY-MM-DD date, got "${declaredCompleted}"`);
+    } else {
+      completedAt = new Date(time).toISOString().slice(0, 10);
+    }
+  }
+
   return {
     issue: {
       id,
@@ -156,8 +241,54 @@ function parseEntry(body: string, category: string): EntryResult {
       contributor,
       goodFirstIssue: goodFirst?.toLowerCase() === "yes",
       mentor,
+      completedAt,
     },
     problems,
+  };
+}
+
+/**
+ * Computes a contributor-scoped breakdown from an already-filtered issue list.
+ * Only completed issues assigned to `contributor` are tallied, so the category
+ * and complexity tallies always sum to the returned totals.
+ */
+export function computeContributorBreakdown(
+  issues: readonly WaveIssue[],
+  contributor: string,
+): ContributorBreakdown {
+  const categoryMap: Record<string, ContributorCategoryBreakdown> = {};
+  const complexityMap: Record<ComplexityTier, ContributorComplexityBreakdown> = {
+    Trivial: { complexity: "Trivial", completedCount: 0, pointsEarned: 0 },
+    Medium: { complexity: "Medium", completedCount: 0, pointsEarned: 0 },
+    High: { complexity: "High", completedCount: 0, pointsEarned: 0 },
+  };
+  let completedCount = 0;
+  let pointsEarned = 0;
+
+  for (const issue of issues) {
+    if (issue.contributor !== contributor || issue.status !== "Completed") continue;
+
+    completedCount++;
+    pointsEarned += issue.points;
+
+    const cat = (categoryMap[issue.category] ??= {
+      category: issue.category,
+      completedCount: 0,
+      pointsEarned: 0,
+    });
+    cat.completedCount++;
+    cat.pointsEarned += issue.points;
+
+    complexityMap[issue.complexity].completedCount++;
+    complexityMap[issue.complexity].pointsEarned += issue.points;
+  }
+
+  return {
+    contributor,
+    completedCount,
+    pointsEarned,
+    categories: Object.values(categoryMap).sort((a, b) => b.pointsEarned - a.pointsEarned),
+    complexities: Object.values(complexityMap),
   };
 }
 

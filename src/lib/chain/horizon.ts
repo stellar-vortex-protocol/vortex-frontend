@@ -4,6 +4,60 @@ const HORIZON_URL = (process.env.NEXT_PUBLIC_HORIZON_URL ?? "https://horizon-tes
 
 export type TrustlineState = "exists" | "missing" | "unknown";
 
+/** Horizon answered with a non-2xx status. Carries the upstream status and raw body. */
+export class HorizonError extends Error {
+  readonly status: number;
+  readonly body: string;
+  constructor(status: number, body: string) {
+    super(`Horizon responded ${status}`);
+    this.name = "HorizonError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+/** Horizon could not be reached or timed out (no HTTP response). */
+export class HorizonUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("Horizon request failed");
+    this.name = "HorizonUnavailableError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Fetches a Horizon account. Resolves with the parsed account on 2xx, throws
+ * `HorizonError` (carrying the upstream status and raw body) on non-2xx, and
+ * `HorizonUnavailableError` on network failure or timeout.
+ */
+export async function fetchHorizonAccount(
+  address: string,
+  fetchImpl: typeof fetch = fetch,
+  horizonUrl: string = HORIZON_URL,
+): Promise<unknown> {
+  let response: Response;
+  try {
+    response = await fetchImpl(`${horizonUrl.replace(/\/$/, "")}/accounts/${encodeURIComponent(address)}`, {
+      signal: AbortSignal.timeout(5_000),
+      cache: "no-store",
+    });
+  } catch (error) {
+    throw new HorizonUnavailableError(error);
+  }
+  if (!response.ok) {
+    let body = "";
+    try {
+      body = await response.text();
+    } catch {
+      body = "";
+    }
+    throw new HorizonError(response.status, body);
+  }
+  return response.json();
+}
+
+export type TrustlineState = "exists" | "missing" | "unknown";
+
 export async function getTrustline(address: string, asset: Token, fetchImpl: typeof fetch = fetch): Promise<TrustlineState> {
   if (asset.symbol === "XLM" || asset.contract === "native") return "exists";
   try {
