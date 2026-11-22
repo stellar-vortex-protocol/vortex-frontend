@@ -46,25 +46,49 @@ interface WorkerScope {
 
 let aggregator: AnalyticsAggregator | null = null;
 
+/**
+ * Serialises the dataset once per message batch. A batch is the set of charts
+ * (snapshot requests) that share the same `id`; the serialised payload is
+ * cached and reused for every chart in that batch instead of being rebuilt
+ * per chart. The cache is keyed by request id and invalidated whenever the
+ * underlying aggregator changes (init/apply).
+ */
+let serialisedBatch: { id: number; snapshot: AnalyticsSnapshot } | null = null;
+
+function invalidateBatch(): void {
+  serialisedBatch = null;
+}
+
+function serialiseSnapshot(id: number): AnalyticsSnapshot {
+  if (serialisedBatch && serialisedBatch.id === id) {
+    return serialisedBatch.snapshot;
+  }
+  if (!aggregator) {
+    aggregator = new AnalyticsAggregator();
+  }
+  const snapshot = aggregator.snapshot();
+  serialisedBatch = { id, snapshot };
+  return snapshot;
+}
+
 function handle(request: AnalyticsWorkerRequest): AnalyticsSnapshot {
   switch (request.type) {
     case 'init': {
       aggregator = new AnalyticsAggregator(request.options);
       aggregator.add(request.intents);
-      return aggregator.snapshot();
+      invalidateBatch();
+      return serialiseSnapshot(request.id);
     }
     case 'apply': {
       if (!aggregator) {
         aggregator = new AnalyticsAggregator();
       }
       aggregator.apply(request.delta);
-      return aggregator.snapshot();
+      invalidateBatch();
+      return serialiseSnapshot(request.id);
     }
     case 'snapshot': {
-      if (!aggregator) {
-        aggregator = new AnalyticsAggregator();
-      }
-      return aggregator.snapshot();
+      return serialiseSnapshot(request.id);
     }
     default: {
       // Exhaustiveness guard: unknown message types are rejected by the caller.
