@@ -594,6 +594,26 @@ function RouteFlowPanel({
   const [minVolumeThreshold, setMinVolumeThreshold] = useState(0);
   const [showTable, setShowTable] = useState(false);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const flowContainerRef = useRef<HTMLDivElement>(null);
+
+  const handlePngExport = useCallback(async () => {
+    const svgEl = flowContainerRef.current?.querySelector("svg");
+    if (!svgEl) {
+      secureLogger.warn("Sankey PNG export: no SVG element found in flow container");
+      return;
+    }
+    const isLight =
+      typeof document !== "undefined" &&
+      document.documentElement.dataset["theme"] === "light";
+    const bg = isLight ? "#ffffff" : "#0f1117";
+    try {
+      const blob = await svgToPng(svgEl as SVGSVGElement, { background: bg });
+      const today = new Date().toISOString().slice(0, 10);
+      downloadBlob(blob, `vortex-route-flow-${today}.png`);
+    } catch (err) {
+      secureLogger.error("Sankey PNG export failed", err);
+    }
+  }, []);
 
   const { nodes, links, totalValue } = sankeyData;
 
