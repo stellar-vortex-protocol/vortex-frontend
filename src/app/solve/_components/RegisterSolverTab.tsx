@@ -55,9 +55,9 @@ export function RegisterSolverTab() {
       registration.reset();
       return;
     }
-    form.markSubmitted();
-    if (!form.isValid || networkMismatch) return;
-    await registration.register(form.address, Number(form.bond));
+    const result = await form.submit();
+    if (!result.ok || networkMismatch) return;
+    await registration.register(result.address, Number(result.bond));
   };
 
   return (

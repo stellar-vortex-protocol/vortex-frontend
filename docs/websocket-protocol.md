@@ -165,10 +165,10 @@ link it here and keep the frontend types in sync. The frontend contract is the s
 The solver open-intents board (`useOpenIntentBoard`) listens on the same `NEXT_PUBLIC_WS_URL` socket for two additional message types; all other messages are ignored by it (and these are ignored by the feed consumers).
 
 ```ts
-{ type: "intent.open";   intent: OpenIntent; serverTime?: string } // new or updated open intent
-{ type: "intent.closed"; id: string;         serverTime?: string } // accepted, cancelled or expired
+{ type: "intent.open";   intent: OpenIntent; serverTime?: string }
+{ type: "intent.closed"; id: string;       serverTime?: string }
 ```
 
-- Events are applied on top of the latest `/intents/open` REST snapshot; a fresh snapshot supersedes earlier events.
-- `serverTime` (ISO 8601), when present, is used to compute a server clock offset so deadline countdowns tolerate local clock drift.
-- If the relay does not emit these events the board still works from the 5 s REST poll.
+These are server-to-client broadcasts only. The client does not send any
+WebSocket messages — it never publishes intents, subscriptions, or acks over
+the socket; all client-initiated actions go through the REST API.
