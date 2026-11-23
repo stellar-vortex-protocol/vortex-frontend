@@ -105,3 +105,36 @@ shared helper in `src/lib/chain/`).
 
 A missing or malformed `address` is rejected with `400` and an error body instead of returning a
 `200` with an empty verdict.
+
+## Account-status endpoint response shape
+
+`GET /api/account-status` (`src/app/api/account-status/route.ts`) returns the current status of a
+Stellar account. The response body is a JSON object with the following fields:
+
+| Field     | Type      | Description                                                       |
+| --------- | --------- | ----------------------------------------------------------------- |
+| `address` | `string`  | The Stellar account address that was queried.                     |
+| `funded`  | `boolean` | Whether the account exists on-chain (has been funded).            |
+| `balance` | `string`  | Account balance as a decimal string; `"0"` when not funded.       |
+
+Example response for a funded account:
+
+```json
+{
+  "address": "G...",
+  "funded": true,
+  "balance": "100.0000000"
+}
+```
+
+Example response for an account that has not been funded:
+
+```json
+{
+  "address": "G...",
+  "funded": false,
+  "balance": "0"
+}
+```
+
+Balances are decimal strings, never numbers, consistent with the amount rule above.
