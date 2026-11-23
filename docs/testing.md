@@ -13,6 +13,31 @@ discover, and `npm run check:docs` validates documented source paths.
 - **Config:** `vitest.setup.ts` imports `@testing-library/jest-dom/vitest`
 - **Path alias:** `@` resolves to `src/`
 
+## Configuration Files
+
+| File | Purpose |
+| --- | --- |
+| `vitest.config.ts` | Vitest runner config: jsdom environment, `@` alias, coverage floors |
+| `vitest.setup.ts` | Global test setup: `@testing-library/jest-dom/vitest`, MSW server lifecycle |
+| `playwright.config.ts` | End-to-end browser tests under `e2e/` |
+| `playwright.config.storybook.ts` | Storybook component tests (see [Visual Testing](./visual-testing.md)) |
+
+## Commands
+
+| Command | What it runs |
+| --- | --- |
+| `npm test` | `vitest run` — full unit/integration suite |
+| `npm run test:watch` | `vitest` in watch mode |
+| `npm run test:coverage` | `vitest run --coverage` |
+| `npm run test:e2e` | Playwright end-to-end suite (`playwright.config.ts`) |
+| `npm run test:storybook` | Playwright Storybook suite (`playwright.config.storybook.ts`) |
+| `npm run check:orphan-tests` | Fails on test-like files Vitest will not discover |
+| `npm run check:docs` | Validates documented source paths |
+
+For visual regression and Storybook Playwright details, see
+[Visual Testing](./visual-testing.md). For link validation, see
+[Link Checking](./link-checking.md).
+
 ## File Layout
 
 Test files live next to the source they exercise:
@@ -227,173 +252,6 @@ serve the browser (`npm run dev:mock`), Vitest (`src/mocks/server.ts`, started b
 `vitest.setup.ts`) and Playwright (`getResponse` in `e2e/swap-happy-path.spec.ts`).
 
 - **Handlers:** `src/mocks/handlers.ts` (`createHandlers(scenario)`)
-- **Fixtures:** `src/mocks/fixtures.ts` — seeded generators (`createRng`, `createFeed`, `createQuote`, `createSolver`) and the in-memory `MockDb`
-- **Scenarios:** `src/mocks/scenarios.ts`
-- **Browser:** `src/mocks/browser.ts` + `MockApiGate` (wired in `src/app/layout.tsx`, inert unless `NEXT_PUBLIC_MOCK_API=1` outside production)
+- **Fixtures
 
-### Scenario catalogue
-
-Select in the browser with `?mock=<name>` on `npm run dev:mock`.
-
-| Scenario  | Feed rows | Latency | Behaviour                          |
-| --------- | --------- | ------- | ---------------------------------- |
-| `default` | 12        | none    | Normal responses                   |
-| `empty`   | 0         | none    | Empty lists                        |
-| `error`   | 0         | none    | Every mocked request returns 500   |
-| `slow`    | 12        | 2 s     | Normal responses after a delay     |
-| `large`   | 5,000     | none    | Large feed for virtual-list checks |
-
-### Stateful behaviour
-
-- `POST /intents` adds the intent to `GET /intents` and to the top of `GET /intents/feed`.
-- `POST /intents/:id/submit` moves the intent to `pending`.
-- Unknown intent IDs return 404.
-
-### Limits
-
-- The mock WebSocket server is not implemented yet; live-update UI will not receive pushed transitions in `dev:mock`.
-- Fixtures are not yet validated against the runtime schemas in `src/lib/schemas.ts`.
-- Storybook is not wired to MSW yet.
-
-## Mutation Testing
-
-Line coverage does not show whether tests would catch a bug. [Stryker](https://stryker-mutator.io/)
-(v9, `@stryker-mutator/vitest-runner`) injects small faults (e.g. `>=` → `>`) into the
-pure libraries under `src/lib/**` and checks that some test fails for each one.
-Configuration lives in `stryker.config.mjs`.
-
-- **Scope:** `src/lib/**/*.{ts,tsx}`, excluding `*.test.*`, `*.fuzz.test.*`, `*.d.ts`
-  and `src/lib/i18n/messages/**`. React components are out of scope.
-- **Coverage analysis:** `perTest`, so each mutant only runs the tests that reach it.
-- **Thresholds:** Stryker fails the run below `break: 75`. The PR check also fails if a
-  changed file is below its floor: 85% for `csv`, `xdrReview`, `textSafety` and `decimal`,
-  75% otherwise (see `scripts/mutation-summary.mjs`).
-- **Timeouts:** `timeoutMS: 10000` with `timeoutFactor: 3`, so slow runners are not
-  counted as "timeout" kills.
-
-### Running locally
-
-```bash
-# Full run over all of src/lib (nightly CI uses this)
-npm run test:mutation
-
-# Incremental run; reuses reports/stryker-incremental.json (PR CI uses this)
-npm run test:mutation:incremental
-
-# A single file: pass the module with --mutate (the test file is found via perTest coverage)
-npx stryker run --mutate src/lib/csv.ts
-```
-
-The HTML report is written to `reports/mutation/index.html`; the JSON report used by the
-PR summary is `reports/mutation/mutation.json`. Both directories are git-ignored.
-
-To print the PR summary locally against a base branch:
-
-```bash
-npm run check:mutation-summary -- origin/main
-```
-
-### CI
-
-- **Pull requests:** incremental run restoring `reports/stryker-incremental.json` from
-  `actions/cache`. The changed-file score table is posted as a PR comment. Target: under
-  5 minutes.
-- **Nightly (`cron: "0 3 * * *"`):** full run, uploaded as the `mutation-report` artifact.
-
-### Triaging surviving mutants
-
-1. Open the HTML report and filter to *Survived* or *NoCoverage* mutants.
-2. If a test should have caught the mutant, add an assertion that fails under it.
-   Prefer explicit assertions to snapshots: a snapshot can hide the change.
-3. If the mutant is equivalent (it cannot change observable behaviour), suppress it on
-   that line with a justification:
-
-   ```ts
-   // Stryker disable next-line EqualityOperator: `<=` and `<` are identical for integers here
-   ```
-
-   Never suppress a mutant only because it is hard to kill.
-
-### Writing mutation-resistant tests
-
-- Inject clocks and random sources instead of calling `Date.now()` or `Math.random()`
-  inside the unit under test, so boundary tests can pin the value.
-- Test both sides of every comparison at the boundary (`=`, `-1`, `+1`).
-- Assert the exact value returned, not only that it is truthy or non-empty.
-
-### Baseline
-
-Baseline scores are recorded here once the first full nightly run completes. Ratchet
-`break` upward in `stryker.config.mjs` as the scores improve.
-
-## Explore virtual list (#444)
-
-`src/components/VirtualList.tsx` is a reusable windowed list (single-column
-`role="grid"` with `aria-rowcount`/`aria-rowindex` and `aria-activedescendant`).
-Rows are measured with TanStack Virtual's `measureElement`, so wrapped chips and
-long solver names never clip.
-
-- **Keyboard:** Up/Down/Home/End/PageUp/PageDown move the active row, Enter opens
-  the intent, and `/` focuses the search box from anywhere on `/explore`.
-- **Scroll restoration:** scroll offset + active row are saved to
-  `sessionStorage` under `vortex-vlist:explore?<query>` (filters live in the URL)
-  and restored on back navigation. Restoration is skipped if the first row
-  changed or the row count moved by more than 20%.
-- **Prepends:** when new intents stream in above the viewport the scroll offset
-  is shifted so the visible row stays anchored.
-- Pure helpers (`nextActiveIndex`, `isRestorable`) are unit-tested in
-  `src/components/VirtualList.test.ts`.
-
-### Performance measurement method
-
-1. `npm run build && npm start`, open `/explore` with a relay (or mocked
-   `useLiveIntents`) returning 5,000 intents.
-2. Chrome DevTools → Performance → CPU 4× slowdown ("mid-range laptop" profile).
-3. Record while scrolling the list top→bottom with the mouse wheel for ~10 s.
-4. Read the FPS track / frames summary; the budget is ≥ 55 fps average with no
-   long tasks > 50 ms during scroll.
-
-## End-to-End Tests (Playwright)
-
-Specs live in `e2e/*.spec.ts`. `playwright.config.ts` runs each spec under three
-projects (`chromium`, `firefox`, `webkit`), serves the production build on
-`:3000` unless `BASE_URL` is set, and enables traces on the first retry.
-
-- `npm run test:e2e` runs the full suite; `npx playwright test --project=chromium`
-  runs one browser. Pull requests run Chromium only; `main` and nightly runs use
-  the full matrix (`.github/workflows/ci.yml`).
-- Selectors use roles, labels and visible text (`getByRole`, `getByPlaceholder`),
-  not CSS selectors.
-
-### Shared fixtures
-
-- **`e2e/fixtures/wallet.ts`** — `mockFreighter(page, overrides?)` replaces the
-  Freighter extension bridge (`window.postMessage`) with a stub. Options:
-  `publicKey`, `network` (`"TESTNET"` / `"PUBLIC"`), and `signing`
-  (`"approve"` / `"reject"` / `"timeout"`). Call `setFreighterState(page, patch)`
-  to switch account, network or signing outcome mid-test. State resets on every
-  navigation because the init script re-runs.
-- **`e2e/fixtures/api.ts`** — `mockBackend(page)` stubs the API on
-  `http://localhost:4000` for the swap flow. Add `page.route` calls after it to
-  override a single response.
-
-### Coverage matrix (journey × browser)
-
-✅ = spec exists and is scheduled in CI for that project. "Planned" = journey is
-in the scope of #515 but no spec exists yet. Nothing in this table has been run
-through the 10× flake check yet.
-
-| Journey | Spec | Chromium | Firefox | WebKit |
-| --- | --- | --- | --- | --- |
-| Command palette: open with shortcut, filter, navigate | `e2e/command-palette.spec.ts` | ✅ | ✅ | ✅ |
-| Swap happy path: connect, quote, submit | `e2e/swap-happy-path.spec.ts` | ✅ | ✅ | ✅ |
-| Contributors page renders with no CSP violations | `e2e/contributors-csp.spec.ts` | ✅ | ✅ | ✅ |
-| Preview smoke: `/`, `/markets`, `/portfolio` | `e2e/smoke/preview-smoke.spec.ts` | ✅ | ✅ | ✅ |
-| Solver registration wizard (happy + unhappy) | planned | — | — | — |
-| Accept intent, including conflict | planned | — | — | — |
-| Explore: filters, search, URL restoration, virtual list keyboard nav | planned | — | — | — |
-| My Intents: connect gating, export | planned | — | — | — |
-| Governance: browse and vote (mocked) | planned | — | — | — |
-| Offline banner and recovery | planned | — | — | — |
-| Network mismatch blocking | planned | — | — | — |
-| Locale switch persistence | planned | — | — | — |
+/* … truncated 8122 chars — edit only what you need near the top … */
