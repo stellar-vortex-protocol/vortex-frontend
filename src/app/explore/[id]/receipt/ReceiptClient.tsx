@@ -43,10 +43,20 @@ export default function ReceiptClient({ id }: { id: string }) {
               <Link href={swapAgainHref(intent)} className={buttonClass}>
                 {t("receipt.swapAgain")}
               </Link>
-              <button type="button" className={buttonClass} onClick={() => void copy(receiptToText(receipt))}>
+              <button
+                type="button"
+                className={buttonClass}
+                aria-label={copied ? t("receipt.copied") : t("receipt.copy")}
+                onClick={() => void copy(receiptToText(receipt))}
+              >
                 {copied ? t("receipt.copied") : t("receipt.copy")}
               </button>
-              <button type="button" className={buttonClass} onClick={() => window.print()}>
+              <button
+                type="button"
+                className={buttonClass}
+                aria-label={t("receipt.print")}
+                onClick={() => window.print()}
+              >
                 {t("receipt.print")}
               </button>
             </div>

@@ -34,7 +34,12 @@ export function sortSolvers(solvers: Solver[], field: SortField, direction: Sort
   });
 }
 
-export function LeaderboardTab() {
+type LeaderboardTabProps = {
+  id?: string;
+  labelledBy?: string;
+};
+
+export function LeaderboardTab({ id, labelledBy }: LeaderboardTabProps = {}) {
   const { t } = useTranslation();
   const { solvers, isLoading, error } = useSolvers();
   const [sortField, setSortField] = useState<SortField>("volume");
@@ -52,7 +57,13 @@ export function LeaderboardTab() {
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div
+      className="card overflow-hidden"
+      id={id}
+      role="tabpanel"
+      aria-labelledby={labelledBy}
+      tabIndex={0}
+    >
       <div className="px-3 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold text-vx-text">{t("solve.leaderboard.title")}</span>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("solve.leaderboard.sortLabel")}>

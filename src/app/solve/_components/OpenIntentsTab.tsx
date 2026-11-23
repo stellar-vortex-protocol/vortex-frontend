@@ -12,7 +12,13 @@ export function OpenIntentsTab() {
   const { accept, acceptingId, error: acceptError } = useAcceptIntent();
 
   return (
-    <div className="space-y-4">
+    <div
+      role="tabpanel"
+      id="solve-panel-intents"
+      aria-labelledby="solve-tab-intents"
+      tabIndex={0}
+      className="space-y-4"
+    >
       <div className="px-5 py-3.5 border-b border-vx-border bg-vx-surface/30 flex items-center justify-between">
         <span className="text-sm font-semibold text-vx-text">{t("solve.intents.title")}</span>
         <span className="chip bg-vx-sage-bg text-vx-sage text-[10px]">

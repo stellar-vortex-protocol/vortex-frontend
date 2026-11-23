@@ -156,10 +156,7 @@ export default async function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:px-3 focus:py-2 focus:rounded-lg focus:bg-vx-card focus:text-vx-text focus:border focus:border-vx-sage/40"
-        >
+        <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
         <I18nProvider locale={locale}>
@@ -167,7 +164,9 @@ export default async function RootLayout({
             <GlobalErrorCapture />
             <WalletHydrator />
             <IntentStatusWatcher />
-            {children}
+            <main id="main-content" tabIndex={-1}>
+              {children}
+            </main>
             <CommandPalette />
             <ToastViewport />
             <ConnectivityBanner />
