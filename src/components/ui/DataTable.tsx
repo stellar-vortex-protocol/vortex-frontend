@@ -29,6 +29,9 @@ import React, {
  *  - Focus is tracked by row key so it survives live data updates and
  *    virtualised scrolling; if the focused row disappears, focus moves to the
  *    nearest surviving row.
+ *
+ * Sortable headers render as native <button>s so they are reachable by Tab and
+ * toggle on Enter/Space; the active column exposes `aria-sort`.
  */
 
 export type SortDirection = 'asc' | 'desc';
@@ -262,14 +265,34 @@ const alignClass: Record<NonNullable<ColumnDef<unknown>['align']>, string> = {
   end: 'text-end',
 };
 
+function nextSortDirection(
+  current: { columnId: string; direction: SortDirection } | null | undefined,
+  columnId: string,
+): SortDirection {
+  if (current && current.columnId === columnId) {
+    return current.direction === 'asc' ? 'desc' : 'asc';
+  }
+  return 'asc';
+}
+
+function ariaSortFor(
+  sort: { columnId: string; direction: SortDirection } | null | undefined,
+  columnId: string,
+): 'ascending' | 'descending' | 'none' {
+  if (!sort || sort.columnId !== columnId) return 'none';
+  return sort.direction === 'asc' ? 'ascending' : 'descending';
+}
+
 export function DataTable<T>({
   columns,
   rows,
   getRowKey,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
   selectable = false,
   selectedKeys,
   onSelectionChange,
-  sort = null,
+  sort,
   onSortChange,
   rowCount,
   rowStartIndex = 0,
@@ -277,38 +300,37 @@ export function DataTable<T>({
   mobileBreakpoint = 640,
   className,
   caption,
-  ...aria
 }: DataTableProps<T>) {
   const isRTL = useIsRTL();
   const isMobile = useIsMobile(mobileBreakpoint);
   const captionId = useId();
 
-  const totalRows = rowCount ?? rows.length;
-  const hasInteractiveCells = useMemo(
-    () => columns.some((c) => Boolean(c.onActivate)),
-    [columns],
-  );
-  const role = selectable || hasInteractiveCells ? 'grid' : 'table';
-
   const visibleColumns = useMemo(() => {
     if (!isMobile) return columns;
-    const sorted = [...columns].sort(
-      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
-    );
-    // Keep at least the two highest-priority columns on mobile.
-    return sorted.slice(0, Math.max(2, Math.ceil(sorted.length / 2)));
+    return columns.filter((col) => (col.priority ?? 0) <= 1);
   }, [columns, isMobile]);
+
+  const totalRows = rowCount ?? rows.length;
+  const hasInteractiveCells = visibleColumns.some((col) => col.onActivate);
+  const role = selectable || hasInteractiveCells ? 'grid' : 'table';
+
+  const handleSort = useCallback(
+    (columnId: string) => {
+      if (!onSortChange) return;
+      onSortChange({ columnId, direction: nextSortDirection(sort, columnId) });
+    },
+    [onSortChange, sort],
+  );
 
   const handleActivate = useCallback(
     (rowIndex: number, colIndex: number) => {
-      const row = rows[rowIndex];
-      if (!row) return;
       const column = visibleColumns[colIndex];
-      if (column?.onActivate) {
+      if (!column) return;
+      const row = rows[rowIndex];
+      if (row === undefined) return;
+      if (column.onActivate) {
         column.onActivate(row, rowIndex);
-        return;
-      }
-      if (selectable && onSelectionChange) {
+      } else if (selectable && onSelectionChange) {
         const key = getRowKey(row, rowIndex);
         const next = new Set(selectedKeys ?? []);
         if (next.has(key)) next.delete(key);
@@ -316,7 +338,7 @@ export function DataTable<T>({
         onSelectionChange(next);
       }
     },
-    [rows, visibleColumns, selectable, onSelectionChange, selectedKeys, getRowKey],
+    [visibleColumns, rows, selectable, onSelectionChange, selectedKeys, getRowKey],
   );
 
   const nav = useGridNavigation({
@@ -326,167 +348,109 @@ export function DataTable<T>({
     onActivate: handleActivate,
   });
 
-  const handleSort = useCallback(
-    (columnId: string) => {
-      if (!onSortChange) return;
-      if (!sort || sort.columnId !== columnId) {
-        onSortChange({ columnId, direction: 'asc' });
-      } else if (sort.direction === 'asc') {
-        onSortChange({ columnId, direction: 'desc' });
-      } else {
-        onSortChange(null);
-      }
-    },
-    [onSortChange, sort],
-  );
-
-  const ariaSortFor = (columnId: string): 'ascending' | 'descending' | 'none' => {
-    if (!sort || sort.columnId !== columnId) return 'none';
-    return sort.direction === 'asc' ? 'ascending' : 'descending';
-  };
-
-  const labelledBy = aria['aria-labelledby'] ?? (caption ? captionId : undefined);
-
-  if (isMobile) {
-    return (
-      <div
-        className={className}
-        role="table"
-        aria-label={aria['aria-label']}
-        aria-labelledby={labelledBy}
-        aria-rowcount={totalRows}
-        aria-colcount={visibleColumns.length}
-      >
-        {caption ? (
-          <div id={captionId} className="sr-only">
-            {caption}
-          </div>
-        ) : null}
-        <div role="rowgroup">
-          {rows.map((row, rowIndex) => {
-            const rowKey = getRowKey(row, rowIndex);
-            const selected = selectedKeys?.has(rowKey) ?? false;
-            return (
-              <div
-                key={rowKey}
-                role="row"
-                aria-rowindex={rowStartIndex + rowIndex + 1}
-                aria-selected={selectable ? selected : undefined}
-                className="mb-3 rounded-lg border border-border bg-card p-3"
-              >
-                {visibleColumns.map((column, colIndex) => (
-                  <div
-                    key={column.id}
-                    role="cell"
-                    aria-colindex={colIndex + 1}
-                    className="flex items-center justify-between gap-2 py-1"
-                  >
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {column.header}
-                    </span>
-                    <span className={alignClass[column.align ?? 'start']}>
-                      {column.accessor(row, rowIndex)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
+  const labelledBy = ariaLabelledBy ?? (caption ? captionId : undefined);
 
   return (
     <GridNavContext.Provider value={nav}>
-      <table
-        role={role}
-        aria-label={aria['aria-label']}
-        aria-labelledby={labelledBy}
-        aria-rowcount={totalRows}
-        aria-colcount={visibleColumns.length}
-        className={className}
-        onKeyDown={nav.onKeyDown}
-      >
-        {caption ? <caption id={captionId}>{caption}</caption> : null}
-        <thead className="sticky top-0 z-10 bg-card">
-          <tr role="row" aria-rowindex={1}>
-            {visibleColumns.map((column, colIndex) => {
-              const sortable = column.sortable && onSortChange;
-              return (
-                <th
+      <div className={className}>
+        <table
+          role={role}
+          aria-label={ariaLabel}
+          aria-labelledby={labelledBy}
+          aria-rowcount={totalRows}
+          className="w-full border-collapse text-sm"
+        >
+          {caption ? (
+            <caption id={captionId} className="sr-only">
+              {caption}
+            </caption>
+          ) : null}
+          <thead>
+            <tr role="row">
+              {visibleColumns.map((column) => {
+                const sortable = Boolean(column.sortable && onSortChange);
+                const ariaSort = sortable ? ariaSortFor(sort, column.id) : undefined;
+                return (
+                  <th
+                    key={column.id}
+                    role="columnheader"
+                    scope="col"
+                    aria-sort={ariaSort}
+                    className={[
+                      'border-b border-neutral-200 px-3 py-2 font-medium text-neutral-700',
+                      alignClass[column.align ?? 'start'],
+                      column.className,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    {sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(column.id)}
+                        className="inline-flex items-center gap-1 rounded-sm font-medium text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+                      >
+                        <span>{column.header}</span>
+                        <span aria-hidden="true" className="text-xs text-neutral-500">
+                          {ariaSort === 'ascending' ? '\u25B2' : ariaSort === 'descending' ? '\u25BC' : '\u2195'}
+                        </span>
+                      </button>
+                    ) : (
+                      column.header
+                    )}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => {
+              const rowKey = getRowKey(row, rowIndex);
+              const selected = selectable && selectedKeys?.has(rowKey);
+              const cells = visibleColumns.map((column, colIndex) => (
+                <td
                   key={column.id}
-                  role="columnheader"
-                  scope="col"
-                  aria-colindex={colIndex + 1}
-                  aria-sort={column.sortable ? ariaSortFor(column.id) : undefined}
-                  className={`px-3 py-2 text-sm font-semibold ${alignClass[column.align ?? 'start']} ${column.className ?? ''}`}
+                  role="gridcell"
+                  tabIndex={nav.tabIndexFor(rowIndex, colIndex)}
+                  ref={nav.cellRef(rowIndex, colIndex)}
+                  onKeyDown={nav.onKeyDown}
+                  onFocus={() => nav.setActive(rowIndex, colIndex)}
+                  aria-selected={selectable ? Boolean(selected) : undefined}
+                  className={[
+                    'border-b border-neutral-100 px-3 py-2',
+                    alignClass[column.align ?? 'start'],
+                    column.className,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                 >
-                  {sortable ? (
-                    <button
-                      type="button"
-                      onClick={() => handleSort(column.id)}
-                      className="inline-flex items-center gap-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                    >
-                      {column.header}
-                      <span aria-hidden="true">
-                        {ariaSortFor(column.id) === 'ascending'
-                          ? '\u25B2'
-                          : ariaSortFor(column.id) === 'descending'
-                            ? '\u25BC'
-                            : '\u21C5'}
-                      </span>
-                    </button>
-                  ) : (
-                    column.header
-                  )}
-                </th>
+                  {column.accessor(row, rowIndex)}
+                </td>
+              ));
+              const rowProps: React.HTMLAttributes<HTMLTableRowElement> = {
+                role: 'row',
+                'aria-rowindex': rowStartIndex + rowIndex + 1,
+                'aria-selected': selectable ? Boolean(selected) : undefined,
+                className: selected ? 'bg-blue-50' : undefined,
+              };
+              if (renderRow) {
+                return (
+                  <React.Fragment key={rowKey}>
+                    {renderRow({ row, rowIndex, rowKey, cells, props: rowProps })}
+                  </React.Fragment>
+                );
+              }
+              return (
+                <tr key={rowKey} {...rowProps}>
+                  {cells}
+                </tr>
               );
             })}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => {
-            const rowKey = getRowKey(row, rowIndex);
-            const selected = selectedKeys?.has(rowKey) ?? false;
-            const cells = visibleColumns.map((column, colIndex) => (
-              <td
-                key={column.id}
-                role="gridcell"
-                aria-colindex={colIndex + 1}
-                tabIndex={nav.tabIndexFor(rowIndex, colIndex)}
-                ref={nav.cellRef(rowIndex, colIndex)}
-                className={`px-3 py-2 text-sm ${alignClass[column.align ?? 'start']} ${column.className ?? ''}`}
-              >
-                {column.accessor(row, rowIndex)}
-              </td>
-            ));
-            const rowProps: React.HTMLAttributes<HTMLTableRowElement> = {
-              role: 'row',
-              'aria-rowindex': rowStartIndex + rowIndex + 1,
-              'aria-selected': selectable ? selected : undefined,
-            };
-            if (renderRow) {
-              return renderRow({ row, rowIndex, rowKey, cells, props: rowProps });
-            }
-            return (
-              <tr key={rowKey} {...rowProps}>
-                {cells}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </GridNavContext.Provider>
   );
-}
-
-export function useDataTableGrid(): GridNavApi {
-  const ctx = useContext(GridNavContext);
-  if (!ctx) {
-    throw new Error('useDataTableGrid must be used within a DataTable');
-  }
-  return ctx;
 }
 
 export default DataTable;
