@@ -27,6 +27,12 @@ const req = (domain: string | null, ip = "1.1.1.1") =>
     headers: { "x-forwarded-for": ip },
   });
 
+const addrReq = (address: string | null, ip = "1.1.1.1") =>
+  new NextRequest(
+    `http://localhost/api/verify-solver${address === null ? "" : `?address=${encodeURIComponent(address)}`}`,
+    { headers: { "x-forwarded-for": ip } },
+  );
+
 describe("GET /api/verify-solver", () => {
   beforeEach(() => {
     safeFetchMock.mockReset();
@@ -37,6 +43,28 @@ describe("GET /api/verify-solver", () => {
     const GET = await load();
     for (const d of [null, "127.0.0.1", "localhost", "evil.example/path"]) {
       expect((await GET(req(d))).status).toBe(400);
+    }
+    expect(safeFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing address with 400 and an error body", async () => {
+    const GET = await load();
+    const res = await GET(addrReq(null));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty("error");
+    expect(body).not.toHaveProperty("verdict");
+    expect(safeFetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed address with 400 and an error body", async () => {
+    const GET = await load();
+    for (const bad of ["", "not-an-address", "GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2", "0BRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H"]) {
+      const res = await GET(addrReq(bad));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body).toHaveProperty("error");
+      expect(body).not.toHaveProperty("verdict");
     }
     expect(safeFetchMock).not.toHaveBeenCalled();
   });
