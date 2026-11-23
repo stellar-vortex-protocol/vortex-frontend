@@ -30,7 +30,7 @@ No `vortex-backend` running? The app still builds and renders, but live data cal
 | `Node.js version mismatch` from the Husky hook | Node is not the version in `.nvmrc` | `nvm use` (or `fnm use` / `volta install node@20`), then retry |
 | `npm run build` fails with `must be ...` env errors | Invalid value in `.env.local` | Compare with `.env.example`; `npm run check:env` names the variable |
 | Commit rejected by `commit-msg` | Message is not Conventional Commits | Use `feat:`, `fix:`, `chore:` ... (`commitlint.config.js`) |
-| Hooks never run | `core.hooksPath` not set | `npm run prepare` |
+| Hooks never run | `core.hooksPath` not set | `npm run prepare` (it verifies `core.hooksPath` is `.husky` and exits non-zero with a hint if it cannot be set) |
 | `npm ci` fails on `package-lock.json` | Lockfile out of sync with `package.json` | `npm install`, then commit the updated lockfile |
 | `browserType.launch: Executable doesn't exist` in e2e | Playwright browsers not installed | `npx playwright install --with-deps chromium` |
 | `EADDRINUSE :3000` | Another dev server is running | Stop it, or `PORT=3001 npm run dev` |
