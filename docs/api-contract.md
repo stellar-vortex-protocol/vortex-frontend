@@ -72,6 +72,18 @@ string-enum schemas; `string` (with `format: date-time` and `pattern`), `number`
 throws with the schema path, so an unsupported change fails loudly instead of drifting silently.
 Paths are documented in the snapshot but are not generated.
 
+## Health route status codes
+
+`GET /api/health` (`src/app/api/health/route.ts`) reports the aggregate state of its dependency
+checks. The JSON body shape is unchanged; only the status code reflects the aggregate result.
+
+| Status | Meaning                                                                         |
+| ------ | ------------------------------------------------------------------------------- |
+| `200`  | Every dependency check passed.                                                  |
+| `503`  | At least one dependency check failed. The body names the failing dependency(s). |
+
+Uptime monitors should treat any non-`200` response as degraded.
+
 ## Frontend-only types
 
 Types that exist only in the frontend (view models, derived fields, UI state) stay in their own

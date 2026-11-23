@@ -1,22 +1,22 @@
-export const RECENT_INTENTS_KEY = "vortex-recent-intents";
-export const MAX_RECENT_INTENTS = 10;
+import { STORAGE_KEYS } from "@/lib/storage";
+import { storage } from "@/lib/storage";
+import { isRegisteredCommand } from "./registry";
 
-export function readRecentIntents(): string[] {
-  try {
-    const raw = window.localStorage.getItem(RECENT_INTENTS_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
-  } catch {
-    return [];
-  }
+const MAX_RECENTS = 8;
+
+function readRaw(): string[] {
+  const raw = storage.get<string[]>(STORAGE_KEYS.commandRecents);
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((id): id is string => typeof id === "string");
 }
 
-/** Records an intent view locally (most recent first, de-duplicated, capped). */
-export function pushRecentIntent(id: string): void {
-  try {
-    const next = [id, ...readRecentIntents().filter((v) => v !== id)].slice(0, MAX_RECENT_INTENTS);
-    window.localStorage.setItem(RECENT_INTENTS_KEY, JSON.stringify(next));
-  } catch {
-    // Storage unavailable (private mode) — recents are a convenience only.
-  }
+/** Returns recent command ids, dropping any that no longer exist in the registry. */
+export function getRecentCommandIds(): string[] {
+  return readRaw().filter((id) => isRegisteredCommand(id));
+}
+
+/** Records a command id as most-recently used. Persisted format is unchanged. */
+export function pushRecentCommandId(id: string): void {
+  const next = [id, ...readRaw().filter((existing) => existing !== id)].slice(0, MAX_RECENTS);
+  storage.set(STORAGE_KEYS.commandRecents, next);
 }

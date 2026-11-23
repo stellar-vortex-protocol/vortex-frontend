@@ -66,12 +66,25 @@ export function serializeTail(opts: ExportOptions): string {
   return opts.format === "csv" ? "" : "]}";
 }
 
+/**
+ * Serialise a full dataset in one string. An empty dataset yields an empty
+ * string so callers can distinguish "nothing matched" from a header-only file.
+ */
+export function serialize(items: readonly FeedItem[], opts: ExportOptions): string {
+  if (items.length === 0) return "";
+  return serializeHead(opts) + serializeChunk(items, opts, true) + serializeTail(opts);
+}
+
 /** Chunked generator: yields string parts so large exports become Blob parts, not one giant string. */
 export function* serializeParts(
   items: readonly FeedItem[],
   opts: ExportOptions,
   chunkSize = EXPORT_CHUNK_SIZE,
 ): Generator<{ part: string; done: number }> {
+  if (items.length === 0) {
+    yield { part: "", done: 0 };
+    return;
+  }
   yield { part: serializeHead(opts), done: 0 };
   for (let i = 0; i < items.length; i += chunkSize) {
     const chunk = items.slice(i, i + chunkSize);

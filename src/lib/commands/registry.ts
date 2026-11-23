@@ -51,3 +51,8 @@ export function registerCommand(command: CommandDefinition): () => void {
 export function useRegisterCommands(commands: CommandDefinition[]): void {
   useEffect(() => useCommandRegistry.getState().register(commands), [commands]);
 }
+
+/** Returns true when a command id currently resolves to a registered command. */
+export function isRegisteredCommand(id: string): boolean {
+  return Boolean(useCommandRegistry.getState().commands[id]);
+}
