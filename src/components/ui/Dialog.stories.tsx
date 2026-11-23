@@ -94,3 +94,23 @@ export const EscapeDisabled: Story = {
     });
   },
 };
+
+export const RestoresFocusToTrigger: Story = {
+  play: async ({ canvasElement, step }) => {
+    const canvas = within(canvasElement);
+    const user = userEvent.setup();
+    const trigger = canvas.getByRole("button", { name: "Open dialog" });
+
+    await step("open the dialog with the keyboard", async () => {
+      trigger.focus();
+      await user.keyboard("{Enter}");
+      await expect(canvas.getByRole("dialog", { name: "Confirm swap" })).toBeInTheDocument();
+    });
+
+    await step("close via the Close button and confirm focus returns to the trigger", async () => {
+      await user.click(within(canvas.getByRole("dialog")).getByRole("button", { name: "Close" }));
+      await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
+      await expect(trigger).toHaveFocus();
+    });
+  },
+};

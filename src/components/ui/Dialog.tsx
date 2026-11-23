@@ -251,8 +251,13 @@ export function Dialog({
         el.removeAttribute('aria-hidden');
       });
       const previous = previouslyFocusedRef.current;
+      previouslyFocusedRef.current = null;
       if (previous && document.contains(previous)) {
         previous.focus({ preventScroll: true });
+      } else {
+        // Trigger was removed from the DOM: fall back to body instead of
+        // leaving focus stranded on a detached node.
+        document.body.focus({ preventScroll: true });
       }
     };
   }, [open, initialFocusRef]);
@@ -273,22 +278,24 @@ export function Dialog({
       if (event.key !== 'Tab') return;
       const container = containerRef.current;
       if (!container) return;
+
       const focusable = getFocusable(container);
       if (focusable.length === 0) {
         event.preventDefault();
         container.focus({ preventScroll: true });
         return;
       }
+
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       const active = document.activeElement as HTMLElement | null;
 
       if (event.shiftKey) {
-        if (active === first || active === startSentinelRef.current || !container.contains(active)) {
+        if (active === first || !container.contains(active)) {
           event.preventDefault();
           last.focus({ preventScroll: true });
         }
-      } else if (active === last || active === endSentinelRef.current) {
+      } else if (active === last || !container.contains(active)) {
         event.preventDefault();
         first.focus({ preventScroll: true });
       }
@@ -305,8 +312,8 @@ export function Dialog({
     const onPointerDown = (event: PointerEvent) => {
       if (!stack.isTop(id)) return;
       const target = event.target as Node | null;
-      if (target && containerRef.current?.contains(target)) return;
-      event.stopPropagation();
+      if (!target) return;
+      if (containerRef.current?.contains(target)) return;
       handleOutsidePress();
     };
 
@@ -314,28 +321,29 @@ export function Dialog({
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [open, id, stack, handleOutsidePress]);
 
-  if (!open || !mounted) return null;
+  if (!mounted || !open) return null;
 
   return createPortal(
     <div
-      className={backdropClassName ?? 'fixed inset-0 z-50 flex items-center justify-center bg-black/50 motion-safe:animate-in motion-safe:fade-in'}
+      className={backdropClassName}
       data-dialog-backdrop=""
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) handleOutsidePress();
+      }}
     >
-      <span ref={startSentinelRef} tabIndex={0} aria-hidden="true" className="sr-only" />
+      <span ref={startSentinelRef} tabIndex={0} aria-hidden="true" />
       <div
         ref={containerRef}
         role="dialog"
         aria-modal="true"
         tabIndex={-1}
-        className={className ?? 'relative w-full max-w-lg rounded-lg bg-background p-6 shadow-lg outline-none'}
+        className={className}
         {...aria}
       >
         {children}
       </div>
-      <span ref={endSentinelRef} tabIndex={0} aria-hidden="true" className="sr-only" />
+      <span ref={endSentinelRef} tabIndex={0} aria-hidden="true" />
     </div>,
     document.body,
   );
 }
-
-export default Dialog;
