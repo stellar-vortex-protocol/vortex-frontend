@@ -7,6 +7,8 @@ the UI: a returning user just sees the wallet already connected, or sees the
 
 Relevant files: [`src/store/wallet.ts`](../src/store/wallet.ts) (`hydrate`) and
 [`src/components/WalletHydrator.tsx`](../src/components/WalletHydrator.tsx).
+For the adapter surface used below (`isConnected`, `isAllowed`, `getPublicKey`,
+`getNetwork`, `connect`), see [Wallet Adapters](./wallet-adapters.md).
 
 ## The flow
 
@@ -68,7 +70,9 @@ the only call that pops the Freighter approval UI. That call only happens in
 [`ConnectWalletButton`](../src/components/ConnectWalletButton.tsx)). Hydration is
 strictly a read of already-granted access — if the extension would need to
 prompt the user, hydration clears the session instead of prompting silently on
-page load.
+page load. This is the same contract the adapter documents in
+[Wallet Adapters → Reconnect vs. connect](./wallet-adapters.md#reconnect-vs-connect),
+and the behaviour exercised by `e2e/fixtures/wallet.ts`.
 
 ## Multi-tab reconciliation (#302)
 
@@ -143,39 +147,3 @@ invalid address) is ignored on rehydrate and the store starts disconnected.
 ## State transitions
 
 `EXPECTED` is `NEXT_PUBLIC_NETWORK` upper-cased (`TESTNET` when unset).
-Each row is covered by a test in [`src/store/wallet.test.ts`](../src/store/wallet.test.ts).
-
-| Action | Condition | Resulting state |
-|---|---|---|
-| `connect()` | Wallet unreachable / not installed | Disconnected; `notInstalled: true`, `errorKey: wallet.error.freighterUnavailable` |
-| `connect()` | User declines / wallet throws an `Error` | Disconnected; `error` = the wallet's message, `errorKey: null` |
-| `connect()` | Wallet throws a non-`Error` | Disconnected; `errorKey: wallet.error.connectFailed` |
-| `connect()` | Access granted | Connected; `address` and `lastKnownAddress` set; `networkMismatch` = network ≠ `EXPECTED` |
-| `disconnect()` | — | Disconnected; `wasSessionCleared: true`; `lastKnownAddress` kept |
-| `hydrate()` | Persisted `isConnected: false` | No-op; no wallet calls |
-| `hydrate()` | Wallet reachable and site allowed | Connected with the wallet's current address/network; `networkMismatch` recomputed |
-| `hydrate()` | Wallet locked or site access revoked | Disconnected; `wasSessionCleared: true`; `lastKnownAddress` = previous address |
-| `hydrate()` | Wallet call throws (extension removed/unreachable) | Same as above |
-| `hydrate()` | A user `connect()` started while waiting on the wallet | No change — the in-flight connect owns the state |
-| `checkForChanges()` | Connected; account or network changed in the wallet | `address`, `lastKnownAddress`, `network`, `networkMismatch` updated |
-| `checkForChanges()` | Wallet locked / unreachable | No change (a locked wallet isn't a revoked session) |
-| `syncFromStorage()` | Other tab's snapshot matches this tab | No-op |
-| `syncFromStorage()` | Other tab disconnected | Disconnected (trusted) |
-| `syncFromStorage()` | Other tab connected or switched account | Address adopted, then re-verified via `hydrate()` |
-| rehydrate | Persisted payload invalid | Ignored; store starts disconnected |
-
-`checkForChanges()` is polled by
-[`ConnectWalletButton`](../src/components/ConnectWalletButton.tsx) every 8 s while
-connected, and on window focus / tab visibility, because the extension doesn't
-push account or network changes.
-
-let state. A user-initiated disconnect is
-  authoritative and there's nothing to re-verify.
-- **Another tab connected or switched account** — the new address is adopted
-  optimistically and then `hydrate()` re-confirms it against the extension
-  (`isConnected` / `isAllowed` / `getPublicKey`), so a tab never trusts an
-  account it can't verify.
-
-The `storage` event never fires in the tab that made the change, so the
-originating tab keeps the correct state from its own `set()` and is unaffected.
-
