@@ -1,44 +1,42 @@
-# Persisted state
+# Persisted State
 
-Persisted Zustand slices (wallet session, saved views, and future preference
-slices) go through `createSyncedPersist` in `src/lib/persist.ts` instead of
-calling `persist` directly. It adds:
+This page explains how persisted state works in the app and how to store it safely.
 
-- **Versioning + migrations.** Each slice declares a `version` and an ordered
-  `migrations` array where `migrations[n]` upgrades a v`n` payload to v`n + 1`.
-- **Validation on rehydrate.** `validate` (for example `isValidPersistedState`
-  in `src/store/wallet.ts`) runs after migration and on every cross-tab payload.
-- **Safe reset.** A payload from an unknown (newer) version, one that fails
-  validation, or one that cannot be parsed is discarded. The store keeps its
-  initial state and `onReset` fires once so the UI can show a toast
-  (`persist.reset.toast`).
-- **Cross-tab sync.** Changes to the persisted slice are broadcast over
-  `BroadcastChannel` (`vortex-sync:<name>`), falling back to the `storage`
-  event. Messages carry the sender's tab id and schema version, so a tab never
-  re-applies its own write and ignores other versions. Changes applied from a
-  remote tab are never re-broadcast.
-- **Storage failures.** Disabled storage falls back to in-memory storage, and
-  quota errors on write are swallowed so the in-memory state stays usable.
-- **SSR.** Nothing touches `window` until the store runs in a browser.
+## Overview
 
-Draft content (`useLocalStorageDraft`) is intentionally **not** synced across
-tabs.
+Persisted state is any data that must survive a page reload or a new session — for example, the selected wallet, user preferences, or cached feature flags. Persisted values are written to browser storage and rehydrated on startup.
 
-## Changing a persisted shape
+## Storage facade and `STORAGE_KEYS`
 
-1. Update the persisted type and its `validate` function.
-2. Bump the slice's version constant (e.g. `WALLET_PERSIST_VERSION`).
-3. Append one migration step that turns the previous shape into the new one.
-   Never edit or reorder shipped steps: returning users may still hold any
-   older version.
-4. **Required:** add a migration test with a fixture of the previous shape to
-   `src/lib/persist.test.ts` (or the slice's own test). Also keep the
-   "one step per shipped version" assertion passing.
+Direct access to `localStorage` or `sessionStorage` is **lint-enforced** and will fail CI. All persisted state must go through the `storage` facade in [`src/lib/storage.ts`](../src/lib/storage.ts), and every key must be registered in `STORAGE_KEYS` in that same module.
 
-## Wallet specifics
+Why:
 
-`useWalletStore` routes remote snapshots through `syncFromStorage`: a
-disconnect in another tab is applied immediately (blocking submissions in
-this tab), and a changed account is adopted and then re-verified with the
-extension via `hydrate()`. Unrelated, non-persisted state such as an in-flight
-submission is never touched by sync.
+- Keys are centralized so they can be audited, versioned, and migrated.
+- The facade handles serialization, namespacing, and safe access (e.g. SSR / private-mode guards).
+- The lint rule in [`.eslintrc.json`](../.eslintrc.json) (`no-restricted-globals` / `no-restricted-properties`) rejects direct `localStorage` / `sessionStorage` calls with a message pointing back to the facade.
+
+### Correct pattern
+
+1. Register the key in `STORAGE_KEYS` in `src/lib/storage.ts` (do not duplicate the module here — see the file for the full list).
+2. Read and write through the `storage` facade.
+
+```ts
+import { STORAGE_KEYS, storage } from "@/lib/storage";
+
+// Write
+storage.set(STORAGE_KEYS.selectedWallet, walletId);
+
+// Read
+const walletId = storage.get<string>(STORAGE_KEYS.selectedWallet);
+```
+
+### What fails lint
+
+```ts
+// ❌ Rejected by the lint rule — use the storage facade instead.
+localStorage.setItem("selectedWallet", walletId);
+window.sessionStorage.getItem("selectedWallet");
+```
+
+If you need a new persisted value, add its key to `STORAGE_KEYS` in [`src/lib/storage.ts`](../src/lib/storage.ts) first, then use the facade. See that module for the exact API surface and existing keys.
