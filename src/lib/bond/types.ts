@@ -33,7 +33,7 @@ export type BuiltBondOperation = {
 export type BondAdapter = {
   /** False for the local mock, which has no real transaction to sign. */
   requiresSignature: boolean;
-  getBond: (address: string) => Promise<BondState>;
+  getBondState: (address: string) => Promise<BondState>;
   build: (address: string, kind: BondOperationKind, amount: string) => Promise<BuiltBondOperation>;
   submit: (address: string, operationId: string, signedXdr: string) => Promise<BondState>;
 };

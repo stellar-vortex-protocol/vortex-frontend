@@ -24,6 +24,18 @@ calling `persist` directly. It adds:
 Draft content (`useLocalStorageDraft`) is intentionally **not** synced across
 tabs.
 
+## Storage keys
+
+`STORAGE_KEYS` is the single source of truth for every persisted key. It is
+exported from `src/lib/storage-keys.ts`; both the storage facade
+(`src/lib/storage.ts`) and the lint rule that enforces key registration import
+it from there. Register a new key by adding it to that module — do not
+hard-code key strings elsewhere.
+
+```ts
+import { STORAGE_KEYS } from "@/lib/storage-keys";
+```
+
 ## Changing a persisted shape
 
 1. Update the persisted type and its `validate` function.
