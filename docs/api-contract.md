@@ -91,3 +91,17 @@ mirrors the `status` field in the JSON body so uptime monitors can rely on the s
 
 The JSON body shape is unchanged; consumers that parse `status` keep working, and monitors that
 only inspect the status code now see a non-2xx response whenever the service is not fully healthy.
+
+## Verify-solver endpoint status codes
+
+`GET /api/verify-solver` (`src/app/api/verify-solver/route.ts`) verifies a solver address. The
+`address` query parameter is required and must be a valid Stellar address (validated with the
+shared helper in `src/lib/chain/`).
+
+| Condition                                   | HTTP status | Body                                              |
+| ------------------------------------------- | ----------- | ------------------------------------------------- |
+| `address` present and valid                 | `200`       | Verification verdict.                             |
+| `address` missing or not a valid Stellar address | `400`  | `{ "error": "<message>" }`                        |
+
+A missing or malformed `address` is rejected with `400` and an error body instead of returning a
+`200` with an empty verdict.
