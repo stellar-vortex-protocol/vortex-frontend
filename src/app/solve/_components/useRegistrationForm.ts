@@ -20,6 +20,11 @@ type FormAction =
 
 const INITIAL: FormState = { address: "", bond: "", submitted: false };
 
+/** Discriminated result returned by `submit` so callers can tell success from failure. */
+export type RegistrationSubmitResult =
+  | { ok: true; address: string; bond: string }
+  | { ok: false; addressError: string | null; bondError: string | null };
+
 export function registrationReducer(state: FormState, action: FormAction): FormState {
   switch (action.type) {
     case "address":
@@ -75,6 +80,25 @@ export function useRegistrationForm() {
       ? t("solve.register.validation.minimumBond", { minBond: MIN_BOND_USDC })
       : null;
 
+  const markSubmitted = useCallback(() => dispatch({ type: "submit" }), []);
+
+  const submit = useCallback((): RegistrationSubmitResult => {
+    // Mark submitted so field-level errors surface in the UI, then report the outcome.
+    dispatch({ type: "submit" });
+    const validAddress = Boolean(address) && isValidStellarPublicKey(address);
+    const validBond = Boolean(bond) && Number.isFinite(bondNum) && bondNum >= MIN_BOND_USDC;
+    if (!validAddress || !validBond) {
+      return {
+        ok: false,
+        addressError: validAddress ? null : t("solve.register.validation.invalidAddress"),
+        bondError: validBond
+          ? null
+          : t("solve.register.validation.minimumBond", { minBond: MIN_BOND_USDC }),
+      };
+    }
+    return { ok: true, address, bond };
+  }, [address, bond, bondNum, t]);
+
   return {
     address,
     bond,
@@ -83,7 +107,8 @@ export function useRegistrationForm() {
     isValid: Boolean(address && bond && !addressError && !bondError),
     setAddress,
     setBond,
-    markSubmitted: useCallback(() => dispatch({ type: "submit" }), []),
+    markSubmitted,
+    submit,
     reset: useCallback(() => {
       dispatch({ type: "reset" });
       clearDraft();
