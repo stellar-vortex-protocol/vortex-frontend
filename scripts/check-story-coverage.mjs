@@ -1,50 +1,53 @@
-#!/usr/bin/env node
+import { readdir, readFile } from 'node:fs/promises';
+import { join, relative } from 'node:path';
 
-/**
- * Story coverage report.
- *
- * Lists every shared component under `src/components/**` that has no sibling
- * `<Name>.stories.tsx`, and exits non-zero while any are missing. Test files
- * and story files themselves are not components and are skipped.
- */
+const root = process.cwd();
+const componentsDir = join(root, 'src', 'components');
+const storySuffix = '.stories.tsx';
+const docsPath = 'docs/visual-testing.md';
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const componentsDir = path.join(root, "src", "components");
-
-function isComponentFile(name) {
-  return name.endsWith(".tsx") && !name.endsWith(".test.tsx") && !name.endsWith(".stories.tsx");
-}
-
-export function findComponentsWithoutStories(dir) {
-  const missing = [];
-  let total = 0;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
+async function walk(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      const nested = findComponentsWithoutStories(full);
-      missing.push(...nested.missing);
-      total += nested.total;
-      continue;
+      files.push(...(await walk(full)));
+    } else {
+      files.push(full);
     }
-    if (!isComponentFile(entry.name)) continue;
-    total += 1;
-    const storyFile = path.join(dir, entry.name.replace(/\.tsx$/, ".stories.tsx"));
-    if (!fs.existsSync(storyFile)) missing.push(path.relative(root, full));
   }
-  return { total, missing };
+  return files;
 }
 
-const { total, missing } = findComponentsWithoutStories(componentsDir);
-const covered = total - missing.length;
-const percent = total === 0 ? 100 : Math.round((covered / total) * 100);
+function isComponentFile(file) {
+  return file.endsWith('.tsx') && !file.endsWith('.stories.tsx') && !file.endsWith('.test.tsx');
+}
 
-console.log(`Story coverage: ${covered}/${total} shared components (${percent}%)`);
-for (const file of missing) console.log(`  missing story: ${file}`);
+function expectedStoryPath(componentFile) {
+  return componentFile.replace(/\.tsx$/, storySuffix);
+}
+
+const files = await walk(componentsDir);
+const storyFiles = new Set(files.filter((file) => file.endsWith(storySuffix)));
+const componentFiles = files.filter(isComponentFile);
+
+const missing = [];
+for (const componentFile of componentFiles) {
+  const storyFile = expectedStoryPath(componentFile);
+  if (!storyFiles.has(storyFile)) {
+    missing.push({ componentFile, storyFile });
+  }
+}
 
 if (missing.length > 0) {
-  process.exitCode = 1;
+  console.error(`Missing stories for ${missing.length} component(s):\n`);
+  for (const { componentFile, storyFile } of missing) {
+    console.error(`  component: ${relative(root, componentFile)}`);
+    console.error(`  expected:  ${relative(root, storyFile)}\n`);
+  }
+  console.error(`See ${docsPath} for the story convention.`);
+  process.exit(1);
 }
+
+console.log(`All ${componentFiles.length} component(s) have stories.`);

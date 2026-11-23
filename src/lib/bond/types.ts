@@ -11,6 +11,8 @@ export type PendingWithdrawal = {
 };
 
 export type BondState = {
+  /** Discriminant: whether the bond currently meets the minimum requirement. */
+  status: "active" | "inactive";
   address: string;
   /** Total bond posted. */
   bond: string;

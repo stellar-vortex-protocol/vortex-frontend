@@ -42,6 +42,30 @@ Invalid environment configuration:
 - a `NEXT_PUBLIC_*` variable's name looks like a secret (see `docs/security-audit.md`)
 - the environment's manifest isn't satisfied (see below)
 
+## The env manifest check
+
+`scripts/env-manifest.mjs` is the manifest of what each environment expects:
+which variables must be set, which networks are allowed, and whether localhost
+or plain `http://` / `ws://` is accepted. `scripts/check-env-vars.mjs` runs it
+as part of `npm run check:env`, so a missing or misspelled key in `.env.local`
+is caught before it reaches a build.
+
+Run the check from the repo root:
+
+```
+npm run check:env
+```
+
+It validates that every variable the schema defines is present and well-formed,
+that `.env.example` and the README table list exactly the schema's variables,
+and that the environment's manifest is satisfied.
+
+When the check fails, compare your `.env.local` against `.env.example` (the
+canonical list of variable names and example values) and fix any missing or
+misspelled entries. Don't duplicate the full variable list here — `.env.example`
+is the source of truth. If `npm run build` fails with an environment error, see
+the troubleshooting table in the project notes.
+
 ## Per-environment manifests
 
 `config/environments/{development,preview,production}.json` hold the
