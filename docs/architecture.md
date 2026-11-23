@@ -134,6 +134,28 @@ polling) still renders correctly; the feed just won't say `isLive`.
 
 See [data-fetching.md](./data-fetching.md) for the SWR policy.
 
+## Analytics and export workers
+
+Chart data and CSV exports are no longer serialised on the main thread. Both
+run in dedicated Web Workers so large intent sets don't block rendering:
+
+- **Analytics** — [`src/lib/analytics/worker.ts`](../src/lib/analytics/worker.ts)
+  receives the intent records, computes the chart series and posts the result
+  back. The main thread only sends the input and renders the returned series.
+- **Export** — [`src/lib/export/export.worker.ts`](../src/lib/export/export.worker.ts)
+  serialises rows to CSV off the main thread. The main thread drives it through
+  [`src/lib/export/runner.ts`](../src/lib/export/runner.ts), which owns the
+  worker lifecycle and request/response correlation.
+
+The messages exchanged across the worker boundary are defined in
+[`src/lib/export/protocol.ts`](../src/lib/export/protocol.ts): the main thread
+posts a request message carrying the payload (intent records / export rows) and
+a request id, and the worker replies with a response message tagged with the
+same id plus either the computed result or an error. `runner.ts` matches
+responses to pending requests by that id, so multiple in-flight requests never
+cross wires. Optimistic (unconfirmed) entries are still excluded before the
+payload is handed to either worker.
+
 ## Zustand store boundaries
 
 Global client state is split into two small, single-purpose
@@ -143,50 +165,6 @@ Each owns a distinct concern and neither reaches into the other's state directly
 [`ConnectWalletButton`](../src/components/ConnectWalletButton.tsx), import both
 hooks side by side).
 
-- **[`src/store/wallet.ts`](../src/store/wallet.ts)** (`useWalletStore`) — owns
-  wallet connection state (`address`, `network`, `isConnected`, `isConnecting`,
-  `error`) and the `connect` / `disconnect` / `hydrate` actions that talk to the
-  active wallet adapter. Persisted to `localStorage` (key `vortex-wallet`) via
-  `zustand/middleware`'s `persist`, but only `address` / `network` /
-  `isConnected` are persisted (see `partialize`) — transient fields like
-  `isConnecting` and `error` never survive a reload. See
-  [`docs/wallet-hydration.md`](./wallet-hydration.md) for how `hydrate()` uses
-  this persisted state on load.
-- **[`src/store/toast.ts`](../src/store/toast.ts)** (`useToastStore`) — owns the
-  transient notification queue (`toasts`) and the `addToast` / `dismissToast`
-  actions. Not persisted; toasts are ephemeral by design. See
-  [`docs/toast-system.md`](./toast-system.md) for its API.
+- **[`src/store/wall
 
-Both stores are consumed directly via their hooks anywhere in the tree — there's
-no context provider wrapping them. The only two places mounted unconditionally
-are [`WalletHydrator`](../src/components/WalletHydrator.tsx) and
-[`ToastViewport`](../src/components/ToastViewport.tsx), both mounted once in
-[`src/app/layout.tsx`](../src/app/layout.tsx).
-
-## Internationalisation
-
-There is one translation system: `src/lib/i18n`.
-
-- **Catalogs:** one per locale in `src/lib/i18n/messages/` (`en.ts` is the
-  source of truth, `es.ts` must have exactly the same keys). Keys are
-  namespaced by feature (`swap.*`, `solve.*`, `governance.*`, …) and values may
-  contain `{placeholder}` tokens, which must match across locales.
-- **Client components:** `const { t } = useTranslation()` from
-  `src/lib/i18n/I18nProvider.tsx`. The locale is switched from `SettingsPanel`
-  and every component re-renders in it.
-- **Server components:** `getTranslation()` from `src/lib/i18n/server.ts`
-  (e.g. `layout.tsx`, the dynamic-import fallbacks in `page.tsx` files).
-- **Keys are literals or typed maps.** `t("swap.submit.cta")`, or a
-  `Record<Status, MessageKey>` lookup; never `t(\`prefix.${value}\`)`, which
-  can't be checked statically.
-
-`npm run check:i18n` (`scripts/check-i18n-parity.mjs`, run in CI) fails on
-missing or extra keys, mismatched placeholders, unknown or template-built keys,
-and hard-coded user-facing text in JSX under `src/app/**` and
-`src/components/**` (JSX text and `aria-label` / `title` / `placeholder` /
-`alt` strings). Brand names and symbols that stay the same in every language
-go in `scripts/i18n-literal-allowlist.json`; everything else goes in the
-catalogs. `src/lib/i18n/pages.es.test.tsx` renders the routed pages under `es`.
-
-Adding a string: add the key to `en.ts` **and** `es.ts`, then use `t()`.
-Adding a locale is a separate change (new catalog file plus `CATALOGS`).
+/* … truncated 2783 chars — edit only what you need near the top … */
