@@ -1,79 +1,47 @@
-# API Contract (Generated Types & Validators)
+# API Contract
 
-The relay's wire types and runtime parsers are generated from a committed OpenAPI 3.1 snapshot,
-so backend drift shows up as a type error or a failing CI job instead of a production bug.
+All JSON API routes under `src/app/api/` share a common error convention.
 
-## Files
+## Error shape
 
-| Path                          | Role                                                                          |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| `spec/relay.openapi.json`     | Contract snapshot. Source of truth for the frontend.                          |
-| `scripts/gen-api.mjs`         | Dependency-free generator. `--check` detects drift.                           |
-| `src/lib/generated/relay.ts`  | Generated models and parsers. Do not edit by hand.                            |
-| `src/lib/types.ts`            | Re-exports the generated models (`FeedItem`, `IntentStatus`, …).              |
-| `src/lib/schemas.ts`          | Re-exports the generated parsers (`parseFeedItem`, …).                        |
-| `.github/workflows/contract-drift.yml` | CI job `contract-drift`.                                             |
+Every error response is JSON with a single `error` field:
 
-The snapshot's `info.version` and `info["x-source"].commit` identify which backend build it was
-taken from. The generated file header repeats both.
+```json
+{ "error": "<code>" }
+```
 
-## Commands
+Known error codes:
 
-- `npm run gen:api`: regenerate `src/lib/generated/relay.ts` from the snapshot.
-- `npm run check:contract`: fail if the committed generated file is stale.
-- `node scripts/gen-api.mjs --check --upstream <file>`: also fail if `<file>` (the backend's current
-  spec) differs from the snapshot. CI does this when the repository variable `RELAY_SPEC_URL` is set.
+| Code              | Status | Meaning                                              |
+| ----------------- | ------ | ---------------------------------------------------- |
+| `invalid-address` | 400    | The `address` query parameter is missing or invalid. |
+| `not-found`       | 404    | The requested resource does not exist upstream.      |
+| `rate-limited`    | 429    | The caller exceeded the per-IP rate limit.           |
+| `unavailable`     | 502    | The upstream service could not be reached.           |
 
-## CI job `contract-drift`
+## Rate limiting
 
-Runs on pull requests, pushes to `main`, daily, and on demand.
+Routes that proxy an upstream service use a per-IP token bucket. When the
+bucket is empty the route responds with `429` and a `Retry-After` header
+(seconds) indicating when the caller may retry.
 
-- If `RELAY_SPEC_URL` is set, the job downloads the backend spec and fails when it differs from
-  `spec/relay.openapi.json`. Comparison ignores key order.
-- It always fails when the committed generated file is out of date.
-- If `RELAY_SPEC_URL` is unset, it emits a warning and checks only the generated output.
+## `GET /api/account-status`
 
-## The backend changed — now what?
+Query: `address` (Stellar public key).
 
-1. Get the backend's new spec (the file behind `RELAY_SPEC_URL`, or the backend release asset).
-2. Replace `spec/relay.openapi.json` with it. Keep `info.version` and `info["x-source"].commit`
-   accurate so the generated header names the backend build.
-3. Run `npm run gen:api`.
-4. Run `npm run typecheck`. Each compile error is a call site that depends on the changed shape;
-   fix those call sites in the same PR.
-5. Check the diff of `src/lib/generated/relay.ts`. Look at added or removed fields, changed
-   optionality (`?`), and changed enum members.
-6. For a new enum member, check that the UI handles it. Until it does, the parser maps it to
-   `"unknown"`.
-7. Run `npm run check:contract` and tick the "Spec updated" box in the PR template.
-8. If the backend contract is not reachable (no `RELAY_SPEC_URL`, or the backend is not yet
-   published), hand-edit the snapshot to match the agreed contract and say so in the PR.
+- `200` → `{ "funded": boolean }`
+- `400` → `{ "error": "invalid-address" }`
+- `429` → `{ "error": "rate-limited" }` with `Retry-After`
+- `502` → `{ "error": "unavailable" }`
 
-## Compatibility rules
+## `GET /api/federation`
 
-- **Unknown enum values** parse to `"unknown"` instead of throwing. Enum types therefore include
-  `"unknown"`, so call sites must handle it. `IntentStatus` is the example.
-- **Unknown properties** are stripped by the parsers and are not exposed on the typed object.
-- **Missing or mistyped required properties** make the parser return `null`. Callers drop the frame
-  or fall back, as `docs/websocket-protocol.md` describes.
-- **Amounts** are decimal strings matched by a `pattern` (`^[0-9]+(\.[0-9]+)?$`). They are never numbers.
-- **Optional vs. nullable.** A property marked `required` must be present. An optional property is
-  declared `prop?: T` and must be absent or of type `T`, never `undefined` (the tsconfig sets
-  `exactOptionalPropertyTypes`). Nullable scalars use `type: ["<T>", "null"]` and generate
-  `prop: T | null`.
-- **`version`** is an integer. The protocol doc describes it as a number; the integer rule is
-  stricter on purpose.
+Query: `address` (Stellar account address).
 
-## Supported spec subset
+- `200` → `{ "address": string, "account_id": string }`
+- `400` → `{ "error": "invalid-address" }`
+- `404` → `{ "error": "not-found" }`
+- `429` → `{ "error": "rate-limited" }` with `Retry-After`
+- `502` → `{ "error": "unavailable" }`
 
-`scripts/gen-api.mjs` supports only what the frontend needs: `components.schemas` with object and
-string-enum schemas; `string` (with `format: date-time` and `pattern`), `number`, `integer`,
-`boolean`, `const`, `$ref` to a component, and `[T, "null"]` for nullable scalars. Anything else
-throws with the schema path, so an unsupported change fails loudly instead of drifting silently.
-Paths are documented in the snapshot but are not generated.
-
-## Frontend-only types
-
-Types that exist only in the frontend (view models, derived fields, UI state) stay in their own
-modules and are not part of the contract. Examples include `TrackableIntent`
-(`src/lib/intentLifecycle.ts`) and the analytics summaries in `src/lib/analytics.ts`.
+Rate limit: 30-request burst, refilling at 1 request / 2 s per IP.
