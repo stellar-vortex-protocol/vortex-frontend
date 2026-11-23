@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer } from "react";
 import { useLocalStorageDraft } from "@/hooks/useLocalStorageDraft";
-import { isValidStellarPublicKey } from "@/lib/stellarAddress";
+import { isValidStellarAddress } from "@/lib/chain/stellarAddress";
 import { useTranslation } from "@/lib/i18n/I18nProvider";
 import { useWalletStore } from "@/store/wallet";
 
@@ -66,7 +66,7 @@ export function useRegistrationForm() {
 
   const { address, bond, submitted } = state;
   const addressError =
-    (address && !isValidStellarPublicKey(address)) || (!address && submitted)
+    (address && !isValidStellarAddress(address)) || (!address && submitted)
       ? t("solve.register.validation.invalidAddress")
       : null;
   const bondNum = Number(bond);
