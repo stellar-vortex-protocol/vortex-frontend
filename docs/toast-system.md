@@ -59,6 +59,19 @@ once in [`src/app/layout.tsx`](../src/app/layout.tsx). You don't need to render
 anything yourself — just call `addToast` and the fixed-position viewport
 (bottom-right) picks it up.
 
+## Accessibility
+
+Toasts are announced to assistive technology through an ARIA live region:
+
+- The viewport container is an `aria-live="polite"` region.
+- Each toast sets `aria-atomic="true"` so its full message is read as a unit.
+- `info` and `success` toasts use `role="status"` with `aria-live="polite"`.
+- `error` toasts use `role="alert"` with `aria-live="assertive"` so failures
+  interrupt and are announced immediately.
+
+Keep these attributes in place when adding new variants — map each new variant
+to the appropriate `role`/`aria-live` pair in `ToastViewport`.
+
 ## Notes
 
 - The store is **not** persisted — toasts are intentionally ephemeral and do not
