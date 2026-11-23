@@ -119,6 +119,7 @@ export default function BondManagePageClient() {
   const now = useLiveRelativeTime(1000);
   const busy = !["idle", "success", "error"].includes(manager.status);
   const bond = manager.bond;
+  const loadError = manager.loadError;
 
   return (
     <div className="min-h-screen">
@@ -133,9 +134,16 @@ export default function BondManagePageClient() {
               {t("commands.wallet.connect")}
             </button>
           </div>
-        ) : manager.loadError ? (
-          <div role="alert" className="card p-6 text-sm text-vx-muted">
-            {t("bond.loadError")}
+        ) : loadError ? (
+          <div role="alert" className="card p-6 text-sm space-y-3">
+            <p className="text-vx-text">{t("bond.loadError")}</p>
+            <button
+              type="button"
+              onClick={() => void manager.refresh()}
+              className="text-vx-sage hover:underline"
+            >
+              {t("common.retry")}
+            </button>
           </div>
         ) : !bond ? (
           <div className="card p-6 h-32 animate-pulse" aria-busy="true" />
@@ -196,15 +204,9 @@ export default function BondManagePageClient() {
               )}
             </section>
 
-            {manager.error && (
-              <p role="alert" className="text-xs text-red-400">
-                {manager.error}
-              </p>
-            )}
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <AmountForm kind="top-up" bond={bond} busy={busy || networkMismatch} onSubmit={manager.topUp} />
-              <AmountForm kind="withdrawal" bond={bond} busy={busy || networkMismatch} onSubmit={manager.requestWithdrawal} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <AmountForm kind="top-up" bond={bond} busy={busy} onSubmit={manager.topUp} />
+              <AmountForm kind="withdrawal" bond={bond} busy={busy} onSubmit={manager.withdraw} />
             </div>
           </>
         )}
