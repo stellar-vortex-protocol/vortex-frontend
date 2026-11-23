@@ -30,6 +30,7 @@ function mockState(address: string): BondState {
   let state = mockStates.get(address);
   if (!state) {
     state = {
+      status: "active",
       address,
       bond: "250",
       locked: "40",
