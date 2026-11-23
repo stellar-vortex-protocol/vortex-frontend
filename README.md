@@ -356,3 +356,8 @@ public issue for security-sensitive details.
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
+
+## Handsoff notes
+
+<!-- handsoff-issue-825 -->
+- #825: README quick-start omits the doctor step the project notes require
