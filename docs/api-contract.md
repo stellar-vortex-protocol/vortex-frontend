@@ -77,3 +77,17 @@ Paths are documented in the snapshot but are not generated.
 Types that exist only in the frontend (view models, derived fields, UI state) stay in their own
 modules and are not part of the contract. Examples include `TrackableIntent`
 (`src/lib/intentLifecycle.ts`) and the analytics summaries in `src/lib/analytics.ts`.
+
+## Health endpoint status codes
+
+`GET /api/health` (`src/app/api/health/route.ts`) reports dependency health. The HTTP status code
+mirrors the `status` field in the JSON body so uptime monitors can rely on the status code alone:
+
+| Body `status` | HTTP status | Meaning                                              |
+| ------------- | ----------- | ---------------------------------------------------- |
+| `healthy`     | `200`       | All dependencies are reachable.                      |
+| `degraded`    | `503`       | At least one dependency is degraded but reachable.   |
+| `unhealthy`   | `503`       | At least one dependency is unreachable.              |
+
+The JSON body shape is unchanged; consumers that parse `status` keep working, and monitors that
+only inspect the status code now see a non-2xx response whenever the service is not fully healthy.
