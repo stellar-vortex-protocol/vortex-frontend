@@ -115,7 +115,11 @@ export function checkPlaywright({ env = process.env, home = homedir(), os = plat
         : join(home, ".cache", "ms-playwright"));
   const installed = existsSync(base) && readdirSync(base).some((d) => d.startsWith("chromium"));
   if (installed) return { name, status: "pass" };
-  return { name, status: "warn", fix: "Only needed for e2e tests. Run: npx playwright install --with-deps chromium" };
+  return {
+    name: `${name} (missing in ${base})`,
+    status: "fail",
+    fix: "Required for e2e tests. Run: npx playwright install",
+  };
 }
 
 /** @returns {Promise<{ name: string, status: string, fix?: string }>} */
