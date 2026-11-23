@@ -2,6 +2,12 @@
  * Per-environment expectations (config/environments/*.json) and the
  * cross-field invariants a whole environment map must satisfy. The manifests
  * hold rules only, never secret values. Used by scripts/check-env-vars.mjs.
+ *
+ * This module is the source of truth for the required keys: `npm run check:env`
+ * validates a local environment against these rules. See docs/configuration.md
+ * for the contributor-facing explanation, .env.example for the file to copy
+ * from, and config/environments/*.json for the per-environment manifests
+ * (which may differ between environments).
  */
 
 import { ENV_SCHEMA, NETWORKS } from "../src/lib/env-schema.mjs";
