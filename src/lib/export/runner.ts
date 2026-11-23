@@ -18,6 +18,10 @@ export async function handleExportMessage(
     return;
   }
   const { jobId, items, options } = msg;
+  if (items.length === 0) {
+    post({ type: "empty", jobId });
+    return;
+  }
   const parts: string[] = [];
   try {
     for (const { part, done } of serializeParts(items, options)) {
@@ -29,6 +33,10 @@ export async function handleExportMessage(
       parts.push(part);
       post({ type: "progress", jobId, done, total: items.length });
       await yieldToLoop();
+    }
+    if (parts.length === 0) {
+      post({ type: "empty", jobId });
+      return;
     }
     post({ type: "complete", jobId, parts });
   } catch (e) {
