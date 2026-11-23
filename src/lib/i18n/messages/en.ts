@@ -28,6 +28,8 @@ export const en = {
   "governance.impact.unchanged": "The proposed minimum bond ({proposed}) equals the current value, so nothing changes.",
   "governance.impact.basis": "Based on {total} active solvers and their current bonds.",
 
+  "solve.deadline.expired": "Expired",
+
   "wave.breadcrumb": "Wave Tracker",
   "wave.eyebrow": "Drips Wave",
   "wave.title": "Wave Tracker",
