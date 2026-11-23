@@ -356,3 +356,8 @@ public issue for security-sensitive details.
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
+
+## Handsoff notes
+
+<!-- handsoff-issue-812 -->
+- #812: The explore page fetches the full intent list before paginating
