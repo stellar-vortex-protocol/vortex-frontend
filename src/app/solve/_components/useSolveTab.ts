@@ -30,3 +30,27 @@ export function useSolveTab() {
 
   return [tab, setTab] as const;
 }
+
+/**
+ * WAI-ARIA tabs keyboard handler for a horizontal tablist. Left/Right move
+ * between tabs (wrapping), Home/End jump to the first/last tab. Returns the
+ * next tab to activate, or `null` when the key is not handled.
+ */
+export function getNextSolveTab(
+  current: SolveTab,
+  key: string,
+): SolveTab | null {
+  const index = SOLVE_TABS.indexOf(current);
+  switch (key) {
+    case "ArrowRight":
+      return SOLVE_TABS[(index + 1) % SOLVE_TABS.length];
+    case "ArrowLeft":
+      return SOLVE_TABS[(index - 1 + SOLVE_TABS.length) % SOLVE_TABS.length];
+    case "Home":
+      return SOLVE_TABS[0];
+    case "End":
+      return SOLVE_TABS[SOLVE_TABS.length - 1];
+    default:
+      return null;
+  }
+}
