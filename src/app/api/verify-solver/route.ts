@@ -38,7 +38,12 @@ const unavailable = (status: number) =>
  * never be used for authorization.
  */
 export async function GET(req: NextRequest) {
-  const domain = normalizeDomain(req.nextUrl.searchParams.get("domain"));
+  const rawDomain = req.nextUrl.searchParams.get("domain");
+  if (!rawDomain || rawDomain.trim() === "") {
+    return NextResponse.json({ error: "missing-domain" }, { status: 400 });
+  }
+
+  const domain = normalizeDomain(rawDomain);
   if (!domain) {
     return NextResponse.json({ error: "invalid-domain" }, { status: 400 });
   }
@@ -75,4 +80,3 @@ export async function GET(req: NextRequest) {
     return unavailable(502);
   }
 }
-

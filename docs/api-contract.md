@@ -77,3 +77,64 @@ Paths are documented in the snapshot but are not generated.
 Types that exist only in the frontend (view models, derived fields, UI state) stay in their own
 modules and are not part of the contract. Examples include `TrackableIntent`
 (`src/lib/intentLifecycle.ts`) and the analytics summaries in `src/lib/analytics.ts`.
+
+## Health endpoint status codes
+
+`GET /api/health` (`src/app/api/health/route.ts`) reports dependency health. The HTTP status code
+mirrors the `status` field in the JSON body so uptime monitors can rely on the status code alone:
+
+| Body `status` | HTTP status | Meaning                                              |
+| ------------- | ----------- | ---------------------------------------------------- |
+| `healthy`     | `200`       | All dependencies are reachable.                      |
+| `degraded`    | `503`       | At least one dependency is degraded but reachable.   |
+| `unhealthy`   | `503`       | At least one dependency is unreachable.              |
+
+The JSON body shape is unchanged; consumers that parse `status` keep working, and monitors that
+only inspect the status code now see a non-2xx response whenever the service is not fully healthy.
+
+## Verify-solver endpoint status codes
+
+`GET /api/verify-solver` (`src/app/api/verify-solver/route.ts`) verifies a solver address. The
+`address` query parameter is required and must be a valid Stellar address (validated with the
+shared helper in `src/lib/chain/`).
+
+| Condition                                   | HTTP status | Body                                              |
+| ------------------------------------------- | ----------- | ------------------------------------------------- |
+| `address` present and valid                 | `200`       | Verification verdict.                             |
+| `address` missing or not a valid Stellar address | `400`  | `{ "error": "<message>" }`                        |
+
+A missing or malformed `address` is rejected with `400` and an error body instead of returning a
+`200` with an empty verdict.
+
+## Account-status endpoint response shape
+
+`GET /api/account-status` (`src/app/api/account-status/route.ts`) returns the current status of a
+Stellar account. The response body is a JSON object with the following fields:
+
+| Field     | Type      | Description                                                       |
+| --------- | --------- | ----------------------------------------------------------------- |
+| `address` | `string`  | The Stellar account address that was queried.                     |
+| `funded`  | `boolean` | Whether the account exists on-chain (has been funded).            |
+| `balance` | `string`  | Account balance as a decimal string; `"0"` when not funded.       |
+
+Example response for a funded account:
+
+```json
+{
+  "address": "G...",
+  "funded": true,
+  "balance": "100.0000000"
+}
+```
+
+Example response for an account that has not been funded:
+
+```json
+{
+  "address": "G...",
+  "funded": false,
+  "balance": "0"
+}
+```
+
+Balances are decimal strings, never numbers, consistent with the amount rule above.

@@ -8,13 +8,16 @@ export const dynamic = "force-dynamic";
 // Public build metadata and process uptime only. Never add env values, hostnames
 // or dependency details here; this endpoint is unauthenticated.
 export function GET() {
+  const status = "ok";
+  const httpStatus = status === "ok" ? 200 : 503;
+
   return NextResponse.json(
     {
-      status: "ok",
+      status,
       version: buildInfo.version,
       commit: buildInfo.commit,
       uptime: Math.floor(process.uptime()),
     },
-    { headers: { "Cache-Control": "no-store" } },
+    { status: httpStatus, headers: { "Cache-Control": "no-store" } },
   );
 }
