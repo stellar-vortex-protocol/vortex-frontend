@@ -8,6 +8,13 @@ import { ENV_SCHEMA, NETWORKS } from "../src/lib/env-schema.mjs";
 
 export const ENVIRONMENTS = ["development", "preview", "production"];
 
+/** Where a contributor should put a value for a given environment. */
+export const DESTINATION_FILES = {
+  development: ".env.local",
+  preview: ".env.local",
+  production: ".env.local",
+};
+
 const SCHEMA_NAMES = ENV_SCHEMA.map((v) => v.name);
 const URL_VARS = ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_WS_URL", "NEXT_PUBLIC_SITE_URL"];
 const SECURE_PROTOCOLS = new Set(["https:", "wss:"]);
@@ -70,9 +77,15 @@ export function checkEnvironment(manifest, env) {
   const { environment, requiredVars, networks, allowLocalhost, requireHttps } = manifest;
   const errors = [];
   const raw = (name) => env[name]?.trim() ?? "";
+  const sourceFile = `config/environments/${environment}.json`;
+  const destination = DESTINATION_FILES[environment] ?? ".env.local";
 
   for (const name of requiredVars) {
-    if (raw(name) === "") errors.push(`${name} must be set in ${environment}`);
+    if (raw(name) === "") {
+      errors.push(
+        `${name} is required by ${sourceFile} but is missing; set it in ${destination} (see .env.example)`,
+      );
+    }
   }
 
   const network = raw("NEXT_PUBLIC_NETWORK");
