@@ -12,6 +12,48 @@ shared machine in [`src/lib/flow`](../src/lib/flow):
   hook. Flows pass a `run(params, { signal, step })` handler; each
   `step(name, handler)` enters a state and receives the run's `AbortSignal`.
 
+## States
+
+The machine's state union is the authority. Every state below exists in
+`machine.ts`; there are no other states.
+
+| State | Meaning |
+| --- | --- |
+| `idle` | No run in progress. The initial state and the state after `CANCEL`/`RESET`. |
+| `pending` | A run is in progress. Carries the current `step` (see below). |
+| `success` | The run completed successfully. |
+| `error` | The run failed. Carries the classified `error` and the `errorStep` where it failed. |
+
+### Pending steps
+
+While `pending`, the snapshot's `step` is one of:
+
+| Step | Meaning |
+| --- | --- |
+| `connecting` | Connecting to the wallet / preparing the run. |
+| `building` | Building the transaction or request payload. |
+| `reviewing` | Reviewing the built transaction before signing. |
+| `awaiting_signature` | Waiting for the user to sign in their wallet. |
+| `submitting` | Submitting the signed transaction. |
+
+`ADVANCE` only moves forward through these steps; steps may be skipped.
+
+## Transitions
+
+| From | Event | To | Notes |
+| --- | --- | --- | --- |
+| `idle` | `START` | `pending` | Begins a run. |
+| `pending` | `ADVANCE` | `pending` | Moves to the next step (forward only). |
+| `pending` | `SUCCEED` | `success` | Run completed. |
+| `pending` | `FAIL` | `error` | Records the classified `error` and `errorStep`. |
+| `pending` | `CANCEL` | `idle` | Aborts the run. |
+| `success` | `START` | `pending` | User starts a new run. |
+| `success` | `RESET` | `idle` | Clears the result. |
+| `error` | `START` | `pending` | User retry. |
+| `error` | `RESET` | `idle` | Clears the error. |
+
+Any event not listed above is a no-op: the reducer returns the same snapshot.
+
 ## Statechart
 
 ```mermaid
