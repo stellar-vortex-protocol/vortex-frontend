@@ -356,3 +356,8 @@ public issue for security-sensitive details.
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
+
+## Handsoff notes
+
+<!-- handsoff-issue-835 -->
+- #835: Popover has no Escape-to-close or focus handling

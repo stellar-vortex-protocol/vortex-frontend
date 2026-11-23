@@ -1,44 +1,41 @@
-# Command palette
+# Commands
 
-The palette (`Cmd/Ctrl+K`, [`CommandPalette.tsx`](../src/components/CommandPalette.tsx)) renders commands from a
-module-level Zustand registry ([`src/lib/commands/registry.ts`](../src/lib/commands/registry.ts)).
+All commands are run from the repository root. Scripts are defined in `package.json`.
 
-- **Groups:** `Recent`, `Navigation`, `Wallet`, `Preferences`, `Solvers`. With an empty query only `Recent` and
-  `Navigation` are listed; typing searches every visible command.
-- **Ranking:** fuzzy subsequence match on the title (matched characters are highlighted) and keywords; prefixes
-  and contiguous runs score higher, ties keep registration order.
-- **`when()`** hides a command when it returns `false` (e.g. "Disconnect wallet" only while connected).
-- **`dangerous: true`** requires a second Enter/click; the row reads "Press Enter again to confirm".
-- **Recents:** the last 10 intents viewed on `/explore/[id]` (stored locally under `vortex-recent-intents`).
-- The result count is announced via a polite live region; IME composition is ignored for navigation keys.
+## Development
 
-Built-ins live in [`BuiltinCommands.tsx`](../src/components/BuiltinCommands.tsx): connect/disconnect wallet, copy
-address, switch language, reduce/enable motion (shares `vortex-motion-preference` with the settings panel), open
-My Intents, and "View solver …" for up to 50 solvers from `useSolvers`.
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server. |
+| `npm run build` | Type-check and build the production bundle. |
+| `npm run preview` | Preview the production build locally. |
+| `npm run typecheck` | Run `tsc --noEmit` to type-check without emitting. |
 
-## How to add a command
+## Testing
 
-1. Build the command list in a client component, memoised so registration only reruns when inputs change.
-2. Put every user-facing `title` through `t()` and add the keys to **both** `en.ts` and `es.ts`.
-3. Call `useRegisterCommands(commands)`; commands are removed automatically on unmount.
+| Command | Description |
+| --- | --- |
+| `npm test` | Run the test suite once. |
+| `npm run test:watch` | Run tests in watch mode. |
+| `npm run test:coverage` | Run tests and report coverage. |
 
-```tsx
-const { t } = useTranslation();
-const commands = useMemo<CommandDefinition[]>(
-  () => [
-    {
-      id: "explore-export-csv",
-      title: t("commands.explore.exportCsv"),
-      keywords: ["download", "csv"],
-      group: "Navigation",
-      when: () => rows.length > 0,
-      run: exportCsv,
-    },
-  ],
-  [t, rows.length, exportCsv],
-);
-useRegisterCommands(commands);
-```
+## Checks
 
-Outside React, `registerCommand(definition)` returns an unregister function. Ids must be unique; a later
-registration with the same id replaces the earlier one.
+These scripts validate repository invariants. The PR template requires `check:editorconfig` and `check:i18n`; run the rest when your change touches the relevant area.
+
+| Command | Description |
+| --- | --- |
+| `npm run check:editorconfig` | Verifies files conform to `.editorconfig` formatting rules. |
+| `npm run check:i18n` | Verifies locale files have matching keys across languages (i18n parity). |
+| `npm run check:merge-debris` | Scans for leftover merge conflict markers and merge debris. |
+| `npm run check:no-empty-modules` | Flags empty module files that should contain code. |
+| `npm run check:orphan-tests` | Detects test files that no longer map to a source module. |
+| `npm run check:single-ssrf-guard` | Ensures there is a single SSRF guard implementation rather than duplicates. |
+| `npm run check:story-coverage` | Verifies components have corresponding Storybook stories. |
+| `npm run check:contract` | Verifies the generated relay contract matches the committed snapshot. |
+
+## Code generation
+
+| Command | Description |
+| --- | --- |
+| `npm run gen:api` | Regenerate the API client from `spec/relay.openapi.json`. |
