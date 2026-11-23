@@ -20,6 +20,18 @@ export const FLOW_STEPS = [
 export type FlowStep = (typeof FLOW_STEPS)[number];
 export type FlowStatus = "idle" | FlowStep | "success" | "error";
 
+/**
+ * Canonical state union, in documentation order. Kept in sync with
+ * `FlowStatus` above; docs/quote-lifecycle.md and docs/transaction-flow.md
+ * render their state tables from this list so the docs cannot drift.
+ */
+export const FLOW_STATES = [
+  "idle",
+  ...FLOW_STEPS,
+  "success",
+  "error",
+] as const satisfies readonly FlowStatus[];
+
 export type FlowErrorKind =
   | "network"
   | "user-rejected"
