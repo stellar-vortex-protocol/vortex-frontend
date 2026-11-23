@@ -43,7 +43,7 @@
     "update:visual": "playwright test -c playwright.config.storybook.ts --update-snapshots",
     "check:actionlint": "actionlint",
     "doctor": "node scripts/doctor.mjs",
-    "prepare": "husky"
+    "prepare": "husky && node -e \"const {execSync}=require('child_process');const expected='.husky';let actual='';try{actual=execSync('git config core.hooksPath',{encoding:'utf8'}).trim();}catch(e){actual='';}if(actual!==expected){console.error('[prepare] core.hooksPath is \\''+actual+'\\' but expected \\''+expected+'\\'. Hooks will not run.');console.error('[prepare] Fix: ensure .git/config is writable, then re-run `npm run prepare`.');process.exit(1);}\""
   },
   "dependencies": {
     "@stellar/freighter-api": "^2.0.0",

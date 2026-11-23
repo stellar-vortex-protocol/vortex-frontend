@@ -38,6 +38,8 @@ const TOOLING_VARS = new Set(["NODE_ENV"]);
 // Build metadata set by next.config.mjs from package.json and the CI/Vercel
 // commit (src/lib/buildInfo.ts). Derived, not user configuration.
 const BUILD_METADATA_VARS = new Set(["NEXT_PUBLIC_APP_VERSION", "NEXT_PUBLIC_COMMIT_SHA", "NEXT_PUBLIC_BUILD_TIME"]);
+// Where a contributor should add a missing variable for local development.
+const SUGGESTED_DESTINATION = ".env.local";
 
 /** Variable names assigned in a dotenv file, in order (duplicates kept). */
 export function parseDotenvNames(text) {
@@ -119,8 +121,22 @@ export function checkEnv({ envExample, readme, sources, env, production, manifes
   if (manifests) {
     errors.push(...checkManifests(manifests));
     const manifest = manifests[environment];
-    if (manifest) errors.push(...checkEnvironment(manifest, env));
-    else errors.push(`no manifest for environment "${environment}"`);
+    if (manifest) {
+      const manifestFile = `config/environments/${environment}.json`;
+      for (const error of checkEnvironment(manifest, env)) {
+        // Name the variable, the file that requires it, and where to add it.
+        const missing = error.match(/^missing required variable ([A-Z0-9_]+)$/);
+        if (missing) {
+          errors.push(
+            `${missing[1]} is required by ${manifestFile} but is not set; add it to ${SUGGESTED_DESTINATION} (see .env.example)`,
+          );
+        } else {
+          errors.push(error);
+        }
+      }
+    } else {
+      errors.push(`no manifest for environment "${environment}"`);
+    }
   }
 
   for (const name of Object.keys(env)) {
