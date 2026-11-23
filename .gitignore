@@ -13,8 +13,6 @@ storybook-static/
 next-env.d.ts
 
 # Environment
-.env
-.env.*
 !.env.example
 
 # Logs
@@ -24,7 +22,6 @@ npm-debug.log*
 # Editor / OS
 .DS_Store
 .idea/
-.vscode/*
 !.vscode/extensions.json
 *.swp
 
@@ -37,3 +34,4 @@ test-results/
 # Mutation testing (Stryker)
 reports/
 .stryker-tmp/
+config.bat
