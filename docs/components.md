@@ -25,6 +25,21 @@ Open `http://127.0.0.1:6006` and pick a component under **Components** or
 - Run `npm run check:stories` to list shared components that still lack a
   story file.
 
+## DataTable (`src/components/ui/DataTable.tsx`)
+
+`DataTable` renders a typed, sortable table from a column definition array.
+Each column may declare a `rowKey` accessor that returns a stable identifier
+for the row it belongs to. When provided, `rowKey` is used for React keys so
+selection and sorting follow the row when data reorders. Callers that omit
+`rowKey` still render, falling back to the array index as the key.
+
+```tsx
+const columns: DataTableColumn<Request>[] = [
+  { header: 'ID', rowKey: (row) => row.id, cell: (row) => row.id },
+  { header: 'Title', cell: (row) => row.title },
+];
+```
+
 ## Charts (`src/components/charts/*`)
 
 The chart primitives (`LineChart`, `AreaChart`, `BarChart`, `DonutChart`,
