@@ -19,6 +19,15 @@ export type CommandDefinition = {
   run: () => void | Promise<void>;
 };
 
+/**
+ * Stable DOM id for a command's option element in the palette listbox.
+ * Used by `aria-activedescendant` on the palette input so screen readers
+ * announce the highlighted result as the user arrows through the list.
+ */
+export function commandOptionId(commandId: string): string {
+  return `command-option-${commandId}`;
+}
+
 type RegistryState = {
   commands: Record<string, CommandDefinition>;
   register: (commands: CommandDefinition[]) => () => void;

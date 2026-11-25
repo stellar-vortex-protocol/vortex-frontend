@@ -52,7 +52,13 @@ export function LeaderboardTab() {
   };
 
   return (
-    <div className="card overflow-hidden">
+    <div
+      id="solve-panel-leaderboard"
+      role="tabpanel"
+      aria-labelledby="solve-tab-leaderboard"
+      tabIndex={0}
+      className="card overflow-hidden"
+    >
       <div className="px-3 sm:px-5 py-3 sm:py-3.5 border-b border-vx-border bg-vx-surface/30 flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold text-vx-text">{t("solve.leaderboard.title")}</span>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t("solve.leaderboard.sortLabel")}>
