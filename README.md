@@ -356,3 +356,8 @@ public issue for security-sensitive details.
 ## License
 
 [MIT](./LICENSE) © 2025 Vortex Protocol Contributors
+
+## Handsoff notes
+
+<!-- handsoff-issue-895 -->
+- #895: Toast notifications never reach the screen reader
