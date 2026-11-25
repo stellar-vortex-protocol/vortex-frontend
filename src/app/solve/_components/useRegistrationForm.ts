@@ -65,6 +65,7 @@ export function useRegistrationForm() {
   );
 
   const { address, bond, submitted } = state;
+  // Full StrKey validation (length, G prefix and checksum) so a corrupted key is rejected.
   const addressError =
     (address && !isValidStellarPublicKey(address)) || (!address && submitted)
       ? t("solve.register.validation.invalidAddress")
