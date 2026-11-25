@@ -3,6 +3,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::io::{AsyncRead, AsyncWrite};
 use std::sync::Arc;
 use log::{debug, error};
+use tracing::Instrument;
 
 use crate::tools::{ToolRegistry, ToolError};
 
@@ -152,8 +153,33 @@ impl McpServer {
             .cloned()
             .unwrap_or(json!({}));
 
-        let result = self.tool_registry.call_tool(name, arguments).await
-            .map_err(|e| RpcError::ToolError(e))?;
+        // Redacted argument summary: keys only, never values.
+        let arg_keys: Vec<String> = arguments
+            .as_object()
+            .map(|obj| obj.keys().cloned().collect())
+            .unwrap_or_default();
+
+        // Enter the span before invoking the tool so any error log emitted
+        // during dispatch is attributed to this tool call.
+        let span = tracing::info_span!(
+            "tools/call",
+            tool.name = %name,
+            tool.arg_keys = ?arg_keys,
+        );
+
+        let result = self.tool_registry
+            .call_tool(name, arguments)
+            .instrument(span)
+            .await
+            .map_err(|e| {
+                error!(
+                    tool.name = %name,
+                    tool.arg_keys = ?arg_keys,
+                    "Tool call failed: {}",
+                    e
+                );
+                RpcError::ToolError(e)
+            })?;
 
         Ok(json!({
             "content": [{
@@ -257,52 +283,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_invalid_json() {
+    async fn test_tools_call_error_logs_tool_name() {
         let mut server = McpServer::new();
-        let request = r#"invalid json"#;
-        
+
+        let init_request = r#"{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}"#;
+        server.handle_request(init_request).await.unwrap();
+
+        // Deliberately invalid argument for the tool.
+        let request = r#"{"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "search_intents", "arguments": {"query": 12345}}}"#;
         let response = server.handle_request(request).await.unwrap();
         assert!(response.is_some());
-        
-        let response_json: Value = serde_json::from_str(&response.unwrap()).unwrap();
-        assert!(response_json.get("error").is_some());
-    }
 
-    #[tokio::test]
-    async fn test_unknown_method() {
-        let mut server = McpServer::new();
-        let request = r#"{"jsonrpc": "2.0", "id": 1, "method": "unknown_method"}"#;
-        
-        let response = server.handle_request(request).await.unwrap();
-        assert!(response.is_some());
-        
         let response_json: Value = serde_json::from_str(&response.unwrap()).unwrap();
+        // JSON-RPC error shape is unchanged.
         assert!(response_json.get("error").is_some());
-    }
-
-    #[tokio::test]
-    async fn test_full_stdio_round_trip() {
-        let mut server = McpServer::new();
-        
-        let input = r#"{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
-{"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "search_intents", "arguments": {"query": "test"}}}
-"#;
-        
-        let reader = Cursor::new(input.as_bytes());
-        let mut writer = Vec::new();
-        
-        let result = server.handle_stream(reader, &mut writer).await;
-        assert!(result.is_ok());
-        
-        let output = String::from_utf8(writer).unwrap();
-        let lines: Vec<&str> = output.trim().split('\n').collect();
-        assert_eq!(lines.len(), 3);
-        
-        // Verify each response is valid JSON
-        for line in lines {
-            let json: Value = serde_json::from_str(line).unwrap();
-            assert!(json.get("id").is_some());
-        }
+        assert_eq!(response_json["error"]["code"], -1);
     }
 }

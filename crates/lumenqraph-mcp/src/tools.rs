@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use tracing::{Instrument, error};
 
 #[derive(Debug)]
 pub struct McpTool {
@@ -70,11 +71,34 @@ impl ToolRegistry {
     }
 
     pub async fn call_tool(&self, name: &str, arguments: Value) -> Result<Value, ToolError> {
-        match name {
-            "search_intents" => self.search_intents(arguments).await,
-            "get_solver_stats" => self.get_solver_stats(arguments).await,
-            _ => Err(ToolError::UnknownTool(name.to_string())),
+        // Redacted argument summary: keys only, never values.
+        let arg_keys = argument_keys(&arguments);
+        let span = tracing::info_span!(
+            "mcp_tool_call",
+            tool.name = %name,
+            tool.arg_keys = %arg_keys,
+        );
+
+        let result = async {
+            match name {
+                "search_intents" => self.search_intents(arguments).await,
+                "get_solver_stats" => self.get_solver_stats(arguments).await,
+                _ => Err(ToolError::UnknownTool(name.to_string())),
+            }
         }
+        .instrument(span)
+        .await;
+
+        if let Err(err) = &result {
+            error!(
+                tool.name = %name,
+                tool.arg_keys = %arg_keys,
+                error = %err,
+                "MCP tool call failed"
+            );
+        }
+
+        result
     }
 
     async fn search_intents(&self, arguments: Value) -> Result<Value, ToolError> {
@@ -107,6 +131,19 @@ impl ToolRegistry {
             "success_rate": 0.0,
             "uptime": "0s"
         }))
+    }
+}
+
+/// Build a redacted, comma-separated summary of the argument keys.
+/// Values are intentionally omitted so secrets are never logged.
+fn argument_keys(arguments: &Value) -> String {
+    match arguments.as_object() {
+        Some(map) => {
+            let mut keys: Vec<&str> = map.keys().map(|k| k.as_str()).collect();
+            keys.sort_unstable();
+            keys.join(",")
+        }
+        None => String::new(),
     }
 }
 
@@ -196,5 +233,63 @@ mod tests {
             ToolError::MissingArgument(arg) => assert_eq!(arg, "query"),
             _ => panic!("Expected MissingArgument error"),
         }
+    }
+
+    #[test]
+    fn test_argument_keys_redacts_values() {
+        let args = json!({
+            "query": "secret-value",
+            "limit": 5
+        });
+        let keys = argument_keys(&args);
+        assert_eq!(keys, "limit,query");
+        assert!(!keys.contains("secret-value"));
+    }
+
+    #[tokio::test]
+    async fn test_failed_call_logs_tool_name() {
+        use std::sync::{Arc, Mutex};
+        use tracing::subscriber::with_default;
+        use tracing_subscriber::fmt::MakeWriter;
+
+        #[derive(Clone, Default)]
+        struct Captured(Arc<Mutex<Vec<u8>>>);
+
+        impl std::io::Write for Captured {
+            fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(buf);
+                Ok(buf.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        impl<'a> MakeWriter<'a> for Captured {
+            type Writer = Captured;
+            fn make_writer(&'a self) -> Self::Writer {
+                self.clone()
+            }
+        }
+
+        let captured = Captured::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(captured.clone())
+            .with_max_level(tracing::Level::ERROR)
+            .finish();
+
+        let registry = ToolRegistry::new();
+        // Deliberately invalid argument: missing required "query".
+        let args = json!({ "limit": 5 });
+
+        let result = with_default(subscriber, || {
+            futures::executor::block_on(registry.call_tool("search_intents", args))
+        });
+
+        assert!(result.is_err());
+
+        let logs = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        assert!(logs.contains("search_intents"), "log missing tool name: {logs}");
+        assert!(logs.contains("limit"), "log missing arg keys: {logs}");
     }
 }
