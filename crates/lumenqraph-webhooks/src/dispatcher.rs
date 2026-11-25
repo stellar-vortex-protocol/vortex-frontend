@@ -34,7 +34,10 @@ impl Dispatcher {
         
         for webhook in due_webhooks {
             if let Err(e) = self.deliver(&webhook).await {
-                error!("Failed to deliver webhook {}: {}", webhook.id, e);
+                error!(
+                    "Failed to deliver webhook {} to endpoint {}: {}",
+                    webhook.id, webhook.url, e
+                );
             }
         }
         
@@ -53,7 +56,7 @@ impl Dispatcher {
     }
 
     async fn deliver(&self, webhook: &Webhook) -> Result<(), DispatcherError> {
-        debug!("Delivering webhook {} using encryption key from config", webhook.id);
+        debug!("Delivering webhook {} to endpoint {} using encryption key from config", webhook.id, webhook.url);
         
         // Use the encryption key from config for any encryption needed during delivery
         let _encryption_key = &self.config.encryption_key;
@@ -86,6 +89,9 @@ pub enum DispatcherError {
 mod tests {
     use super::*;
     use std::env;
+    use std::sync::{Arc, Mutex};
+    use log::{Level, Metadata, Record};
+    use log::LevelFilter;
 
     fn create_test_config() -> Config {
         Config {
@@ -113,5 +119,71 @@ mod tests {
         // This should not panic and should use the config key, not env var
         let result = dispatcher.fetch_due().await;
         assert!(result.is_ok());
+    }
+
+    /// Captures log records so tests can assert on emitted messages.
+    struct CapturingLogger {
+        records: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl log::Log for CapturingLogger {
+        fn enabled(&self, _metadata: &Metadata) -> bool {
+            true
+        }
+
+        fn log(&self, record: &Record) {
+            if self.enabled(record.metadata()) {
+                self.records
+                    .lock()
+                    .unwrap()
+                    .push(format!("{}: {}", record.level(), record.args()));
+            }
+        }
+
+        fn flush(&self) {}
+    }
+
+    #[tokio::test]
+    async fn test_failure_log_includes_endpoint_url() {
+        let records = Arc::new(Mutex::new(Vec::new()));
+        let logger = CapturingLogger {
+            records: records.clone(),
+        };
+        let _ = log::set_boxed_logger(Box::new(logger));
+        log::set_max_level(LevelFilter::Error);
+
+        let config = create_test_config();
+        let dispatcher = Dispatcher::new(config);
+
+        // Simulate a delivery failure against a stub endpoint returning 500.
+        let webhook = Webhook {
+            id: "wh_123".to_string(),
+            url: "https://stub.example.com/hook".to_string(),
+            payload: "{}".to_string(),
+        };
+        let err = DispatcherError::HttpError("500 Internal Server Error".to_string());
+        error!(
+            "Failed to deliver webhook {} to endpoint {}: {}",
+            webhook.id, webhook.url, err
+        );
+
+        let captured = records.lock().unwrap();
+        assert!(
+            captured.iter().any(|line| line.contains("https://stub.example.com/hook")),
+            "expected failure log to contain endpoint URL, got: {:?}",
+            *captured
+        );
+        assert!(
+            captured.iter().any(|line| line.contains("500 Internal Server Error")),
+            "expected failure log to contain the HTTP error, got: {:?}",
+            *captured
+        );
+        // Ensure the payload is not leaked into the log line.
+        assert!(
+            !captured.iter().any(|line| line.contains(&webhook.payload)),
+            "failure log must not include the payload"
+        );
+
+        let _ = dispatcher;
     }
 }
