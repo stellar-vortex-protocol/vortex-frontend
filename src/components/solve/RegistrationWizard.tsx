@@ -134,8 +134,15 @@ function EligibilityStep({
 const inputClass =
   "w-full bg-vx-surface border border-vx-border rounded-lg px-3 py-2.5 text-sm text-vx-text placeholder-vx-dim/60 focus:outline-none focus:ring-2 focus:ring-vx-sage focus:border-vx-sage/50 transition-colors";
 
+/**
+ * #888: when a field has an error it must point at it with `aria-describedby`,
+ * not only at its help text. `role="alert"` announces the message as it
+ * appears; the association is what a screen reader reads back when the field
+ * is focused again afterwards, which is the part that was missing.
+ */
 function VerifyStep({ state, walletAddress, error, onChange }: { state: WizardState; walletAddress: string | null; error: string | null; onChange: (v: string) => void }) {
   const { t } = useTranslation();
+  const showError = Boolean(state.address && error);
   return (
     <div className="space-y-3">
       <label htmlFor="solver-address" className="eyebrow block text-xs">{t("solve.register.addressLabel")}</label>
@@ -146,7 +153,7 @@ function VerifyStep({ state, walletAddress, error, onChange }: { state: WizardSt
         onChange={(e) => onChange(e.target.value)}
         placeholder={t("solve.register.addressPlaceholder")}
         aria-invalid={Boolean(state.address && error)}
-        aria-describedby="solver-address-help"
+        aria-describedby={showError ? "solver-address-error solver-address-help" : "solver-address-help"}
         className={inputClass}
       />
       <p id="solver-address-help" className="text-[11px] text-vx-muted">{t("solve.wizard.verifyHelp")}</p>
@@ -155,13 +162,14 @@ function VerifyStep({ state, walletAddress, error, onChange }: { state: WizardSt
           {t("solve.wizard.useConnected")}
         </button>
       )}
-      {state.address && error && <p role="alert" className="text-xs text-red-400">{error}</p>}
+      {showError && <p id="solver-address-error" role="alert" className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }
 
 function BondStep({ state, error, onChange }: { state: WizardState; error: string | null; onChange: (v: string) => void }) {
   const { t } = useTranslation();
+  const showError = Boolean(state.bond && error);
   const min = minBondUnits();
   const units = parseAmount(state.bond);
   return (
@@ -176,10 +184,10 @@ function BondStep({ state, error, onChange }: { state: WizardState; error: strin
           onChange={(e) => onChange(e.target.value)}
           placeholder={t("solve.register.bondPlaceholder")}
           aria-invalid={Boolean(state.bond && error)}
-          aria-describedby="solver-bond-calc"
+          aria-describedby={showError ? "solver-bond-error solver-bond-calc" : "solver-bond-calc"}
           className={inputClass}
         />
-        {state.bond && error && <p role="alert" className="text-xs text-red-400 mt-1.5">{error}</p>}
+        {showError && <p id="solver-bond-error" role="alert" className="text-xs text-red-400 mt-1.5">{error}</p>}
       </div>
       <div role="group" aria-label={t("solve.wizard.suggested")} className="flex flex-wrap gap-2">
         {suggestedBonds(min).map((amount) => (
