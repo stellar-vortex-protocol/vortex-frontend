@@ -51,3 +51,13 @@ export function registerCommand(command: CommandDefinition): () => void {
 export function useRegisterCommands(commands: CommandDefinition[]): void {
   useEffect(() => useCommandRegistry.getState().register(commands), [commands]);
 }
+
+/** Returns true when a command id is currently present in the registry. */
+export function isCommandRegistered(id: string): boolean {
+  return id in useCommandRegistry.getState().commands;
+}
+
+/** Returns the set of command ids currently present in the registry. */
+export function getRegisteredCommandIds(): Set<string> {
+  return new Set(Object.keys(useCommandRegistry.getState().commands));
+}
