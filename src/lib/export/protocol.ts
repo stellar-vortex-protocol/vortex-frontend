@@ -11,4 +11,10 @@ export type ExportResponse =
   | { type: "progress"; jobId: string; done: number; total: number }
   | { type: "complete"; jobId: string; parts: string[] }
   | { type: "cancelled"; jobId: string }
-  | { type: "error"; jobId: string; message: string };
+  | ExportErrorMessage;
+
+/**
+ * Terminal failure message. The worker posts this before terminating so the
+ * main thread can reject instead of resolving with partial output.
+ */
+export type ExportErrorMessage = { type: "error"; jobId: string; message: string };

@@ -2,6 +2,7 @@ import type { FeedItem } from "@/lib/types";
 import type { ExportRequest, ExportResponse } from "./protocol";
 import { handleExportMessage } from "./runner";
 import type { ExportOptions } from "./serialize";
+import { secureLogger } from "@/lib/secureLogging";
 
 export type ExportJob = { promise: Promise<Blob | null>; cancel: () => void };
 
@@ -47,7 +48,12 @@ export function startExport(
     if (msg.type === "progress") onProgress(msg.done, msg.total);
     else if (msg.type === "complete") settle(new Blob(msg.parts, { type }));
     else if (msg.type === "cancelled") settle(null);
-    else fail(new Error(msg.message));
+    else {
+      // Report per docs/error-monitoring.md: failures surface as a rejected
+      // promise and are logged with the job id, never as partial output.
+      secureLogger.error("Export job failed", { jobId, message: msg.message });
+      fail(new Error(msg.message));
+    }
     if (msg.type !== "progress") worker?.terminate();
   };
 

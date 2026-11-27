@@ -12,6 +12,11 @@ describe("fuzzyMatch", () => {
   it("scores prefixes above scattered matches", () => {
     expect(fuzzyMatch("con", "Connect")!.score).toBeGreaterThan(fuzzyMatch("con", "Reconnect")!.score);
   });
+
+  it("returns no match for empty or whitespace-only queries", () => {
+    expect(fuzzyMatch("", "Connect wallet")).toBeNull();
+    expect(fuzzyMatch("   ", "Connect wallet")).toBeNull();
+  });
 });
 
 describe("rankByQuery", () => {
@@ -30,6 +35,21 @@ describe("rankByQuery", () => {
     const [hit] = rankByQuery(items, "idioma", (i) => i.title, (i) => i.keywords);
     expect(hit?.item.title).toBe("Switch language");
     expect(hit?.indices).toEqual([]);
+  });
+
+  it("returns no matches for empty or whitespace-only queries", () => {
+    expect(rankByQuery(items, "", (i) => i.title, (i) => i.keywords)).toEqual([]);
+    expect(rankByQuery(items, "  ", (i) => i.title, (i) => i.keywords)).toEqual([]);
+  });
+
+  it("still ranks governance commands for a non-empty query", () => {
+    const commands = [
+      { title: "Open governance" },
+      { title: "Connect wallet" },
+      { title: "Governance archive" },
+    ];
+    const ranked = rankByQuery(commands, "gov", (i) => i.title);
+    expect(ranked.map((r) => r.item.title)).toEqual(["Open governance", "Governance archive"]);
   });
 });
 

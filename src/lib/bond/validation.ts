@@ -15,6 +15,8 @@ export type BondAmountCheck = {
 export function checkBondAmount(kind: BondOperationKind, input: string, state: BondState): BondAmountCheck {
   const amount = parseAmount(input);
   if (amount === null) return { error: "invalid", dropsBelowMinimum: false };
+  // Reject NaN, Infinity and -Infinity before any range comparison.
+  if (!Number.isFinite(Number(amount))) return { error: "invalid", dropsBelowMinimum: false };
   if (amount === ZERO) return { error: "zero", dropsBelowMinimum: false };
   if (kind === "top-up") {
     return { error: amount > (parseAmount(MAX_TOP_UP) ?? ZERO) ? "tooLarge" : null, dropsBelowMinimum: false };
